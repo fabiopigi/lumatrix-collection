@@ -3,12 +3,13 @@ import select
 from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
+import screens
 
 NAME = "LetterDisplay"
 NUM_LEDS = 64
+IDLE_MS = 10_000
 
 np = None
-JOY_CENTER = None
 
 MASK = {
     "a": [57, 51, 40, 42, 35],
@@ -33,7 +34,7 @@ MASK = {
     "z": [56],
 }
 
-CURSOR = {ch: 0 for ch in MASK}
+CURSOR = {}
 
 FONT = {
     "A": [".XXX.","X...X","X...X","XXXXX","X...X","X...X","X...X"],
@@ -63,27 +64,6 @@ FONT = {
     "Y": ["X...X","X...X",".X.X.","..X..","..X..","..X..","..X.."],
     "Z": ["XXXXX","....X","...X.","..X..",".X...","X....","XXXXX"],
 }
-
-
-_exit_press_start = None
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return False
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
 
 
 def letter_color(ch):
@@ -149,7 +129,8 @@ def render_faded(active, scale):
     np.write()
 
 
-def loop():
+def show_letters():
+    """Letter loop. Returns 'exit' on hold-center or Ctrl-C, 'idle' after 10 s no input."""
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
 
@@ -165,12 +146,13 @@ def loop():
     np.write()
 
     while True:
-        if check_exit():
-            return
+        if screens.check_exit():
+            return "exit"
+
         if poll.poll(0):
             ch = sys.stdin.read(1)
             if ch in ("\x03", "\x04"):
-                return
+                return "exit"
             new_active = pixels_for_char(ch)
             if new_active:
                 active = new_active
@@ -178,8 +160,8 @@ def loop():
                 last_input = ticks_ms()
                 fading = False
         else:
+            now = ticks_ms()
             if active:
-                now = ticks_ms()
                 if not fading:
                     if ticks_diff(now, last_input) >= HOLD_MS:
                         fading = True
@@ -193,14 +175,24 @@ def loop():
                         fading = False
                     else:
                         render_faded(active, 1.0 - elapsed / FADE_MS)
+            elif ticks_diff(now, last_input) >= IDLE_MS:
+                return "idle"
             sleep_ms(15)
 
 
 def run(neopixel, joystick):
-    global np, JOY_CENTER
+    global np, CURSOR
     np = neopixel
-    JOY_CENTER = joystick["center"]
-    loop()
+    CURSOR = {ch: 0 for ch in MASK}
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        outcome = show_letters()
+        if outcome == "exit":
+            return
+        if screens.end_screen() == "exit":
+            return
 
 
 if __name__ == "__main__":
@@ -211,5 +203,6 @@ if __name__ == "__main__":
         "left":   Pin(7, Pin.IN),
         "right":  Pin(2, Pin.IN),
         "center": Pin(8, Pin.IN),
+        "slide":  Pin(9, Pin.IN),
     }
     run(_np, _joy)

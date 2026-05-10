@@ -2,13 +2,13 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import random
+import screens
 
 NAME = "ArrowReaction"
 NUM_LEDS = 64
 
 np = None
 PINS = {}
-JOY_CENTER = None
 
 DIRS = ("up", "down", "left", "right")
 
@@ -27,9 +27,6 @@ BAR_GREEN = (0, 45, 0)
 BAR_AMBER = (45, 25, 0)
 BAR_RED   = (55, 0, 0)
 HIT_GREEN = (0, 60, 0)
-BOOM_RED  = (60, 0, 0)
-SCORE_COL = (50, 30, 0)
-GAMEOVER_COL = (55, 0, 0)
 
 ARROWS = {
     "up": [
@@ -69,27 +66,6 @@ ARROWS = {
 }
 
 
-_exit_press_start = None
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return False
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
-
-
 def clear():
     for i in range(NUM_LEDS):
         np[i] = (0, 0, 0)
@@ -124,11 +100,6 @@ def read_joystick():
     return None
 
 
-def wait_release():
-    while read_joystick() is not None:
-        sleep_ms(10)
-
-
 def play_round(duration_ms, arrow_color):
     direction = random.choice(DIRS)
     clear()
@@ -139,7 +110,7 @@ def play_round(duration_ms, arrow_color):
 
     start = ticks_ms()
     while True:
-        if check_exit():
+        if screens.check_exit():
             return ("exit", 0, direction)
         elapsed = ticks_diff(ticks_ms(), start)
         new_bar = 8 - (elapsed * 8) // duration_ms
@@ -170,136 +141,6 @@ def flash_hit(direction):
         sleep_ms(50)
 
 
-def game_over_animation():
-    frames = []
-
-    f = []
-    for c, r in ((3,3),(4,3),(3,4),(4,4)):
-        f.append((c, r))
-    frames.append(f)
-
-    f = list(frames[-1])
-    for c, r in ((3,2),(4,2),(3,5),(4,5),(2,3),(2,4),(5,3),(5,4)):
-        f.append((c, r))
-    frames.append(f)
-
-    f = []
-    for i in range(8):
-        f.append((3, i)); f.append((4, i))
-        f.append((i, 3)); f.append((i, 4))
-    frames.append(f)
-
-    f = []
-    for i in range(8):
-        f.append((i, i))
-        f.append((i, 7 - i))
-    frames.append(f)
-
-    f = list(frames[-1])
-    for i in range(7):
-        f.append((i, i + 1)); f.append((i + 1, i))
-        f.append((i, 6 - i)); f.append((i + 1, 7 - i))
-    frames.append(f)
-
-    for frame in frames:
-        clear()
-        for c, r in frame:
-            px(c, r, BOOM_RED)
-        np.write()
-        sleep_ms(110)
-
-    for i in range(NUM_LEDS):
-        np[i] = BOOM_RED
-    np.write()
-    sleep_ms(180)
-
-    for b in (45, 30, 18, 8, 0):
-        for i in range(NUM_LEDS):
-            np[i] = (b, 0, 0)
-        np.write()
-        sleep_ms(70)
-    clear()
-    np.write()
-
-
-FONT = {
-    "0": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "1": ["..X..",".XX..","..X..","..X..","..X..","..X..","XXXXX"],
-    "2": [".XXX.","X...X","....X","...X.","..X..",".X...","XXXXX"],
-    "3": ["XXXX.","....X","....X",".XXX.","....X","....X","XXXX."],
-    "4": ["X...X","X...X","X...X","XXXXX","....X","....X","....X"],
-    "5": ["XXXXX","X....","X....","XXXX.","....X","X...X",".XXX."],
-    "6": [".XXX.","X....","X....","XXXX.","X...X","X...X",".XXX."],
-    "7": ["XXXXX","....X","...X.","..X..","..X..","..X..","..X.."],
-    "8": [".XXX.","X...X","X...X",".XXX.","X...X","X...X",".XXX."],
-    "9": [".XXX.","X...X","X...X",".XXXX","....X","....X",".XXX."],
-    " ": [".....",".....",".....",".....",".....",".....","....."],
-    ":": [".....","..X..","..X..",".....","..X..","..X..","....."],
-    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
-    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
-    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
-    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
-    "G": [".XXXX","X....","X....","X..XX","X...X","X...X",".XXX."],
-    "A": [".XXX.","X...X","X...X","XXXXX","X...X","X...X","X...X"],
-    "M": ["X...X","XX.XX","X.X.X","X...X","X...X","X...X","X...X"],
-    "V": ["X...X","X...X","X...X","X...X","X...X",".X.X.","..X.."],
-}
-
-
-def text_to_bitmap(text):
-    rows = ["", "", "", "", "", "", ""]
-    for ch in text:
-        glyph = FONT.get(ch, FONT[" "])
-        for i, line in enumerate(glyph):
-            rows[i] += line + "."
-    return rows
-
-
-def marquee(text, color, step_ms=80):
-    bitmap = text_to_bitmap(text)
-    total = len(bitmap[0])
-    for offset in range(-8, total + 1):
-        if check_exit():
-            return True
-        clear()
-        for i in range(7):
-            for j in range(8):
-                src = offset + j
-                if 0 <= src < total and bitmap[i][src] == "X":
-                    px(j, 7 - i, color)
-        np.write()
-        t0 = ticks_ms()
-        while ticks_diff(ticks_ms(), t0) < step_ms:
-            if check_exit():
-                return True
-            sleep_ms(10)
-    return False
-
-
-def pulse_until_press():
-    """Return 'press' on direction press, 'exit' on hold-center exit."""
-    while True:
-        for b in range(0, 35, 4):
-            if check_exit():
-                return "exit"
-            if read_joystick() is not None:
-                return "press"
-            for c, r in ((3,3),(4,3),(3,4),(4,4)):
-                px(c, r, (0, b, b))
-            np.write()
-            sleep_ms(35)
-        for b in range(35, -1, -4):
-            if check_exit():
-                return "exit"
-            if read_joystick() is not None:
-                return "press"
-            for c, r in ((3,3),(4,3),(3,4),(4,4)):
-                px(c, r, (0, b, b))
-            np.write()
-            sleep_ms(35)
-
-
 def pick_arrow_color(prev):
     while True:
         c = random.choice(ARROW_PALETTE)
@@ -307,14 +148,8 @@ def pick_arrow_color(prev):
             return c
 
 
-def game():
-    """Run one session. Returns when game ends or user holds center to exit."""
-    clear()
-    np.write()
-    if pulse_until_press() == "exit":
-        return
-    wait_release()
-
+def play_one_game():
+    """Returns final score, or None if exit triggered mid-play."""
     score = 0
     duration = 1800
     prev_color = None
@@ -326,26 +161,18 @@ def game():
         prev_color = color
         result, gained, direction = play_round(duration, color)
         if result == "exit":
-            return
+            return None
         if result == "hit":
             score += gained
             flash_hit(direction)
             if duration > 600:
                 duration -= 60
         else:
-            game_over_animation()
-            sleep_ms(250)
-            if marquee("GAME OVER", GAMEOVER_COL):
-                return
-            sleep_ms(200)
-            if marquee("SCORE: " + str(score), SCORE_COL):
-                return
-            sleep_ms(400)
-            return
+            return score
 
 
 def run(neopixel, joystick):
-    global np, PINS, JOY_CENTER
+    global np, PINS
     np = neopixel
     PINS = {
         "up":    joystick["up"],
@@ -353,8 +180,15 @@ def run(neopixel, joystick):
         "left":  joystick["left"],
         "right": joystick["right"],
     }
-    JOY_CENTER = joystick["center"]
-    game()
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        score = play_one_game()
+        if score is None:
+            return
+        if screens.game_over_screen(score) == "exit":
+            return
 
 
 if __name__ == "__main__":
@@ -365,6 +199,6 @@ if __name__ == "__main__":
         "left":   Pin(7, Pin.IN),
         "right":  Pin(2, Pin.IN),
         "center": Pin(8, Pin.IN),
+        "slide":  Pin(9, Pin.IN),
     }
-    while True:
-        run(_np, _joy)
+    run(_np, _joy)

@@ -2,6 +2,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import random
+import screens
 
 NAME = "Snake"
 NUM_LEDS = 64
@@ -11,71 +12,16 @@ JOY_UP = None
 JOY_DOWN = None
 JOY_LEFT = None
 JOY_RIGHT = None
-JOY_CENTER = None
 
 BODY_COLOR = (0, 40, 5)
 HEAD_COLOR = (25, 55, 30)
 FOOD_COLOR = (55, 15, 0)
-SCORE_COL    = (50, 30, 0)
-GAMEOVER_COL = (60, 0, 0)
-WIN_COLOR    = (0, 55, 10)
+WIN_COLOR  = (0, 55, 10)
 
 FRAME_MS = 50
 START_INTERVAL = 6
 MIN_INTERVAL = 2
 SPEEDUP_EVERY = 5
-
-_exit_press_start = None
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return False
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
-
-
-def gameover_input():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return None
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return "hold"
-    else:
-        if _exit_press_start is not None:
-            _exit_press_start = None
-            return "tap"
-    return None
-
-
-def _gameover_wait(ms):
-    t0 = ticks_ms()
-    while ticks_diff(ticks_ms(), t0) < ms:
-        r = gameover_input()
-        if r == "tap":
-            return "restart"
-        if r == "hold":
-            return "exit"
-        sleep_ms(15)
-    return None
 
 
 def clear():
@@ -117,113 +63,19 @@ def move_interval(score):
     return max(MIN_INTERVAL, START_INTERVAL - score // SPEEDUP_EVERY)
 
 
-FONT = {
-    "0": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "1": ["..X..",".XX..","..X..","..X..","..X..","..X..","XXXXX"],
-    "2": [".XXX.","X...X","....X","...X.","..X..",".X...","XXXXX"],
-    "3": ["XXXX.","....X","....X",".XXX.","....X","....X","XXXX."],
-    "4": ["X...X","X...X","X...X","XXXXX","....X","....X","....X"],
-    "5": ["XXXXX","X....","X....","XXXX.","....X","X...X",".XXX."],
-    "6": [".XXX.","X....","X....","XXXX.","X...X","X...X",".XXX."],
-    "7": ["XXXXX","....X","...X.","..X..","..X..","..X..","..X.."],
-    "8": [".XXX.","X...X","X...X",".XXX.","X...X","X...X",".XXX."],
-    "9": [".XXX.","X...X","X...X",".XXXX","....X","....X",".XXX."],
-    " ": [".....",".....",".....",".....",".....",".....","....."],
-    ":": [".....","..X..","..X..",".....","..X..","..X..","....."],
-    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
-    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
-    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
-    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
-    "W": ["X...X","X...X","X...X","X.X.X","X.X.X","XX.XX",".X.X."],
-    "I": ["XXXXX","..X..","..X..","..X..","..X..","..X..","XXXXX"],
-    "N": ["X...X","XX..X","X.X.X","X.X.X","X.X.X","X..XX","X...X"],
-}
-
-
-def text_to_bitmap(text):
-    rows = ["", "", "", "", "", "", ""]
-    for ch in text:
-        glyph = FONT.get(ch, FONT[" "])
-        for i, line in enumerate(glyph):
-            rows[i] += line + "."
-    return rows
-
-
-def gameover_marquee(text, color, step_ms=70):
-    bitmap = text_to_bitmap(text)
-    total = len(bitmap[0])
-    for offset in range(-8, total + 1):
-        clear()
-        for i in range(7):
-            for j in range(8):
-                src = offset + j
-                if 0 <= src < total and bitmap[i][src] == "X":
-                    px(j, 7 - i, color)
-        np.write()
-        r = _gameover_wait(step_ms)
-        if r:
-            return r
-    return None
-
-
-def game_over_sequence(score):
-    for _ in range(3):
-        for i in range(NUM_LEDS):
-            np[i] = GAMEOVER_COL
-        np.write()
-        r = _gameover_wait(120)
-        if r:
-            return r
-        clear()
-        np.write()
-        r = _gameover_wait(80)
-        if r:
-            return r
-    for b in (50, 30, 15, 5, 0):
-        for i in range(NUM_LEDS):
-            np[i] = (b, 0, 0)
-        np.write()
-        r = _gameover_wait(70)
-        if r:
-            return r
-    clear()
-    np.write()
-    r = _gameover_wait(200)
-    if r:
-        return r
-    r = gameover_marquee("SCORE: " + str(score), SCORE_COL)
-    if r:
-        return r
-    r = _gameover_wait(300)
-    if r:
-        return r
-    return "exit"
-
-
-def win_sequence(score):
+def win_flash():
     for _ in range(5):
         for i in range(NUM_LEDS):
             np[i] = WIN_COLOR
         np.write()
-        r = _gameover_wait(90)
-        if r:
-            return r
+        sleep_ms(90)
         clear()
         np.write()
-        r = _gameover_wait(70)
-        if r:
-            return r
-    r = gameover_marquee("WIN " + str(score), WIN_COLOR)
-    if r:
-        return r
-    r = _gameover_wait(300)
-    if r:
-        return r
-    return "exit"
+        sleep_ms(70)
 
 
-def play_one_round():
+def play_one_game():
+    """Returns final score, or None if exit triggered mid-play."""
     snake = [(3, 4), (4, 4), (5, 4)]
     snake_set = set(snake)
     food = spawn_food(snake_set)
@@ -234,8 +86,8 @@ def play_one_round():
     move_timer = 0
 
     while True:
-        if check_exit():
-            return "exit"
+        if screens.check_exit():
+            return None
 
         inp = read_dir()
         if inp is not None:
@@ -270,7 +122,7 @@ def play_one_round():
 
                 if collision:
                     render(snake, food)
-                    return game_over_sequence(score)
+                    return score
 
                 snake.append(new_head)
                 snake_set.add(new_head)
@@ -282,28 +134,29 @@ def play_one_round():
                     food = spawn_food(snake_set)
                     if food is None:
                         render(snake, food)
-                        return win_sequence(score)
+                        win_flash()
+                        return score
 
         render(snake, food)
         sleep_ms(FRAME_MS)
 
 
-def play():
-    while True:
-        if play_one_round() == "exit":
-            return
-
-
 def run(neopixel, joystick):
-    global np, JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_CENTER, _exit_press_start
+    global np, JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT
     np = neopixel
     JOY_UP = joystick["up"]
     JOY_DOWN = joystick["down"]
     JOY_LEFT = joystick["left"]
     JOY_RIGHT = joystick["right"]
-    JOY_CENTER = joystick["center"]
-    _exit_press_start = None
-    play()
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        score = play_one_game()
+        if score is None:
+            return
+        if screens.game_over_screen(score) == "exit":
+            return
 
 
 if __name__ == "__main__":
@@ -316,5 +169,4 @@ if __name__ == "__main__":
         "center": Pin(8, Pin.IN),
         "slide":  Pin(9, Pin.IN),
     }
-    while True:
-        run(_np, _joy)
+    run(_np, _joy)

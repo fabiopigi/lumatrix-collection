@@ -3,11 +3,12 @@ from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import math
 import random
+import screens
 
 NAME = "Doom"
 NUM_LEDS = 64
+IDLE_MS = 10_000
 
-# Hardware (set in run())
 np = None
 JOY_UP = None
 JOY_DOWN = None
@@ -15,39 +16,17 @@ JOY_LEFT = None
 JOY_RIGHT = None
 JOY_SEL = None
 
-# Constants
 MAP_SIZE = 10
 FOV = math.pi / 3
 BRIGHTNESS = 0.15
 MAX_DIST = 8.0
 
-# Game State
 px, py, pa = 1.5, 1.5, 0.0
 world_map = [[1 for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
 z_buffer = [MAX_DIST] * 8
 enemies = []
-projectiles = []  # Each: [x, y, angle]
+projectiles = []
 frame_buffer = [[0.0, 0.0, 0.0] for _ in range(NUM_LEDS)]
-
-_exit_press_start = None
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_SEL is None:
-        return False
-    if JOY_SEL.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_SEL.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
 
 
 def generate_map():
@@ -69,10 +48,6 @@ def generate_map():
             enemies.append([ex + 0.5, ey + 0.5, 1, 0])
 
 
-# ==========================================
-# RENDERING ENGINE
-# ==========================================
-
 def clear_buffer():
     for i in range(NUM_LEDS):
         frame_buffer[i][0] = 0.0
@@ -90,7 +65,6 @@ def show_buffer():
 
 
 def draw_sprite(x_pos, y_pos, dist, size, color):
-    """Generic 3D sprite drawer for enemies and projectiles"""
     half_s = size / 2.0
     start_x = int(x_pos - half_s + 0.5)
     end_x = int(x_pos + half_s + 0.5)
@@ -109,7 +83,6 @@ def draw_sprite(x_pos, y_pos, dist, size, color):
 
 def render_world():
     global z_buffer
-    # 1. Cast Rays for Walls
     for i in range(8):
         ray_angle = (pa - FOV / 2.0) + (i / 8.0) * FOV
         rx, ry, d = px, py, 0.0
@@ -126,7 +99,6 @@ def render_world():
         for y in range(start_y, start_y + height):
             frame_buffer[y * 8 + i] = [200 * nz, 50 * nz ** 2, 255 * (1 - nz)]
 
-    # 2. Draw Enemies
     t = ticks_ms()
     for e in enemies:
         dx, dy = e[0] - px, e[1] - py
@@ -142,7 +114,6 @@ def render_world():
             if e[3] > 0: e[3] -= 1
             draw_sprite(sx, 3.5, dist, size, color)
 
-    # 3. Draw Projectiles
     for p in projectiles:
         dx, dy = p[0] - px, p[1] - py
         dist = math.sqrt(dx * dx + dy * dy)
@@ -155,10 +126,6 @@ def render_world():
             size = max(1.0, 6.0 - (dist * 4.0))
             draw_sprite(sx, 4.0, dist, size, [255, 255, 100])
 
-
-# ==========================================
-# GAME LOGIC
-# ==========================================
 
 def update_game():
     global projectiles, enemies
@@ -186,33 +153,48 @@ def update_game():
     enemies = [e for e in enemies if e[2] > 0]
 
 
-def play():
+def play_doom():
+    """Run a doom session. Returns 'exit' or 'idle'."""
     global px, py, pa, projectiles
-
     projectiles = []
     pa = 0.0
     generate_map()
 
-    while True:
-        if check_exit():
-            return
+    last_activity = ticks_ms()
 
-        if JOY_LEFT.value() == 0: pa -= 0.15
-        if JOY_RIGHT.value() == 0: pa += 0.15
+    while True:
+        if screens.check_exit():
+            return "exit"
+
+        active = False
+        if JOY_LEFT.value() == 0:
+            pa -= 0.15
+            active = True
+        if JOY_RIGHT.value() == 0:
+            pa += 0.15
+            active = True
 
         nx, ny = px, py
         if JOY_UP.value() == 0:
             nx += math.cos(pa) * 0.15
             ny += math.sin(pa) * 0.15
+            active = True
         if JOY_DOWN.value() == 0:
             nx -= math.cos(pa) * 0.15
             ny -= math.sin(pa) * 0.15
+            active = True
         if world_map[int(ny)][int(nx)] == 0:
             px, py = nx, ny
 
         if JOY_SEL.value() == 0:
             if len(projectiles) == 0:
                 projectiles.append([px, py, pa])
+            active = True
+
+        if active:
+            last_activity = ticks_ms()
+        elif ticks_diff(ticks_ms(), last_activity) >= IDLE_MS:
+            return "idle"
 
         update_game()
         clear_buffer()
@@ -226,15 +208,22 @@ def play():
 
 
 def run(neopixel, joystick):
-    global np, JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_SEL, _exit_press_start
+    global np, JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_SEL
     np = neopixel
     JOY_UP = joystick["up"]
     JOY_DOWN = joystick["down"]
     JOY_LEFT = joystick["left"]
     JOY_RIGHT = joystick["right"]
     JOY_SEL = joystick["center"]
-    _exit_press_start = None
-    play()
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        outcome = play_doom()
+        if outcome == "exit":
+            return
+        if screens.end_screen() == "exit":
+            return
 
 
 if __name__ == "__main__":

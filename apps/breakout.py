@@ -2,6 +2,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import random
+import screens
 
 NAME = "Breakout"
 NUM_LEDS = 64
@@ -9,16 +10,12 @@ NUM_LEDS = 64
 np = None
 JOY_LEFT = None
 JOY_RIGHT = None
-JOY_CENTER = None
 
 PADDLE_LEN = 3
 PADDLE_COLOR = (0, 40, 50)
 BALL_COLOR   = (50, 50, 50)
-SCORE_COL    = (50, 30, 0)
-GAMEOVER_COL = (60, 0, 0)
 LEVEL_COL    = (0, 50, 30)
 LIFE_COL     = (55, 0, 0)
-READY_COL    = (40, 30, 0)
 
 FRAME_MS = 50
 PADDLE_SPEED = 0.50
@@ -96,58 +93,6 @@ LEVELS = (
     },
 )
 
-_exit_press_start = None
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return False
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
-
-
-def gameover_input():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return None
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return "hold"
-    else:
-        if _exit_press_start is not None:
-            _exit_press_start = None
-            return "tap"
-    return None
-
-
-def _gameover_wait(ms):
-    t0 = ticks_ms()
-    while ticks_diff(ticks_ms(), t0) < ms:
-        r = gameover_input()
-        if r == "tap":
-            return "restart"
-        if r == "hold":
-            return "exit"
-        sleep_ms(15)
-    return None
-
 
 def clear():
     for i in range(NUM_LEDS):
@@ -160,7 +105,6 @@ def px(col, row, color):
 
 
 def parse_level(layout):
-    """layout[0] is row 7 (top), layout[7] is row 0 (bottom)."""
     bricks = {}
     for i, line in enumerate(layout):
         row = 7 - i
@@ -202,106 +146,6 @@ def render(paddle_center, ball_x, ball_y, bricks, ball_visible=True):
     np.write()
 
 
-FONT = {
-    "0": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "1": ["..X..",".XX..","..X..","..X..","..X..","..X..","XXXXX"],
-    "2": [".XXX.","X...X","....X","...X.","..X..",".X...","XXXXX"],
-    "3": ["XXXX.","....X","....X",".XXX.","....X","....X","XXXX."],
-    "4": ["X...X","X...X","X...X","XXXXX","....X","....X","....X"],
-    "5": ["XXXXX","X....","X....","XXXX.","....X","X...X",".XXX."],
-    "6": [".XXX.","X....","X....","XXXX.","X...X","X...X",".XXX."],
-    "7": ["XXXXX","....X","...X.","..X..","..X..","..X..","..X.."],
-    "8": [".XXX.","X...X","X...X",".XXX.","X...X","X...X",".XXX."],
-    "9": [".XXX.","X...X","X...X",".XXXX","....X","....X",".XXX."],
-    " ": [".....",".....",".....",".....",".....",".....","....."],
-    ":": [".....","..X..","..X..",".....","..X..","..X..","....."],
-    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
-    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
-    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
-    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
-}
-
-
-def text_to_bitmap(text):
-    rows = ["", "", "", "", "", "", ""]
-    for ch in text:
-        glyph = FONT.get(ch, FONT[" "])
-        for i, line in enumerate(glyph):
-            rows[i] += line + "."
-    return rows
-
-
-def gameover_marquee(text, color, step_ms=70):
-    bitmap = text_to_bitmap(text)
-    total = len(bitmap[0])
-    for offset in range(-8, total + 1):
-        clear()
-        for i in range(7):
-            for j in range(8):
-                src = offset + j
-                if 0 <= src < total and bitmap[i][src] == "X":
-                    px(j, 7 - i, color)
-        np.write()
-        r = _gameover_wait(step_ms)
-        if r:
-            return r
-    return None
-
-
-def game_over_sequence(score):
-    for _ in range(3):
-        for i in range(NUM_LEDS):
-            np[i] = GAMEOVER_COL
-        np.write()
-        r = _gameover_wait(120)
-        if r:
-            return r
-        clear()
-        np.write()
-        r = _gameover_wait(80)
-        if r:
-            return r
-    for b in (50, 30, 15, 5, 0):
-        for i in range(NUM_LEDS):
-            np[i] = (b, 0, 0)
-        np.write()
-        r = _gameover_wait(70)
-        if r:
-            return r
-    clear()
-    np.write()
-    r = _gameover_wait(200)
-    if r:
-        return r
-    r = gameover_marquee("SCORE: " + str(score), SCORE_COL)
-    if r:
-        return r
-    r = _gameover_wait(300)
-    if r:
-        return r
-    return "exit"
-
-
-def show_digit(digit, color, hold_ms):
-    """Show a single digit centered. Return 'exit' if hold-center triggered, else None."""
-    glyph = FONT.get(str(digit), FONT["0"])
-    clear()
-    for grow in range(7):
-        line = glyph[grow]
-        mrow = 7 - grow
-        for gcol in range(5):
-            if line[gcol] == "X":
-                px(gcol + 1, mrow, color)
-    np.write()
-    t0 = ticks_ms()
-    while ticks_diff(ticks_ms(), t0) < hold_ms:
-        if check_exit():
-            return "exit"
-        sleep_ms(15)
-    return None
-
-
 def cap_speed(vx, vy):
     if vx > MAX_VX: vx = MAX_VX
     elif vx < -MAX_VX: vx = -MAX_VX
@@ -323,11 +167,7 @@ def update_paddle(paddle_center):
 
 
 def play_ball(bricks, base_speed, paddle_center, score):
-    """Returns one of:
-      ('cleared', score, paddle_center)
-      ('lost',    score, paddle_center)
-      ('exit',    score, paddle_center)
-    """
+    """Returns ('cleared'|'lost'|'exit', score, paddle_center)."""
     ball_x = paddle_center
     ball_y = 1.0
     ball_vx = 0.0
@@ -335,7 +175,7 @@ def play_ball(bricks, base_speed, paddle_center, score):
 
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < LAUNCH_HOLD_MS:
-        if check_exit():
+        if screens.check_exit():
             return ("exit", score, paddle_center)
         paddle_center = update_paddle(paddle_center)
         ball_x = paddle_center
@@ -346,7 +186,7 @@ def play_ball(bricks, base_speed, paddle_center, score):
     ball_vx = (random.random() - 0.5) * 0.3
 
     while True:
-        if check_exit():
+        if screens.check_exit():
             return ("exit", score, paddle_center)
 
         paddle_center = update_paddle(paddle_center)
@@ -413,58 +253,59 @@ def level_clear_flash():
         sleep_ms(60)
 
 
-def play_one_round():
+def play_one_game():
+    """Returns final score, or None if exit triggered mid-play."""
     score = 0
     lives = INIT_LIVES
     level_idx = 0
     paddle_center = 4.0
 
     while True:
-        if check_exit():
-            return "exit"
+        if screens.check_exit():
+            return None
 
-        if show_digit(level_idx + 1, LEVEL_COL, 600) == "exit":
-            return "exit"
+        if screens.show_digit_briefly(level_idx + 1, LEVEL_COL, 600) == "exit":
+            return None
 
         bricks = parse_level(LEVELS[level_idx]["layout"])
         speed = LEVELS[level_idx]["speed"]
 
         while bricks and lives > 0:
-            if check_exit():
-                return "exit"
+            if screens.check_exit():
+                return None
 
-            if show_digit(lives, LIFE_COL, 500) == "exit":
-                return "exit"
+            if screens.show_digit_briefly(lives, LIFE_COL, 500) == "exit":
+                return None
 
             outcome, score, paddle_center = play_ball(bricks, speed, paddle_center, score)
             if outcome == "exit":
-                return "exit"
+                return None
             if outcome == "lost":
                 lives -= 1
             elif outcome == "cleared":
                 break
 
         if lives <= 0:
-            return game_over_sequence(score)
+            return score
 
         level_clear_flash()
         level_idx = (level_idx + 1) % len(LEVELS)
 
 
-def play():
-    while True:
-        if play_one_round() == "exit":
-            return
-
-
 def run(neopixel, joystick):
-    global np, JOY_LEFT, JOY_RIGHT, JOY_CENTER, _exit_press_start
+    global np, JOY_LEFT, JOY_RIGHT
     np = neopixel
     JOY_LEFT = joystick["left"]
     JOY_RIGHT = joystick["right"]
-    JOY_CENTER = joystick["center"]
-    _exit_press_start = None
-    play()
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        score = play_one_game()
+        if score is None:
+            return
+        if screens.game_over_screen(score) == "exit":
+            return
 
 
 if __name__ == "__main__":
@@ -477,5 +318,4 @@ if __name__ == "__main__":
         "center": Pin(8, Pin.IN),
         "slide":  Pin(9, Pin.IN),
     }
-    while True:
-        run(_np, _joy)
+    run(_np, _joy)

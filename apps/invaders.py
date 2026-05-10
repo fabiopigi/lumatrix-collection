@@ -2,6 +2,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import random
+import screens
 
 NAME = "SpaceInvaders"
 NUM_LEDS = 64
@@ -9,12 +10,9 @@ NUM_LEDS = 64
 np = None
 JOY_LEFT = None
 JOY_RIGHT = None
-JOY_CENTER = None
 
 ALIEN_COLOR  = (50, 0, 0)
 BULLET_COLOR = (45, 40, 5)
-SCORE_COL    = (50, 30, 0)
-GAMEOVER_COL = (60, 0, 0)
 LEVELUP_COL  = (45, 45, 45)
 
 SHIP_COLORS = [
@@ -38,8 +36,6 @@ LEVELS = (
 
 LEVEL_THRESHOLDS = (8, 20, 35, 55)
 
-_exit_press_start = None
-
 
 def level_index(score):
     for i, t in enumerate(LEVEL_THRESHOLDS):
@@ -54,56 +50,6 @@ def stream_offsets(n):
     if n == 3: return (-1, 0, 1)
     if n == 5: return (-2, -1, 0, 1, 2)
     return (0,)
-
-
-def check_exit():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return False
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return True
-    else:
-        _exit_press_start = None
-    return False
-
-
-def gameover_input():
-    global _exit_press_start
-    if JOY_CENTER is None:
-        return None
-    if JOY_CENTER.value() == 0:
-        now = ticks_ms()
-        if _exit_press_start is None:
-            _exit_press_start = now
-        elif ticks_diff(now, _exit_press_start) >= 1500:
-            while JOY_CENTER.value() == 0:
-                sleep_ms(20)
-            _exit_press_start = None
-            return "hold"
-    else:
-        if _exit_press_start is not None:
-            _exit_press_start = None
-            return "tap"
-    return None
-
-
-def _gameover_wait(ms):
-    t0 = ticks_ms()
-    while ticks_diff(ticks_ms(), t0) < ms:
-        r = gameover_input()
-        if r == "tap":
-            return "restart"
-        if r == "hold":
-            return "exit"
-        sleep_ms(15)
-    return None
 
 
 def clear():
@@ -166,88 +112,8 @@ def level_up_flash():
         sleep_ms(40)
 
 
-FONT = {
-    "0": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "1": ["..X..",".XX..","..X..","..X..","..X..","..X..","XXXXX"],
-    "2": [".XXX.","X...X","....X","...X.","..X..",".X...","XXXXX"],
-    "3": ["XXXX.","....X","....X",".XXX.","....X","....X","XXXX."],
-    "4": ["X...X","X...X","X...X","XXXXX","....X","....X","....X"],
-    "5": ["XXXXX","X....","X....","XXXX.","....X","X...X",".XXX."],
-    "6": [".XXX.","X....","X....","XXXX.","X...X","X...X",".XXX."],
-    "7": ["XXXXX","....X","...X.","..X..","..X..","..X..","..X.."],
-    "8": [".XXX.","X...X","X...X",".XXX.","X...X","X...X",".XXX."],
-    "9": [".XXX.","X...X","X...X",".XXXX","....X","....X",".XXX."],
-    " ": [".....",".....",".....",".....",".....",".....","....."],
-    ":": [".....","..X..","..X..",".....","..X..","..X..","....."],
-    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
-    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
-    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
-    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
-}
-
-
-def text_to_bitmap(text):
-    rows = ["", "", "", "", "", "", ""]
-    for ch in text:
-        glyph = FONT.get(ch, FONT[" "])
-        for i, line in enumerate(glyph):
-            rows[i] += line + "."
-    return rows
-
-
-def gameover_marquee(text, color, step_ms=70):
-    bitmap = text_to_bitmap(text)
-    total = len(bitmap[0])
-    for offset in range(-8, total + 1):
-        clear()
-        for i in range(7):
-            for j in range(8):
-                src = offset + j
-                if 0 <= src < total and bitmap[i][src] == "X":
-                    px(j, 7 - i, color)
-        np.write()
-        r = _gameover_wait(step_ms)
-        if r:
-            return r
-    return None
-
-
-def game_over_sequence(score):
-    for _ in range(3):
-        for i in range(NUM_LEDS):
-            np[i] = GAMEOVER_COL
-        np.write()
-        r = _gameover_wait(120)
-        if r:
-            return r
-        clear()
-        np.write()
-        r = _gameover_wait(80)
-        if r:
-            return r
-    for b in (50, 30, 15, 5, 0):
-        for i in range(NUM_LEDS):
-            np[i] = (b, 0, 0)
-        np.write()
-        r = _gameover_wait(70)
-        if r:
-            return r
-    clear()
-    np.write()
-    r = _gameover_wait(200)
-    if r:
-        return r
-    r = gameover_marquee("SCORE: " + str(score), SCORE_COL)
-    if r:
-        return r
-    r = _gameover_wait(300)
-    if r:
-        return r
-    return "exit"
-
-
-def play_one_round():
+def play_one_game():
+    """Returns final score, or None if exit triggered."""
     player_col_f = 4.0
     aliens = []
     bullets = []
@@ -260,8 +126,8 @@ def play_one_round():
     intro_frames = 14
 
     while True:
-        if check_exit():
-            return "exit"
+        if screens.check_exit():
+            return None
 
         cur_level = level_index(score)
         params = LEVELS[min(cur_level, len(LEVELS) - 1)]
@@ -300,7 +166,7 @@ def play_one_round():
                 bullets, aliens, score = handle_collisions(bullets, aliens, score)
                 if any(a[1] <= 0 for a in aliens):
                     render(player_col, ship_color, aliens, bullets)
-                    return game_over_sequence(score)
+                    return score
 
         if frame >= intro_frames:
             shoot_timer += 1
@@ -322,20 +188,20 @@ def play_one_round():
         frame += 1
 
 
-def play():
-    while True:
-        if play_one_round() == "exit":
-            return
-
-
 def run(neopixel, joystick):
-    global np, JOY_LEFT, JOY_RIGHT, JOY_CENTER, _exit_press_start
+    global np, JOY_LEFT, JOY_RIGHT
     np = neopixel
     JOY_LEFT = joystick["left"]
     JOY_RIGHT = joystick["right"]
-    JOY_CENTER = joystick["center"]
-    _exit_press_start = None
-    play()
+    screens.init(neopixel, joystick)
+    while True:
+        if screens.loading_screen() == "exit":
+            return
+        score = play_one_game()
+        if score is None:
+            return
+        if screens.game_over_screen(score) == "exit":
+            return
 
 
 if __name__ == "__main__":
@@ -348,5 +214,4 @@ if __name__ == "__main__":
         "center": Pin(8, Pin.IN),
         "slide":  Pin(9, Pin.IN),
     }
-    while True:
-        run(_np, _joy)
+    run(_np, _joy)
