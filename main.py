@@ -5,6 +5,8 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 
+from fonts import FONT_3X5, glyph as font_glyph
+
 import reaction
 import letters
 import flappy
@@ -46,53 +48,6 @@ LUMA_COLOR   = (45, 45, 45)
 TRIX_COLOR   = hex_dim("#0080ff")
 
 
-FONT_3x5 = {
-    " ": ["...", "...", "...", "...", "..."],
-    "A": [".X.", "X.X", "XXX", "X.X", "X.X"],
-    "B": ["XX.", "X.X", "XX.", "X.X", "XX."],
-    "C": [".XX", "X..", "X..", "X..", ".XX"],
-    "D": ["XX.", "X.X", "X.X", "X.X", "XX."],
-    "E": ["XXX", "X..", "XX.", "X..", "XXX"],
-    "F": ["XXX", "X..", "XX.", "X..", "X.."],
-    "G": [".XX", "X..", "X.X", "X.X", ".XX"],
-    "H": ["X.X", "X.X", "XXX", "X.X", "X.X"],
-    "I": ["XXX", ".X.", ".X.", ".X.", "XXX"],
-    "J": [".XX", ".X.", ".X.", ".X.", "XX."],
-    "K": ["X.X", "XX.", "X..", "XX.", "X.X"],
-    "L": ["X..", "X..", "X..", "X..", "XXX"],
-    "M": ["X.X", "XXX", "XXX", "X.X", "X.X"],
-    "N": ["X.X", "XX.", "XXX", "X.X", "X.X"],
-    "O": ["XXX", "X.X", "X.X", "X.X", "XXX"],
-    "P": ["XX.", "X.X", "XX.", "X..", "X.."],
-    "Q": ["XXX", "X.X", "X.X", "XXX", "..X"],
-    "R": ["XX.", "X.X", "XX.", "X.X", "X.X"],
-    "S": [".XX", "X..", ".X.", "..X", "XX."],
-    "T": ["XXX", ".X.", ".X.", ".X.", ".X."],
-    "U": ["X.X", "X.X", "X.X", "X.X", "XXX"],
-    "V": ["X.X", "X.X", "X.X", "X.X", ".X."],
-    "W": ["X.X", "X.X", "X.X", "XXX", ".X."],
-    "X": ["X.X", "X.X", ".X.", "X.X", "X.X"],
-    "Y": ["X.X", "X.X", ".X.", ".X.", ".X."],
-    "Z": ["XXX", "..X", ".X.", "X..", "XXX"],
-    "0": ["XXX", "X.X", "X.X", "X.X", "XXX"],
-    "1": ["XX.", ".X.", ".X.", ".X.", "XXX"],
-    "2": ["XX.", "..X", ".X.", "X..", "XXX"],
-    "3": ["XX.", "..X", ".X.", "..X", "XX."],
-    "4": ["X.X", "X.X", "XXX", "..X", "..X"],
-    "5": ["XXX", "X..", "XX.", "..X", "XX."],
-    "6": [".XX", "X..", "XX.", "X.X", ".X."],
-    "7": ["XXX", "..X", ".X.", "X..", "X.."],
-    "8": [".X.", "X.X", ".X.", "X.X", ".X."],
-    "9": [".X.", "X.X", ".XX", "..X", "XX."],
-    ".": ["...", "...", "...", "...", ".X."],
-    "!": [".X.", ".X.", ".X.", "...", ".X."],
-    "?": ["XX.", "..X", ".X.", "...", ".X."],
-    ":": ["...", ".X.", "...", ".X.", "..."],
-    "-": ["...", "...", "XXX", "...", "..."],
-    "+": ["...", ".X.", "XXX", ".X.", "..."],
-}
-
-
 def clear():
     for i in range(NUM_LEDS):
         np[i] = (0, 0, 0)
@@ -105,14 +60,10 @@ def px_visual(x, y, color):
         np[led_row * 8 + x] = color
 
 
-def glyph_for(ch):
-    return FONT_3x5.get(ch) or FONT_3x5.get(ch.upper()) or FONT_3x5[" "]
-
-
 def text_to_bitmap(text, trailing_gap=8):
     rows = ["", "", "", "", ""]
     for ch in text:
-        g = glyph_for(ch)
+        g = font_glyph(FONT_3X5, ch)
         for i in range(5):
             rows[i] += g[i] + "."
     for i in range(5):

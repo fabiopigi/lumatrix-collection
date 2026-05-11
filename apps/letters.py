@@ -4,6 +4,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import screens
+from fonts import FONT_5X8
 
 NAME = "LetterDisplay"
 NUM_LEDS = 64
@@ -35,35 +36,6 @@ MASK = {
 }
 
 CURSOR = {}
-
-FONT = {
-    "A": [".XXX.","X...X","X...X","XXXXX","X...X","X...X","X...X"],
-    "B": ["XXXX.","X...X","X...X","XXXX.","X...X","X...X","XXXX."],
-    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
-    "D": ["XXXX.","X...X","X...X","X...X","X...X","X...X","XXXX."],
-    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
-    "F": ["XXXXX","X....","X....","XXXX.","X....","X....","X...."],
-    "G": [".XXXX","X....","X....","X..XX","X...X","X...X",".XXX."],
-    "H": ["X...X","X...X","X...X","XXXXX","X...X","X...X","X...X"],
-    "I": ["XXXXX","..X..","..X..","..X..","..X..","..X..","XXXXX"],
-    "J": ["XXXXX","....X","....X","....X","....X","X...X",".XXX."],
-    "K": ["X...X","X..X.","X.X..","XX...","X.X..","X..X.","X...X"],
-    "L": ["X....","X....","X....","X....","X....","X....","XXXXX"],
-    "M": ["X...X","XX.XX","X.X.X","X...X","X...X","X...X","X...X"],
-    "N": ["X...X","XX..X","X.X.X","X.X.X","X.X.X","X..XX","X...X"],
-    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "P": ["XXXX.","X...X","X...X","XXXX.","X....","X....","X...."],
-    "Q": [".XXX.","X...X","X...X","X...X","X.X.X","X..XX",".XXXX"],
-    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
-    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
-    "T": ["XXXXX","..X..","..X..","..X..","..X..","..X..","..X.."],
-    "U": ["X...X","X...X","X...X","X...X","X...X","X...X",".XXX."],
-    "V": ["X...X","X...X","X...X","X...X","X...X",".X.X.","..X.."],
-    "W": ["X...X","X...X","X...X","X.X.X","X.X.X","XX.XX",".X.X."],
-    "X": ["X...X","X...X",".X.X.","..X..",".X.X.","X...X","X...X"],
-    "Y": ["X...X","X...X",".X.X.","..X..","..X..","..X..","..X.."],
-    "Z": ["XXXXX","....X","...X.","..X..",".X...","X....","XXXXX"],
-}
 
 
 def letter_color(ch):
@@ -99,11 +71,11 @@ def pixels_for_char(ch):
         return [(idx, color)]
 
     if ch.isupper():
-        glyph = FONT.get(ch)
+        glyph = FONT_5X8.get(ch)
         if not glyph:
             return []
         out = []
-        for grow in range(7):
+        for grow in range(8):
             line = glyph[grow]
             mrow = 7 - grow
             for gcol in range(5):

@@ -7,6 +7,8 @@ spec and boilerplate.
 
 from time import sleep_ms, ticks_ms, ticks_diff
 
+from fonts import FONT_3X5 as _FONT
+
 NUM_LEDS = 64
 EXIT_HOLD_MS = 1500
 
@@ -25,21 +27,6 @@ _joy = None
 _joy_center = None
 _exit_press_start = None
 
-
-_FONT = {
-    "0": ["XXX", "X.X", "X.X", "X.X", "XXX"],
-    "1": ["XX.", ".X.", ".X.", ".X.", "XXX"],
-    "2": ["XX.", "..X", ".X.", "X..", "XXX"],
-    "3": ["XX.", "..X", ".X.", "..X", "XX."],
-    "4": ["X.X", "X.X", "XXX", "..X", "..X"],
-    "5": ["XXX", "X..", "XX.", "..X", "XX."],
-    "6": [".XX", "X..", "XX.", "X.X", ".X."],
-    "7": ["XXX", "..X", ".X.", "X..", "X.."],
-    "8": [".X.", "X.X", ".X.", "X.X", ".X."],
-    "9": [".X.", "X.X", ".XX", "..X", "XX."],
-    " ": ["...", "...", "...", "...", "..."],
-    "-": ["...", "...", "XXX", "...", "..."],
-}
 
 # Left-pointing arrow used on the End screen, in visual (x, y) with y=0 at top.
 _END_ARROW_PIXELS = (
