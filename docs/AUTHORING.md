@@ -165,6 +165,151 @@ def px_visual(x, y, color):
 
 ---
 
+## Using Pixel Designer designs
+
+The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** is the browser tool used to design the launcher backgrounds, game-over halftones, and end-screen arrow in this repo. It exports JSON files where each page is one screen/frame and only the lit pixels are listed. Cells you didn't paint are off.
+
+A typical export looks like this:
+
+```json
+{
+  "version": 3,
+  "config": {
+    "width": 8, "height": 8,
+    "origin": "bottom-left",
+    "axis": "row", "serpentine": false
+  },
+  "pages": [
+    {
+      "label": "Page 1",
+      "pixels": [
+        { "index": 56, "x": 0, "y": 0, "color": "#ff0000" },
+        { "index": 58, "x": 2, "y": 0, "color": "#ff0000" }
+      ]
+    },
+    { "label": "Page 2", "pixels": [ ... ] }
+  ]
+}
+```
+
+Each pixel object carries:
+
+| Field | What it is |
+|---|---|
+| `index` | LED chain position 0..63. **Use this directly** as `np[index] = (r, g, b)`. |
+| `x`, `y` | Visual coordinates (`x` = col 0..7 left→right, `y` = row 0..7 top→bottom). Redundant with `index` but handy for math. |
+| `color` | CSS hex string `"#RRGGBB"`. Full 8-bit per channel — needs dimming for the matrix. |
+
+### Two ways to embed a design
+
+**Option A — embed pages directly in your app.** Best for small, fixed designs (a logo, a few frames). Self-contained, no filesystem dependency.
+
+```python
+# Each page = {led_index: "#hex"} for the lit pixels only.
+PAGES_HEX = (
+    {  # Page 1
+        56: "#ff0000", 58: "#ff0000", 60: "#ff0000", 62: "#ff0000",
+        49: "#ff0000", 51: "#ff0000", 53: "#ff0000", 55: "#ff0000",
+        # ... more pixels ...
+    },
+    {  # Page 2
+        # ...
+    },
+)
+```
+
+Copy-paste the JSON's `pixels` arrays and collapse each one into the `{index: hex}` form. It's compact and lives next to the code that uses it.
+
+**Option B — keep the JSON file on the Pico and load it at runtime.** Best for larger or more frequently-edited designs.
+
+```python
+import json
+
+def load_pages(path):
+    with open(path) as f:
+        data = json.load(f)
+    pages = []
+    for page in data["pages"]:
+        d = {}
+        for p in page["pixels"]:
+            d[p["index"]] = p["color"]
+        pages.append(d)
+    return pages
+
+PAGES_HEX = load_pages("/designs/my_design.json")
+```
+
+Drop the JSON file alongside `main.py` on the Pico (e.g. `/designs/my_design.json`) and load it once at app startup.
+
+### Rendering a page
+
+The matrix is uncomfortably bright at full intensity, so always dim. ~25% (`BRIGHTNESS = 0.25`) is the project convention — it maps the hex source range `0..255` to a more reasonable `0..64`.
+
+```python
+BRIGHTNESS = 0.25
+
+
+def hex_to_rgb(h, scale=BRIGHTNESS):
+    h = h.lstrip("#")
+    return (int(int(h[0:2], 16) * scale),
+            int(int(h[2:4], 16) * scale),
+            int(int(h[4:6], 16) * scale))
+
+
+def clear():
+    for i in range(NUM_LEDS):
+        np[i] = (0, 0, 0)
+
+
+def render_page(page):
+    """page = {led_index: '#hex'}"""
+    clear()
+    for idx, hex_color in page.items():
+        np[idx] = hex_to_rgb(hex_color)
+    np.write()
+```
+
+For an animation, loop through `PAGES_HEX` with timing:
+
+```python
+for page in PAGES_HEX:
+    render_page(page)
+    sleep_ms(1500)
+```
+
+### Fading between pages
+
+A common pattern: hold each page for a few seconds, then crossfade into the next. Linearly interpolate per-LED RGB from page A → page B:
+
+```python
+def render_fade(page_a, page_b, t):
+    """t in [0, 1]: 0 = full page_a, 1 = full page_b."""
+    indices = set()
+    indices.update(page_a.keys())
+    indices.update(page_b.keys())
+    clear()
+    for idx in indices:
+        a = hex_to_rgb(page_a.get(idx, "#000000"))
+        b = hex_to_rgb(page_b.get(idx, "#000000"))
+        r = int(a[0] + (b[0] - a[0]) * t)
+        g = int(a[1] + (b[1] - a[1]) * t)
+        bb = int(a[2] + (b[2] - a[2]) * t)
+        np[idx] = (r, g, bb)
+    np.write()
+```
+
+LEDs that appear in only one page fade naturally to or from black.
+
+### Tips and pitfalls
+
+- **Always dim.** The JSON colors are full-intensity (e.g. `#ffffff` = `(255, 255, 255)`); pushing those straight to the strip is painful at close range. Stick with `BRIGHTNESS ≈ 0.20–0.30` unless you have a specific reason.
+- **Use `index`, not `(x, y)`.** Both fields are exported, but `index` is the LED chain position you can write to `np[]` directly. The `(x, y)` coords are convenient for understanding the design but require a `7 - y` conversion to get the LED row.
+- **Don't trust the JSON's `width`/`height` config beyond 8×8.** This codebase assumes 8×8. If you design something larger in the tool, the export will still work but won't fit the matrix.
+- **The `instructions` field is free LLM context.** Every export includes a schema description and rendering hint at the bottom. If you're vibe-coding integration, paste that section into your prompt.
+- **For animation, prefer Option A (embedded).** Iterating designs you have to re-flash the JSON is slower than re-flashing one `.py` file.
+
+---
+
 ## Joystick input
 
 The launcher passes a dict of six pin objects to `run()`:

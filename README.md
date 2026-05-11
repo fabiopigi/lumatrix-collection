@@ -62,6 +62,45 @@ LumaMatrix/
         └── snake.md
 ```
 
+## Designing screens with the Pixel Designer
+
+The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
+
+### Workflow
+
+1. Open [pigagnelli.ch/pixel-designer](https://pigagnelli.ch/pixel-designer/) in your browser.
+2. Pick a color from the palette and click cells on the grid to paint them. Hold to fill, or use the tool palette for line / rect / fill modes.
+3. Use **Add page** to design multi-frame animations or alternate states (loading / game-over / etc.). Each page is one frame.
+4. Configure under **Settings**: matrix size (defaults to 8×8), color mode, wiring (axis, serpentine, origin). The defaults match the LUMATRIX.
+5. The **letterMask** field accepts a string like `ZATWENTY\nHQUARTER\n…` so you can design designs that align with the word-clock cutout on physical LUMATRIX hardware.
+6. **Export → JSON**. Save the file.
+
+### What the JSON looks like
+
+Each pixel is exported with both its LED chain `index` and visual `(x, y)` coordinates. Cells you didn't paint are omitted (interpreted as off / `#000000`).
+
+```json
+{
+  "version": 3,
+  "config": { "width": 8, "height": 8, "origin": "bottom-left", ... },
+  "pages": [
+    {
+      "label": "Page 1",
+      "pixels": [
+        { "index": 56, "x": 0, "y": 0, "color": "#ff0000" },
+        { "index": 57, "x": 1, "y": 0, "color": "#ff0000" }
+      ]
+    }
+  ]
+}
+```
+
+The `instructions` field embedded in every export includes the LED-index formula, coordinate conventions, and example renderer snippets — useful to point an LLM at when iterating.
+
+### Integrating into your app
+
+`docs/AUTHORING.md` has the **[full Python integration guide](docs/AUTHORING.md#using-pixel-designer-designs)**, including both runtime-load and embedded-dict patterns, plus brightness scaling and helper functions.
+
 ## Writing a new app
 
 The full guide is in **[docs/AUTHORING.md](docs/AUTHORING.md)**. It covers:
