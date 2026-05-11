@@ -15,6 +15,7 @@ import invaders
 import doom
 import breakout
 import snake
+import watch
 
 NUM_LEDS = 64
 np = NeoPixel(Pin(19, Pin.OUT), NUM_LEDS)
@@ -28,7 +29,7 @@ JOY = {
     "slide":  Pin(9, Pin.IN),
 }
 
-APPS = [reaction, letters, flappy, pong, invaders, doom, breakout, snake]
+APPS = [reaction, letters, flappy, pong, invaders, doom, breakout, snake, watch]
 
 BRIGHTNESS = 0.25
 MARQUEE_STEP_MS = 180
