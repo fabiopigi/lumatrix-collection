@@ -4,6 +4,8 @@ A self-contained HTML pixel-art designer for LED matrix displays. Built original
 
 Single file. No build step. No dependencies. Open `index.html` in a modern browser and design.
 
+![LUMATRIX Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
+
 ---
 
 ## Table of Contents
@@ -40,33 +42,7 @@ That's it for the minimum loop. Everything else is convenience: more tools, more
 
 ## UI tour
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  LUMATRIX Pixel Designer  by Fabio Pigagnelli   [↶][↷] [Clear] [PNG] [⚙]  │  ← header
-├──────┬───────────────────────────────────────────┬──────────────┤
-│ ✏    │                                           │  MODE        │
-│ ⌫    │           #1  Page label                  │  [Pixel|Mask]│
-│ 🪣    │           ┌─────────────────────┐         │              │
-│ 💧   │           │                     │         │  COLOR       │
-│ ╱    │           │     8 × 8 grid      │         │  ▓ #ff4000   │
-│ ▢    │           │                     │         │  ███████████ │
-│ ▣    │           │                     │         │  ███████████ │
-│ ○    │           └─────────────────────┘         │  ███████████ │
-│ ●    │                                           │  ███████████ │
-│ ⛶    │           [+ Add page]                    │              │
-│ T    │                                           │  TEXT [3×5]  │
-│      │  Page: 1/1  Cell: —  LED: —  Tool: pencil │  ____________│
-│      │                                           │              │
-│      │                                           │  SYMBOLS     │
-│      │                                           │  ♥ ☺ ★ + ✕ ✓ │
-│      │                                           │  ↑ ↓ ← → ◆ # │
-│      │                                           │  ● ○ 🔔 △ ☀ ♪│
-│      │                                           │              │
-│      │                                           │  DESIGN JSON │
-│      │                                           │  [textarea]  │
-│      │                                           │  Export/Imp. │
-└──────┴───────────────────────────────────────────┴──────────────┘
-```
+![Annotated UI overview](docs/images/pixel-designer-basic.png)
 
 - **Header**: title, undo/redo, clear, PNG export, and the **⚙ Config** button.
 - **Left column**: drawing tools (pencil, eraser, fill, eyedropper, line, rect outline/fill, ellipse outline/fill, selection, text).
@@ -196,6 +172,8 @@ All symbols are designed to fit within an 8×8 grid; if your matrix is smaller, 
 
 ## Pages (multi-frame designs)
 
+![Two pages stacked vertically, "1 2" on top in warm colors and "3 4" below in blues/yellows. The active page has a cyan border.](docs/images/pixel-designer-basic.png)
+
 A page is one frame/screen of your design. Use multiple pages when you want sequential states like:
 - A 3-frame animation (page 1 → 2 → 3 in a loop).
 - A slideshow: "FIRST", "SHOW", "THIS", "THEN", "THAT".
@@ -233,6 +211,8 @@ The **status bar** shows `Page: N/M` so you always know where you are.
 
 ## Letter mask mode
 
+![Same two-page design rendered in mask mode — each cell shows its assigned LUMATRIX word-clock letter; lit cells glow in color, unlit letters are dim grey.](docs/images/pixel-designer-mask.png)
+
 A "letter mask" assigns a letter (or blank) to every LED on the matrix. In **mask mode** the cells render as their letter glyph instead of a colored square. This is the model used by word clocks (e.g., the LUMATRIX 8×8 ships with `FOURNINE / TWELEVEN / SIXTHREE / FIVEIGHT / WTPASTOR / AHALFIVE / HQUARTER / ZATWENTY` so a single lit pattern spells a time).
 
 ### Switching modes
@@ -263,6 +243,8 @@ If the mask is empty, the **Letter mask** mode toggle is disabled in the side pa
 ---
 
 ## Matrix configuration
+
+![The Matrix configuration modal — dimensions with quick presets, color mode dropdown, LED indexing controls with a live index preview grid (cell 0 highlighted in cyan), and the letter-mask textarea pre-filled with the LUMATRIX word-clock layout.](docs/images/pixel-designer-settings.png)
 
 The **⚙ Config** button opens a modal with three sections.
 
@@ -369,6 +351,8 @@ If the imported config differs from your current one (dimensions, color mode, in
 ---
 
 ## PNG export
+
+![Example PNG export — two pages stacked, each with its "#N Label" header and the grid below with the glow baked in.](docs/images/pixel-designer-png-export.png)
 
 The **PNG** button in the header renders all pages stacked vertically into a single image:
 
@@ -530,6 +514,8 @@ LumaMatrix/
 ├── index.html                  # the pixel designer (this tool)
 ├── fonts.json                  # both pixel fonts in a machine-readable form
 ├── pixel-designer-usage.md     # this document
+├── docs/
+│   └── images/                 # screenshots referenced from this doc
 ├── main.py                     # the active MicroPython app flashed to the Pico
 ├── apps/                       # additional MicroPython apps (snake, breakout, …)
 └── README.md                   # (optional) top-level project readme
