@@ -3,7 +3,7 @@ from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import math
 import random
-import screens
+import _screens as screens
 
 NAME = "Doom"
 NUM_LEDS = 64

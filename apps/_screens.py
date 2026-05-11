@@ -7,7 +7,7 @@ spec and boilerplate.
 
 from time import sleep_ms, ticks_ms, ticks_diff
 
-from fonts import FONT_3X5 as _FONT
+from _fonts import FONT_3X5 as _FONT
 
 NUM_LEDS = 64
 EXIT_HOLD_MS = 1500

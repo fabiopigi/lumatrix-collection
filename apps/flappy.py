@@ -2,7 +2,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 import random
-import screens
+import _screens as screens
 
 NAME = "FlappyPixels"
 NUM_LEDS = 64

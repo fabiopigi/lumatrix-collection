@@ -5,7 +5,7 @@ from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
 
-from fonts import FONT_3X5, glyph as font_glyph
+from _fonts import FONT_3X5, glyph as font_glyph
 
 import reaction
 import letters

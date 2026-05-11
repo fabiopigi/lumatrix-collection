@@ -11,7 +11,7 @@ If /fonts.json is missing or unreadable, a small embedded fallback covering
 just digits is used so apps/screens.py (game-over scores) keep working.
 
 Usage:
-    from fonts import FONT_3X5, FONT_5X8, glyph
+    from _fonts import FONT_3X5, FONT_5X8, glyph
     g = glyph(FONT_3X5, ch)   # falls back ch -> ch.upper() -> ' '
 """
 

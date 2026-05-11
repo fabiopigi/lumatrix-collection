@@ -3,8 +3,8 @@ import select
 from machine import Pin
 from neopixel import NeoPixel
 from time import sleep_ms, ticks_ms, ticks_diff
-import screens
-from fonts import FONT_5X8
+import _screens as screens
+from _fonts import FONT_5X8
 
 NAME = "LetterDisplay"
 NUM_LEDS = 64
