@@ -29,7 +29,7 @@ JOY = {
     "slide":  Pin(9, Pin.IN),
 }
 
-APPS = [reaction, letters, flappy, pong, invaders, doom, breakout, snake, watch]
+APPS = [pong, breakout]
 
 BRIGHTNESS = 0.25
 MARQUEE_STEP_MS = 180

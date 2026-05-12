@@ -36,7 +36,7 @@ _FALLBACK_3X5 = {
 
 def _load():
     try:
-        with open("/fonts.json") as f:
+        with open("/_fonts.json") as f:
             data = json.load(f)
         fonts = data["fonts"]
         return fonts["3x5"]["glyphs"], fonts["5x8"]["glyphs"]
