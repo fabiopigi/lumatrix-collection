@@ -284,6 +284,14 @@ export async function run(
     clear();
     np.write();
     await sleep_ms(150);
+
+    // forceExit() was fired by the rail handler at the moment of the click.
+    // If an app was running, its check_exit() already consumed the flag.
+    // If nothing was running (user clicked the rail while on the menu), the
+    // flag is still set and would bite the brand-new app's first check_exit.
+    // Wipe it here, right before launching, so the new app starts clean.
+    screens.clearExternalExit();
+
     notifyAppChange(i); // entering app
     await APPS[i].run(np, joy);
     await waitRelease();

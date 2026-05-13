@@ -38,6 +38,14 @@ export function skipNextLoading(): void {
   _skipNextLoading = true;
 }
 
+/** Drop any pending external-exit signal without firing it. Used by the
+ *  launcher at known safe points (top of its main loop) so that a stale
+ *  forceExit() — e.g. fired while no app was running — doesn't bite the
+ *  next app's first check_exit() call. */
+export function clearExternalExit(): void {
+  _externalExit = false;
+}
+
 function consumeExternalExit(): boolean {
   if (_externalExit) {
     _externalExit = false;
