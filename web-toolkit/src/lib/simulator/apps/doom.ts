@@ -1,3 +1,4 @@
+import { FONT_3X5 } from "../fonts";
 import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
@@ -43,6 +44,17 @@ const BOSS_EVERY_N_LEVELS = 3;
 const BOSS_HP = 3;
 const ENEMY_SIGHT_RANGE_SQ = 25;
 const FIRE_FLASH_MS = 80;
+// Reaction time: enemies must keep the player in sight this long before they
+// can fire. Resets when LOS breaks. Gives the player a "peek out, shoot, hide
+// behind a wall" gameplay loop.
+const ENEMY_REACTION_MS = 1000;
+const BOSS_REACTION_MS = 600;
+// Initial level-start grace period — extra time before the FIRST shot fires,
+// stacked on top of the regular cooldown. Gives the player a beat to orient.
+const LEVEL_START_GRACE_MS = 2000;
+const LEVEL_START_GRACE_BOSS_MS = 1500;
+// Frames the level transition stays on screen (~1 s at 30 ms/frame).
+const TRANSITION_FRAMES = 32;
 
 // Per-level enemy cooldown range — shrinks as `level` grows so deep play is
 // noticeably more dangerous than level 1.
@@ -83,6 +95,10 @@ interface Enemy {
   maxHp: number;
   hitFlash: number;
   nextShot: number; // ticks_ms at which this enemy may next fire
+  // When this enemy first acquired LOS on the player. Resets to null when LOS
+  // breaks. The enemy only fires after ENEMY_REACTION_MS (or BOSS_REACTION_MS)
+  // of continuous sight has passed.
+  spottedAt: number | null;
   isBoss: boolean;
 }
 interface Projectile {
@@ -183,16 +199,15 @@ function setupLevel(level: number): void {
       continue;
     const isBoss = isBossLevel && placed === 0;
     const cool = isBoss ? bmax : emax; // start with the long end so the first shot isn't instant
+    const grace = isBoss ? LEVEL_START_GRACE_BOSS_MS : LEVEL_START_GRACE_MS;
     enemies.push({
       x: ex + 0.5,
       y: ey + 0.5,
       hp: isBoss ? BOSS_HP : 1,
       maxHp: isBoss ? BOSS_HP : 1,
       hitFlash: 0,
-      nextShot:
-        now +
-        randInt(isBoss ? bmin : emin, cool) +
-        800, // small grace period at level start
+      nextShot: now + randInt(isBoss ? bmin : emin, cool) + grace,
+      spottedAt: null,
       isBoss,
     });
     placed++;
@@ -444,25 +459,50 @@ function updateProjectiles(): void {
   enemies = enemies.filter((e) => e.hp > 0);
 }
 
+/** Random shot-angle offset (radians). Shrinks with level so early-game enemies
+ *  miss a lot and late-game ones are pinpoint. Bosses are markedly better
+ *  shots than regular grunts at the same level. */
+function inaccuracyRadians(level: number, isBoss: boolean): number {
+  const base = isBoss ? 0.20 : 0.40; // ~11° / ~23° at level 1
+  return Math.max(0.04, base - level * 0.03);
+}
+
 function updateEnemyFire(level: number): void {
   const now = ticks_ms();
   const proj = enemyProjectileSpeed(level);
   for (const e of enemies) {
-    if (now < e.nextShot) continue;
     const dx = px - e.x;
     const dy = py - e.y;
     const distSq = dx * dx + dy * dy;
-    if (distSq > ENEMY_SIGHT_RANGE_SQ) continue;
-    if (!hasLineOfSight(e.x, e.y, px, py)) continue;
+    const inRange = distSq < ENEMY_SIGHT_RANGE_SQ;
+    const sees = inRange && hasLineOfSight(e.x, e.y, px, py);
 
-    const angle = Math.atan2(dy, dx);
+    if (!sees) {
+      // Lost (or never had) LOS — reset reaction so re-acquiring sight costs
+      // another full reaction time. This is what makes peek-shoot-hide work.
+      e.spottedAt = null;
+      continue;
+    }
+
+    // Acquire / hold sight.
+    if (e.spottedAt === null) e.spottedAt = now;
+
+    const reactionMs = e.isBoss ? BOSS_REACTION_MS : ENEMY_REACTION_MS;
+    if (now - e.spottedAt < reactionMs) continue; // still aiming
+    if (now < e.nextShot) continue; // cooling down
+
+    // Aim with per-shot inaccuracy that improves with level.
+    const inacc = inaccuracyRadians(level, e.isBoss);
+    const offset = (Math.random() - 0.5) * 2 * inacc;
+    const aimAngle = Math.atan2(dy, dx) + offset;
+
     // Spawn just outside the enemy's hitbox so it doesn't instantly self-hit.
-    const sx = e.x + Math.cos(angle) * 0.4;
-    const sy = e.y + Math.sin(angle) * 0.4;
+    const sx = e.x + Math.cos(aimAngle) * 0.4;
+    const sy = e.y + Math.sin(aimAngle) * 0.4;
     projectiles.push({
       x: sx,
       y: sy,
-      angle,
+      angle: aimAngle,
       speed: proj,
       fromPlayer: false,
     });
@@ -470,6 +510,33 @@ function updateEnemyFire(level: number): void {
       ? bossCooldownRange(level)
       : enemyCooldownRange(level);
     e.nextShot = now + randInt(range.min, range.max);
+  }
+}
+
+// ── Level indicator ─────────────────────────────────────────────────────
+function drawDigit(ch: string, x0: number, y0: number, color: RGB): void {
+  const g = FONT_3X5[ch];
+  if (!g) return;
+  for (let gy = 0; gy < 5; gy++) {
+    const row = g[gy];
+    for (let gx = 0; gx < 3; gx++) {
+      if (row[gx] === "X") setPixel(x0 + gx, y0 + gy, color);
+    }
+  }
+}
+
+/** Paint the level number centred on the display, on top of whatever else is
+ *  already in the frame buffer. Wide displays accommodate 2-digit levels. */
+function renderLevelOverlay(level: number, color: RGB): void {
+  const text = String(level);
+  // 3 cells per digit + 1 cell between digits.
+  const totalWidth = text.length * 3 + (text.length - 1);
+  // If the display is too narrow to fit the whole number, just bail.
+  if (totalWidth > W || H < 5) return;
+  const x0 = Math.floor((W - totalWidth) / 2);
+  const y0 = Math.floor((H - 5) / 2);
+  for (let i = 0; i < text.length; i++) {
+    drawDigit(text[i], x0 + i * 4, y0, color);
   }
 }
 
@@ -553,21 +620,40 @@ async function playGame(): Promise<number | null> {
 
     // ── Level cleared ──
     if (enemies.length === 0) {
-      levelClearFrames = 12;
-      // Render the green-tinted backdrop briefly before spawning the next
-      // level so the transition reads as a level change, not a glitch.
-      for (let i = 0; i < 12; i++) {
+      // 1) Green clear-tint pulse on the current map (~0.5 s).
+      for (let i = 0; i < 14; i++) {
         if (screens.check_exit()) return null;
+        levelClearFrames = 14 - i; // fade out
         fillBackdrop();
         renderWorld();
         showBuffer();
         await sleep_ms(30);
-        if (levelClearFrames > 0) levelClearFrames--;
       }
-      // Restore 1 HP between levels, capped at MAX_HP.
+      levelClearFrames = 0;
+
+      // 2) Generate the next level + restore 1 HP, then show a cyan "get
+      // ready" overlay with the new level number on top of the freshly
+      // generated map (~1 s).
       playerHp = Math.min(MAX_HP, playerHp + 1);
       levelIdx++;
       setupLevel(levelIdx);
+
+      const nextLevelColor: RGB = [60, 200, 240]; // cyan "ready"
+      for (let f = 0; f < TRANSITION_FRAMES; f++) {
+        if (screens.check_exit()) return null;
+        fillBackdrop();
+        renderWorld();
+        // Pulse the digit's brightness so it reads as an alert, not a
+        // static label.
+        const pulse = 0.65 + 0.35 * Math.abs(Math.sin((f / 6) * Math.PI));
+        renderLevelOverlay(levelIdx, [
+          Math.floor(nextLevelColor[0] * pulse),
+          Math.floor(nextLevelColor[1] * pulse),
+          Math.floor(nextLevelColor[2] * pulse),
+        ]);
+        showBuffer();
+        await sleep_ms(30);
+      }
       continue;
     }
 
