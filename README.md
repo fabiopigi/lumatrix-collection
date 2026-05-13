@@ -4,7 +4,7 @@ MicroPython apps for the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) kit — a Ras
 
 `python/main.py` boots into a launcher that lets you pick from the installed apps. Center-click launches; left/right cycles through the list; hold-center-1.5 s from anywhere inside an app brings you back.
 
-A browser-based **simulator** of the LUMATRIX hardware lives in `web/` (TypeScript source). Run `cd web && npm install && npm run build` to compile a single self-contained file to `web-apps/simulator.html`.
+A browser-based **simulator** of the LUMATRIX hardware lives in `web-toolkit/` as part of the LumenLab Next.js app. Run `cd web-toolkit && npm install && npm run dev` and visit [http://localhost:3000/simulator](http://localhost:3000/simulator) to drive every registered app in a real browser without a Pico.
 
 ![device](https://lumatrix.zhaw.ch)
 
@@ -49,12 +49,12 @@ LumaMatrix/
 │       └── snake.py
 ├── shared/
 │   └── fonts.json           ← font definitions (used by Python + simulator)
-├── web/                     ← TypeScript source for the browser simulator
-│   ├── src/
-│   └── compile.mjs          ← bundles into web-apps/simulator.html
-├── web-apps/                ← compiled / standalone browser tools
-│   ├── pixel-designer.html
-│   └── simulator.html
+├── web-toolkit/             ← Next.js app: LumenDesigner + LumenSimulator
+│   └── src/
+│       ├── app/             ← /pixel-designer and /simulator routes
+│       └── lib/simulator/   ← TS port of _screens.py, _fonts.py, every app
+├── web-apps/                ← standalone single-file browser tools
+│   └── pixel-designer.html
 └── docs/
     ├── AUTHORING.md             ← how to write a new app
     ├── pixel-designer-usage.md  ← Pixel Designer reference
