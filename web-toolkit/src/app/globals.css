@@ -21,6 +21,7 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
     system-ui, sans-serif;
   --font-mono: "SF Mono", Menlo, Consolas, monospace;
+  --font-bitcount: var(--bitcount-font), "SF Mono", Menlo, monospace;
 }
 
 html,
