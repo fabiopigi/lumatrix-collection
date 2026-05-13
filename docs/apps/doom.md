@@ -73,3 +73,11 @@ After 10 s of no input (no movement, no firing), `screens.end_screen()` takes ov
 - The `int(8 / (distance + 0.01))` math protects against division by zero when the player is touching a wall.
 - Procedural map generation runs every time enemies are cleared, so each "room" is unique. There's no persistent map.
 - This app has no win condition, no death, no score. It's a passive exploration mode. If you want a doom-with-health-and-death variant, that's a fork rather than a tweak.
+
+## Responsive scaling
+
+**Feasibility: Yes — wider FOV, taller walls.**
+
+The raycaster casts one ray per display column. Currently that's 8 columns / 8 rays. A 32-wide display gives 32 rays for a much smoother wall projection. Taller displays improve wall-height fidelity (height is currently quantised to 8 rows). The map size (`MAP_SIZE = 10`) and projection math don't care about display dimensions.
+
+Things to think about: enemy sprite size and palette gradient already scale by distance, so they keep working. The bullet sprite size formula may need tuning to feel right at higher resolution.

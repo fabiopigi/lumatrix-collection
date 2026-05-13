@@ -94,3 +94,11 @@ Want a tighter score ceiling? Either:
 - `play_ball()` returns one of: `("cleared", score, paddle_center)`, `("lost", score, paddle_center)`, `("exit", score, paddle_center)`. The outer loop in `play_one_game()` handles each case.
 - The "level cleared" flash is 2 green strobes (~280 ms total).
 - Three nested timers/loops make this app the longest — outer for the game, middle for the level, inner for the ball. Each layer is self-contained.
+
+## Responsive scaling
+
+**Feasibility: Yes — scales naturally.**
+
+The 8×8 source has very few bricks per level (8 in the simplest layout). A wider display can host longer brick rows; a taller display can host more rows or thicker bricks. Levels would become richer with more interesting layouts. The paddle could scale proportionally (currently 3 cells wide; 6 on a 16-wide display). Ball-paddle deflection math is already in floats and works at any resolution.
+
+Things to think about: brick palette gets more interesting at larger sizes (rainbow rows by depth), and the level set may need rebalancing — current pacing assumes 8-brick rows.

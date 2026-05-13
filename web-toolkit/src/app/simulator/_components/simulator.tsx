@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type DisplayConfig,
+  DEFAULT_DISPLAY,
+  isLumatrix,
+  loadDisplayConfig,
+  saveDisplayConfig,
+} from "@/lib/simulator/display-config";
 import { createJoystick } from "@/lib/simulator/hardware/joystick";
 import { createNeoPixel } from "@/lib/simulator/hardware/neopixel";
 import { createSlide } from "@/lib/simulator/hardware/slide";
@@ -10,6 +17,7 @@ import { setRuntimeSignal } from "@/lib/simulator/runtime/time";
 import * as screens from "@/lib/simulator/screens";
 import type { DisplayMode, JoyButton } from "@/lib/simulator/types";
 import { AppLauncher } from "./app-launcher";
+import { DisplayPicker } from "./display-picker";
 import { JoystickPad } from "./joystick-pad";
 import { ModeToggle } from "./mode-toggle";
 import { SlideSwitch } from "./slide-switch";
@@ -19,10 +27,28 @@ export function Simulator() {
   const gridRef = useRef<SimGridHandle>(null);
   const [mode, setMode] = useState<DisplayMode>("pixel");
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // Start with the default; hydrate from localStorage on mount to keep
+  // server and first-client renders identical.
+  const [display, setDisplay] = useState<DisplayConfig>(DEFAULT_DISPLAY);
+  useEffect(() => {
+    setDisplay(loadDisplayConfig());
+  }, []);
 
   const joy = useMemo(() => createJoystick(), []);
   const slide = useMemo(() => createSlide(), []);
   const apps = useMemo(() => launcher.getApps(), []);
+
+  const handleDisplay = useCallback((next: DisplayConfig) => {
+    setDisplay(next);
+    saveDisplayConfig(next);
+  }, []);
+
+  // Mask mode is keyed to the LUMATRIX 8×8 word-clock layout — meaningless at
+  // other sizes. Force back to "pixel" if the display moves off 8×8.
+  const maskAvailable = isLumatrix(display);
+  useEffect(() => {
+    if (!maskAvailable && mode === "mask") setMode("pixel");
+  }, [maskAvailable, mode]);
 
   const handleLaunch = useCallback((index: number) => {
     setActiveIdx(index);
@@ -126,16 +152,23 @@ export function Simulator() {
   return (
     <div className="flex flex-col items-center gap-6 px-6 py-10">
       <div className="flex items-start gap-8 justify-center w-full max-w-[1100px]">
-        <AppLauncher
-          apps={apps}
-          activeIdx={activeIdx}
-          onLaunch={handleLaunch}
-          onBackToLauncher={handleBackToLauncher}
-        />
+        <div className="flex flex-col gap-6">
+          <DisplayPicker display={display} onChange={handleDisplay} />
+          <AppLauncher
+            apps={apps}
+            activeIdx={activeIdx}
+            onLaunch={handleLaunch}
+            onBackToLauncher={handleBackToLauncher}
+          />
+        </div>
 
         <div className="flex flex-col items-center gap-4">
-          <SimulatorGrid ref={gridRef} />
-          <ModeToggle mode={mode} onChange={setMode} />
+          <SimulatorGrid ref={gridRef} display={display} />
+          <ModeToggle
+            mode={mode}
+            onChange={setMode}
+            maskAvailable={maskAvailable}
+          />
         </div>
 
         <div className="flex flex-col items-center gap-4 w-48 shrink-0">

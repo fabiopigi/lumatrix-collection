@@ -82,3 +82,11 @@ source. For palette B the overlap saturates toward white.
   direction (or switching to a different one) resets the state.
 - **Slide switch is read every frame.** Toggle is live; no need to leave and
   re-enter the watch to switch palettes.
+
+## Responsive scaling
+
+**Feasibility: Limited — more elaborate clock face, not a bigger app.**
+
+The four-digit `HH:MM` layout fills the 8×8 source. On a larger display you could add a seconds row, a date row, or replace the digit clock with an analog face. None of that is required — the existing rendering scaled up looks fine, just blockier.
+
+Things to think about: the two-palette toggle (orange-green vs blue-yellow) could grow into a real palette picker. At 32×32 you have room for a settings overlay; on 8×8 you don't.

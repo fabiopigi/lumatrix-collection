@@ -95,3 +95,11 @@ Both happen at the moment an obstacle's `x` reaches `DINO_COL` (column 2):
 - Jumping into an air obstacle (y=5) kills you — the airborne row set (4, 5) overlaps. Ducking under a ground obstacle (y=6) kills you for the same reason. The game forces the player to identify each obstacle type before reacting.
 - `random.getrandbits(1)` is preferred over `random.choice(...)` for the air/ground coin flip — it's available on every MicroPython port, while `choice` is occasionally trimmed out.
 - No backwards-compatibility for missing joystick keys: the launcher always provides up/down. Standalone mode constructs them locally.
+
+## Responsive scaling
+
+**Feasibility: Yes — longer track, more variety.**
+
+A wider display directly extends the side-scroller: more obstacles visible at once, longer reaction window. A taller display opens the door to taller obstacles, multi-height jump arcs, or platforms. The world-step cadence (`MOVE_INTERVAL_*`) might want a slower default at higher widths so the speed feels right at the new pixel scale.
+
+Things to think about: obstacle spawn variety would benefit from a second axis — e.g., flying birds at the top half on a tall display.

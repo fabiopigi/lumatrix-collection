@@ -71,3 +71,11 @@ To make the game tighter (lower score ceiling), reduce `SPEEDUP_HITS` to 7 or 8.
 - Wall bounces use reflection: if the ball would cross `y < 0` or `y > 7`, position is reflected back inside and velocity inverted. This works correctly for any speed up to `MAX_VY`.
 - Paddle hit detection uses `int(round(ball_y))` for the row check. With sub-pixel ball positions, the player can sometimes "save" a ball that's mathematically about to cross the edge.
 - The deflection formula: `vy += (ball_y - paddle_center) * DEFLECTION`. With `DEFLECTION = 0.18` and a 2-pixel paddle, hitting near an edge changes `vy` by up to ±0.18 — a noticeable shift but not extreme.
+
+## Responsive scaling
+
+**Feasibility: Yes — longer field, taller paddles.**
+
+A wider display lengthens the ball's travel time across the field, giving the CPU (currently a perfect tracker) more time to position and giving the player room to anticipate. A taller display lets paddles grow (`PADDLE_LEN`) to keep the difficulty curve similar, or stay short for a harder game. The deflection physics work at any resolution.
+
+Things to think about: the CPU's perfect tracking is already too good on 8×8; on a wider display you'll want to add a max paddle speed so the CPU isn't unbeatable.

@@ -58,3 +58,11 @@ The check at game over time uses `screens.game_over_screen(score)`, which means:
 - `play_round()` returns one of: `("hit", pixels_left, dir)`, `("wrong", 0, dir)`, `("timeout", 0, dir)`, `("exit", 0, dir)`. Only "hit" continues; the others end the game.
 - The flash-on-hit is intentionally subtle (two quick toggles, ~250 ms total) so it doesn't slow the pace.
 - Game length scales reasonably with skill. A casual player runs ~5–10 rounds (~10–25 points). An expert sustains ~25–40 rounds (~60–99 points). Sustained 99+ is rare.
+
+## Responsive scaling
+
+**Feasibility: Limited — bigger pixels, not a bigger game.**
+
+The arrow and bar already fill the 8×8 frame; rendered on a larger display they'd just be visually larger (which is fine for readability). The gameplay loop — pick a direction, react before the bar empties — doesn't gain depth from more pixels.
+
+Things to think about: at 16×16 you could afford a thicker, more detailed arrow shape, and the timing bar could be replaced with a more elaborate visual (e.g., a shrinking ring). Cosmetic, not mechanical.

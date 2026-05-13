@@ -80,3 +80,11 @@ For a tighter score ceiling, raise the level 5 spawn rate (more aliens = faster 
 - `handle_collisions(bullets, aliens, score)` builds a `(col, row) → alien_index` dict and walks bullets, removing matches from both lists. Returns updated `(bullets, aliens, score)`.
 - The 3-pixel-wide ship rendering uses simple `for off in (-1, 0, 1): px(player_col + off, 0, ship_color)`.
 - `stream_offsets(n)` returns the bullet offset list for a given stream count: `(0,)`, `(-1, 1)`, `(-1, 0, 1)`, or `(-2, -1, 0, 1, 2)` for higher stream counts not used by default levels.
+
+## Responsive scaling
+
+**Feasibility: Yes — more dramatic descent.**
+
+A taller display directly extends the aliens' fall time, making the difficulty pacing gentler. A wider display means more horizontal travel for the player and more spawn variety. Bullet streams (already configurable 1/2/3 per shot) scale naturally. The `LEVELS` table would want rebalancing — current step-rates assume 8-row descent.
+
+Things to think about: spawning a wave of multiple aliens simultaneously becomes more interesting at 16-wide+, and could be a new level mechanic.

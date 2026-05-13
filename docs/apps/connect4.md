@@ -44,3 +44,11 @@ Center is handled on **release**, not on press, so it can coexist with `screens.
 The color palette mirrors the Pixel Designer source (#ff0000, #ffff00, #800000) pre-dimmed to ~25% at module import: placed Red `(64, 0, 0)`, placed Yellow `(64, 64, 0)`, cursor Red `(32, 0, 0)`, cursor Yellow `(32, 32, 0)`. The pulse's "dim" state is a further /4 of the placed color, so the contrast stays inside the same hue and the winning line reads as a single throbbing element rather than a color change.
 
 `winning_line()` walks forward and backward from the just-placed piece in each of the four line directions, collecting same-colored cells. Returning the full collected run (which can exceed 4 on a 5-in-a-row) lets the pulse highlight the whole line rather than an arbitrary 4-cell slice.
+
+## Responsive scaling
+
+**Feasibility: Yes — expand the board.**
+
+The game is naturally parameterised on (cols, rows) — the source code already uses `COLS = 8` and `ROWS = 7`. Going to 16×16 means a 16-column, 14-row Connect-4 board (one row reserved for the cursor, like the 8×8 version). The win-line scanner already iterates in 4 directions over arbitrary distance, so it'd handle larger boards without change.
+
+Things to think about: a 16-wide board makes finding wins much harder for casual play — consider raising the win-length from 4 to 5 on bigger boards.

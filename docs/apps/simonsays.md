@@ -55,3 +55,11 @@ Panel pixel positions come from a Pixel Designer JSON of the four colored arrow 
 The random pattern is generated once per game (32 letters). Losing on round 5 and restarting starts a fresh pattern, not a re-roll of the failed letter — that's deliberate; the player is always memorizing a fresh sequence.
 
 `screens.game_over_screen(score)` handles the red flash + score render; the app itself never draws end-of-session UI.
+
+## Responsive scaling
+
+**Feasibility: Limited — bigger panels, same game.**
+
+The four corner-coloured panels would scale up uniformly. The actual gameplay is "remember a sequence of up to 32 direction taps" and doesn't change with display size. The panels' fixed LED indices would need to be regenerated for the larger size, but that's mechanical.
+
+Things to think about: at 16×16 the panels could become 6×6 each (with gaps), making the visual layout more readable. The brightness boost during playback could be subtler to compensate.
