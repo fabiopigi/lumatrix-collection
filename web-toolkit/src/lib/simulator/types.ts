@@ -14,6 +14,10 @@ export interface Joystick {
   readonly left: Pin;
   readonly right: Pin;
   readonly center: Pin;
+  /** Slide-switch pin, mirroring the Pico's `joystick["slide"]` entry. Apps
+   *  that need it (flappy, watch) read `joy.slide?.value()`. Attached by the
+   *  simulator host after construction. */
+  slide?: Pin;
   press(button: JoyButton): void;
   release(button: JoyButton): void;
   isPressed(button: JoyButton): boolean;

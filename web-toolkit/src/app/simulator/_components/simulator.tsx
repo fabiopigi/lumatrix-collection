@@ -20,6 +20,12 @@ export function Simulator() {
   const joy = useMemo(() => createJoystick(), []);
   const slide = useMemo(() => createSlide(), []);
 
+  // Expose the slide as a Pin on the joystick so apps (flappy, watch) can read
+  // it as `joy.slide?.value()`, matching the Pico's joystick["slide"] dict.
+  useMemo(() => {
+    joy.slide = { value: () => slide.value() };
+  }, [joy, slide]);
+
   useEffect(() => {
     const controller = new AbortController();
     setRuntimeSignal(controller.signal);
