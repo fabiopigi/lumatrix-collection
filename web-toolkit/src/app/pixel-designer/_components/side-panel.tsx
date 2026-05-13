@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { SYMBOLS } from "@/lib/pixel-designer/symbols";
 import type { FontKey, Mode } from "@/lib/pixel-designer/types";
 
@@ -31,8 +30,6 @@ interface SidePanelProps {
 }
 
 export function SidePanel(props: SidePanelProps) {
-  const colorInputRef = useRef<HTMLInputElement>(null);
-
   const handleHexBlur = (v: string) => {
     let next = v.trim();
     if (!next.startsWith("#")) next = "#" + next;
@@ -76,17 +73,15 @@ export function SidePanel(props: SidePanelProps) {
       <Section title="Color">
         <div className="flex items-center gap-2 mb-2">
           <label
-            className="relative w-7 h-7 rounded-md border border-white/10 cursor-pointer block"
+            className="relative w-7 h-7 rounded-md border border-white/10 cursor-pointer block overflow-hidden"
             style={{ background: props.color }}
-            onClick={() => colorInputRef.current?.click()}
             title="Click to pick custom"
           >
             <input
-              ref={colorInputRef}
               type="color"
               value={normalizeHex(props.color)}
               onChange={(e) => props.onColor(e.target.value)}
-              className="absolute opacity-0 pointer-events-none w-0 h-0"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer border-0 p-0 m-0 bg-transparent"
             />
           </label>
           <input

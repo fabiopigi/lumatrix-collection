@@ -1,8 +1,8 @@
 # LUMATRIX Pixel Designer — Usage Guide
 
-A self-contained HTML pixel-art designer for LED matrix displays. Built originally for the ZHAW **LUMATRIX** 8×8 NeoPixel kit but configurable for any matrix size, color mode, and LED-chain layout.
+A pixel-art designer for LED matrix displays, originally written for the ZHAW **LUMATRIX** 8×8 NeoPixel kit but configurable for any matrix size, color mode, and LED-chain layout.
 
-Single file. No build step. No dependencies. Open `web-apps/pixel-designer.html` in a modern browser and design.
+Lives in `web-toolkit/src/app/pixel-designer/` as **LumenDesigner**, a route in the LumenLab Next.js app. Run `cd web-toolkit && npm run dev` and visit [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer).
 
 ![LUMATRIX Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
 
@@ -31,10 +31,11 @@ Single file. No build step. No dependencies. Open `web-apps/pixel-designer.html`
 
 ## Quick start
 
-1. Open `web-apps/pixel-designer.html` in a browser (Chrome, Safari, or Firefox, all current).
-2. Pick a color from the palette on the right.
-3. Click and drag on the grid to paint pixels.
-4. Hit **Export** in the side panel to dump JSON, or **PNG** in the header for an image.
+1. Start the LumenLab dev server: `cd web-toolkit && npm run dev`.
+2. Open [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer) in a current Chrome, Safari, or Firefox.
+3. Pick a color from the palette on the right.
+4. Click and drag on the grid to paint pixels.
+5. Hit **Export** in the side panel to dump JSON, or **PNG** in the header for an image.
 
 That's it for the minimum loop. Everything else is convenience: more tools, more pages, more configuration.
 
@@ -511,9 +512,11 @@ The Text tool stamps on **click**. Type in the field → hover the grid to see a
 
 ```
 LumaMatrix/
-├── web-apps/
-│   ├── pixel-designer.html     # the pixel designer (this tool)
-│   └── simulator.html          # browser-based LUMATRIX simulator
+├── web-toolkit/                # LumenLab Next.js app
+│   └── src/
+│       ├── app/pixel-designer/ # LumenDesigner route (this tool)
+│       ├── app/simulator/      # LumenSimulator route
+│       └── lib/pixel-designer/ # designer libs (palette, geometry, fonts, …)
 ├── shared/
 │   └── fonts.json              # both pixel fonts in a machine-readable form
 ├── docs/
@@ -525,4 +528,4 @@ LumaMatrix/
 └── README.md                   # top-level project readme
 ```
 
-The designer is fully self-contained: open `web-apps/pixel-designer.html` directly from disk (no web server needed) and it works.
+The designer runs entirely client-side: `npm run dev` is only there for Hot Module Reload while you iterate — once built (`npm run build`), the route is a single statically-rendered page.
