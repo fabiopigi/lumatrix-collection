@@ -36,7 +36,7 @@ There's almost always a good reason to start in the web simulator:
 - **Faster iteration.** No flashing, no Thonny disconnect dance. Save the file, the build watcher rebuilds, refresh the browser, see the result. Cycle time is a few seconds vs ~30 s on hardware.
 - **Real debugging.** Browser DevTools, breakpoints, console logs, time travel — none of which exist on a Pico.
 - **No "is the hardware to blame?" ambiguity.** When something breaks in the sim, it's your code. On the Pico it might be a wiring quirk, a brightness issue, a serial-port lock, or a soft brick.
-- **The port is mostly mechanical.** The TypeScript simulator under `web/src/` is a direct API mirror of the MicroPython codebase: same `np[i] = [r, g, b]` writes, same `pin.value() === 0` active-low, same `screens` and `fonts` modules. Once the sim works, translating to Python is rote — see [Porting from TypeScript to MicroPython](#porting-from-typescript-to-micropython).
+- **The port is mostly mechanical.** The TypeScript simulator under `web-toolkit/src/lib/simulator/` is a direct API mirror of the MicroPython codebase: same `np[i] = [r, g, b]` writes, same `pin.value() === 0` active-low, same `screens` and `fonts` modules. Once the sim works, translating to Python is rote — see [Porting from TypeScript to MicroPython](#porting-from-typescript-to-micropython).
 - **The user can test without a Pico.** They can open the sim in any browser, click the on-screen joystick or use keyboard, and tell you what feels off.
 
 Reasons to skip the sim and go straight to Python:
@@ -49,8 +49,9 @@ Reasons to skip the sim and go straight to Python:
 
 ```
 1. Ask:   "Web simulator first, or straight to MicroPython?"
-2. Build: web/src/apps/<name>.ts + wire into web/src/launcher.ts
-3. Test:  user runs `npm run watch` in web/ and opens index.html
+2. Build: web-toolkit/src/lib/simulator/apps/<name>.ts + wire into web-toolkit/src/lib/simulator/launcher.ts
+3. Test:  user runs `npm run dev` in web-toolkit/ and opens
+          http://localhost:3000/simulator
 4. Iterate based on user feedback in the browser.
 5. Port:  copy the .ts into python/apps/<name>.py with the mechanical
           translation (await → blocking, [] → (), dict-access conventions).
@@ -117,28 +118,29 @@ LumaMatrix/
 │       ├── flappy.py
 │       ├── ...
 │       └── <your_app>.py    ← your new app goes here
-├── web/                     ← browser simulator (TypeScript)
-│   ├── index.html           ← the simulator UI
-│   ├── compile.mjs          ← esbuild bundler
-│   ├── package.json         ← `npm install && npm run watch`
+├── web-toolkit/             ← LumenLab Next.js app (LumenDesigner + LumenSimulator)
+│   ├── package.json         ← `npm install && npm run dev`
 │   └── src/
-│       ├── main.ts          ← simulator entry point (mounts UI, boots launcher)
-│       ├── launcher.ts      ← port of main.py
-│       ├── screens.ts       ← port of _screens.py
-│       ├── fonts.ts         ← port of _fonts.py
-│       ├── letter-mask.ts   ← LUMATRIX word-clock mask helper
-│       ├── runtime/
-│       │   └── time.ts      ← ticks_ms / ticks_diff / sleep_ms
-│       ├── hardware/
-│       │   ├── neopixel.ts  ← NeoPixel buffer + flush callback
-│       │   ├── joystick.ts  ← Joystick with active-low pin.value()
-│       │   └── slide.ts     ← slide switch
-│       ├── ui/              ← grid renderer, mode toggle, on-screen joystick
-│       └── apps/
-│           ├── reaction.ts  ← port of reaction.py
-│           ├── connect4.ts
-│           ├── ...
-│           └── <your_app>.ts  ← your new app (web-first path)
+│       ├── app/
+│       │   ├── simulator/   ← /simulator route (React UI host)
+│       │   └── pixel-designer/  ← /pixel-designer route
+│       └── lib/simulator/
+│           ├── launcher.ts  ← port of main.py
+│           ├── screens.ts   ← port of _screens.py
+│           ├── fonts.ts     ← port of _fonts.py
+│           ├── types.ts     ← shared NeoPixel / Joystick / Pin / RGB / App
+│           ├── letter-mask.ts ← LUMATRIX word-clock mask helper
+│           ├── runtime/
+│           │   └── time.ts  ← ticks_ms / ticks_diff / sleep_ms
+│           ├── hardware/
+│           │   ├── neopixel.ts  ← NeoPixel buffer + flush callback
+│           │   ├── joystick.ts  ← Joystick with active-low pin.value()
+│           │   └── slide.ts     ← slide switch
+│           └── apps/
+│               ├── reaction.ts  ← port of reaction.py
+│               ├── connect4.ts
+│               ├── ...
+│               └── <your_app>.ts  ← your new app (web-first path)
 ├── shared/
 │   └── fonts.json           ← font definitions (copy to Pico's filesystem root; also imported by the sim at build time)
 └── docs/
@@ -150,7 +152,7 @@ LumaMatrix/
         └── <your_app>.md    ← your app's docs go here
 ```
 
-The two trees mirror each other. Every `python/apps/foo.py` ideally has a `web/src/apps/foo.ts` sibling, with both registered in their respective launcher (`python/main.py` and `web/src/launcher.ts`). Apps that only exist on one side are an in-progress state — not a permanent split.
+The two trees mirror each other. Every `python/apps/foo.py` ideally has a `web-toolkit/src/lib/simulator/apps/foo.ts` sibling, with both registered in their respective launcher (`python/main.py` and `web-toolkit/src/lib/simulator/launcher.ts`). Apps that only exist on one side are an in-progress state — not a permanent split.
 
 Two things to keep in mind:
 
@@ -684,19 +686,19 @@ The existing apps in `docs/apps/` are filled-in examples; copy the closest one a
 
 ## Authoring for the web simulator
 
-The web simulator under `web/` is a TypeScript reimplementation of the launcher and shared modules, designed so that an app written against the simulator's API ports to MicroPython with mostly mechanical edits.
+The web simulator lives in `web-toolkit/src/lib/simulator/` — a TypeScript reimplementation of the launcher and shared modules running inside a Next.js app. An app written against the simulator's API ports to MicroPython with mostly mechanical edits.
 
 ### Dev loop
 
 ```bash
-cd web
+cd web-toolkit
 npm install          # one-time
-npm run watch        # rebuilds dist/ on every save
+npm run dev          # Turbopack dev server with HMR
 ```
 
-Open `web/index.html` in any modern browser (file:// is fine — no server required). You'll see the LUMATRIX matrix on the left and a virtual joystick + slide switch on the right. Keyboard works too: arrow keys = D-pad, space = center, S = slide.
+Open [http://localhost:3000/simulator](http://localhost:3000/simulator). You'll see the LUMATRIX matrix on top with a virtual joystick + slide switch underneath. Keyboard works too: arrow keys = D-pad, space = center, S = slide.
 
-The watcher rebuilds in a few hundred ms. Refresh the browser after each save.
+Hot module reload picks up changes within a second. No browser refresh needed for most edits.
 
 ### What's mirrored from MicroPython
 
@@ -715,10 +717,9 @@ The watcher rebuilds in a few hundred ms. Refresh the browser after each save.
 ### Standard shape of a TS app
 
 ```ts
-import type { NeoPixel, RGB } from "../hardware/neopixel";
-import type { Joystick } from "../hardware/joystick";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
+import type { Joystick, NeoPixel, RGB } from "../types";
 
 export const NAME = "MyGame";
 
@@ -769,7 +770,7 @@ Notes:
 
 ### Registering in the simulator launcher
 
-Edit `web/src/launcher.ts`. There are two spots, just like in `python/main.py`:
+Edit `web-toolkit/src/lib/simulator/launcher.ts`. There are two spots, just like in `python/main.py`:
 
 ```ts
 // ... existing imports ...
@@ -799,7 +800,7 @@ Once the user has tested the web version and is happy, port it. The translation 
 |---|---|---|
 | `import * as screens from "../screens";` | `import _screens as screens` | |
 | `import { sleep_ms, ticks_ms, ticks_diff } from "../runtime/time";` | `from time import sleep_ms, ticks_ms, ticks_diff` | |
-| `import type { NeoPixel, RGB } from "../hardware/neopixel";` | Delete. MicroPython has no static types. | |
+| `import type { Joystick, NeoPixel, Pin, RGB } from "../types";` | Delete. MicroPython has no static types. | |
 | `export const NAME = "MyGame";` | `NAME = "MyGame"` | |
 | `export async function run(np, joy) { ... }` | `def run(np, joy):` | Drop `async` and `export`. |
 | `await sleep_ms(50);` | `sleep_ms(50)` | Drop `await` everywhere. |
@@ -927,10 +928,9 @@ if __name__ == "__main__":
 ### Game app (TypeScript, web simulator)
 
 ```ts
-import type { NeoPixel, RGB } from "../hardware/neopixel";
-import type { Joystick } from "../hardware/joystick";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
+import type { Joystick, NeoPixel, RGB } from "../types";
 
 export const NAME = "MyGame";
 
