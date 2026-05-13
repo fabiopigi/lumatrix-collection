@@ -1,10 +1,21 @@
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 
 export const NAME = "Doom";
 
-const NUM_LEDS = 64;
+/**
+ * 1D raycaster — fires W rays per frame (was hardcoded 8), keeps a float
+ * z-buffer per column, and projects walls with float heights + alpha-blended
+ * top/bottom edges so the wall outline is smooth even at low resolutions.
+ *
+ * Every frame starts with a subtle sky / floor gradient as the backdrop, so
+ * empty cells aren't pure black — that hides the row-by-row stepping a lot
+ * better than the previous "off cells are off" look. At 16×16 and 32×32 the
+ * gradient + AA walls + scaled sprites give the raycaster room to breathe.
+ */
+export const RESPONSIVE = true;
+
 const IDLE_MS = 10_000;
 
 const MAP_SIZE = 10;
@@ -15,16 +26,22 @@ const MAX_DIST = 8.0;
 let np: NeoPixel;
 let JOY_UP: Pin, JOY_DOWN: Pin, JOY_LEFT: Pin, JOY_RIGHT: Pin, JOY_SEL: Pin;
 
+let W = 8;
+let H = 8;
+let N = 64;
+
 let px = 1.5;
 let py = 1.5;
 let pa = 0.0;
 let worldMap: number[][] = [];
-const zBuffer: number[] = new Array(8).fill(MAX_DIST);
+let zBuffer: number[] = new Array(8).fill(MAX_DIST);
 type Enemy = [number, number, number, number]; // x, y, hp, hitFlashFrames
 type Projectile = [number, number, number]; // x, y, angle
 let enemies: Enemy[] = [];
 let projectiles: Projectile[] = [];
-const frameBuffer: number[][] = Array.from({ length: NUM_LEDS }, () => [0, 0, 0]);
+// Float-valued frame buffer in [r, g, b] triples; `showBuffer()` clamps + dims
+// to 8-bit when writing to the NeoPixel.
+let frameBuffer: number[][] = [];
 
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -60,71 +77,162 @@ function generateMap(): void {
   while (enemies.length < 3) {
     const ex = randInt(1, 8);
     const ey = randInt(1, 8);
-    if (worldMap[ey][ex] === 0 && (Math.abs(ex - px) > 2 || Math.abs(ey - py) > 2)) {
+    if (
+      worldMap[ey][ex] === 0 &&
+      (Math.abs(ex - px) > 2 || Math.abs(ey - py) > 2)
+    ) {
       enemies.push([ex + 0.5, ey + 0.5, 1, 0]);
     }
   }
 }
 
-function clearBuffer(): void {
-  for (let i = 0; i < NUM_LEDS; i++) {
-    frameBuffer[i][0] = 0;
-    frameBuffer[i][1] = 0;
-    frameBuffer[i][2] = 0;
+/** Fill the frame buffer with a vertical sky → floor gradient. */
+function fillBackdrop(): void {
+  // y is in DISPLAY space (visual row, 0 = top). LED row = H-1-y.
+  // We write directly to frameBuffer indexed in visual-y * W + x for clarity,
+  // and the showBuffer() step converts to LED order.
+  const horizon = (H - 1) / 2;
+  for (let y = 0; y < H; y++) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if (y < horizon) {
+      // Sky: dim blue at top, fading toward the horizon. We scale by 1/0.15
+      // because showBuffer multiplies by BRIGHTNESS = 0.15 at write time.
+      const t = (horizon - y) / horizon; // 1 at top, 0 at horizon
+      r = 40 * t;
+      g = 60 * t;
+      b = 140 * t + 20;
+    } else {
+      // Floor: dim brown, fading toward the horizon.
+      const t = (y - horizon) / horizon;
+      r = 90 * t + 25;
+      g = 50 * t + 15;
+      b = 25 * t + 8;
+    }
+    for (let x = 0; x < W; x++) {
+      const idx = y * W + x;
+      frameBuffer[idx][0] = r;
+      frameBuffer[idx][1] = g;
+      frameBuffer[idx][2] = b;
+    }
   }
 }
 
 function showBuffer(): void {
-  for (let i = 0; i < NUM_LEDS; i++) {
-    const r = Math.min(255, Math.floor(frameBuffer[i][0] * BRIGHTNESS));
-    const g = Math.min(255, Math.floor(frameBuffer[i][1] * BRIGHTNESS));
-    const b = Math.min(255, Math.floor(frameBuffer[i][2] * BRIGHTNESS));
-    np[i] = [r, g, b] as RGB;
+  // frameBuffer is in visual-y indexing. NeoPixel uses LED row = H-1-y.
+  for (let y = 0; y < H; y++) {
+    const ledRow = H - 1 - y;
+    for (let x = 0; x < W; x++) {
+      const src = y * W + x;
+      const r = Math.min(255, Math.floor(frameBuffer[src][0] * BRIGHTNESS));
+      const g = Math.min(255, Math.floor(frameBuffer[src][1] * BRIGHTNESS));
+      const b = Math.min(255, Math.floor(frameBuffer[src][2] * BRIGHTNESS));
+      np[ledRow * W + x] = [r, g, b] as RGB;
+    }
   }
   np.write();
 }
 
-function drawSprite(xPos: number, yPos: number, dist: number, size: number, color: readonly number[]): void {
+/** Composite a colour onto the frame buffer at (px, py) (visual y) with the
+ *  given alpha in [0, 1]. Alpha-blends additively over the backdrop. */
+function blendInto(
+  ix: number,
+  iy: number,
+  color: readonly number[],
+  alpha: number,
+): void {
+  if (ix < 0 || ix >= W || iy < 0 || iy >= H) return;
+  const idx = iy * W + ix;
+  const a = Math.max(0, Math.min(1, alpha));
+  frameBuffer[idx][0] = Math.min(
+    255,
+    frameBuffer[idx][0] * (1 - a) + color[0] * a,
+  );
+  frameBuffer[idx][1] = Math.min(
+    255,
+    frameBuffer[idx][1] * (1 - a) + color[1] * a,
+  );
+  frameBuffer[idx][2] = Math.min(
+    255,
+    frameBuffer[idx][2] * (1 - a) + color[2] * a,
+  );
+}
+
+/** Draw a sprite with float position + float size, alpha-blending the
+ *  partial-coverage edge cells against the existing backdrop / walls. */
+function drawSprite(
+  xPos: number,
+  yPos: number,
+  dist: number,
+  size: number,
+  color: readonly number[],
+): void {
   const halfS = size / 2;
-  const startX = Math.floor(xPos - halfS + 0.5);
-  const endX = Math.floor(xPos + halfS + 0.5);
-  const startY = Math.floor(yPos - halfS + 0.5);
-  const endY = Math.floor(yPos + halfS + 0.5);
+  const x0 = xPos - halfS;
+  const x1 = xPos + halfS;
+  const y0 = yPos - halfS;
+  const y1 = yPos + halfS;
+
+  const startX = Math.floor(x0);
+  const endX = Math.ceil(x1) - 1;
+  const startY = Math.floor(y0);
+  const endY = Math.ceil(y1) - 1;
+
   for (let ix = startX; ix <= endX; ix++) {
-    if (ix >= 0 && ix < 8 && dist < zBuffer[ix]) {
-      for (let iy = startY; iy <= endY; iy++) {
-        if (iy >= 0 && iy < 8) {
-          const idx = iy * 8 + ix;
-          frameBuffer[idx][0] = Math.min(255, frameBuffer[idx][0] + color[0]);
-          frameBuffer[idx][1] = Math.min(255, frameBuffer[idx][1] + color[1]);
-          frameBuffer[idx][2] = Math.min(255, frameBuffer[idx][2] + color[2]);
-        }
-      }
+    if (ix < 0 || ix >= W) continue;
+    if (dist >= zBuffer[ix]) continue;
+    // Horizontal coverage of this column [ix, ix+1] inside [x0, x1].
+    const xCov = Math.min(ix + 1, x1) - Math.max(ix, x0);
+    if (xCov <= 0) continue;
+    for (let iy = startY; iy <= endY; iy++) {
+      if (iy < 0 || iy >= H) continue;
+      const yCov = Math.min(iy + 1, y1) - Math.max(iy, y0);
+      if (yCov <= 0) continue;
+      const alpha = Math.min(1, xCov * yCov);
+      blendInto(ix, iy, color, alpha);
     }
   }
 }
 
 function renderWorld(): void {
-  for (let i = 0; i < 8; i++) {
-    const rayAngle = pa - FOV / 2 + (i / 8) * FOV;
-    let rx = px, ry = py, d = 0;
+  // Walls — one ray per display column.
+  for (let i = 0; i < W; i++) {
+    // Sample the ray at the column's centre.
+    const rayAngle = pa - FOV / 2 + ((i + 0.5) / W) * FOV;
+    let d = 0;
     while (d < MAX_DIST) {
-      d += 0.1;
-      const mx = Math.floor(rx + Math.cos(rayAngle) * d);
-      const my = Math.floor(ry + Math.sin(rayAngle) * d);
+      d += 0.05;
+      const mx = Math.floor(px + Math.cos(rayAngle) * d);
+      const my = Math.floor(py + Math.sin(rayAngle) * d);
       if (worldMap[my] && worldMap[my][mx] === 1) break;
     }
 
     const actualDist = d * Math.cos(rayAngle - pa);
     zBuffer[i] = actualDist;
-    const height = Math.min(8, Math.max(1, Math.floor(8 / (actualDist + 0.01))));
-    const startY = Math.floor((8 - height) / 2);
+
+    // Float wall height in cells; clamp to keep the slab inside [0, H].
+    const wallH = Math.min(H, H / (actualDist + 0.01));
+    const topF = (H - wallH) / 2;
+    const bottomF = (H + wallH) / 2;
+
+    // Closer = warmer wall colour; farther = cooler blue.
     const nz = Math.max(0, Math.min(1, 1 - actualDist / 7));
-    for (let y = startY; y < startY + height; y++) {
-      frameBuffer[y * 8 + i] = [200 * nz, 50 * nz * nz, 255 * (1 - nz)];
+    const wallColor: RGB = [200 * nz, 50 * nz * nz, 255 * (1 - nz)];
+
+    // Walk every row the wall slab touches, including the partially-covered
+    // top/bottom rows. Alpha = the fraction of the row's vertical span that
+    // falls inside [topF, bottomF] — that's the per-row coverage.
+    const yStart = Math.max(0, Math.floor(topF));
+    const yEnd = Math.min(H - 1, Math.ceil(bottomF) - 1);
+    for (let y = yStart; y <= yEnd; y++) {
+      const cov = Math.min(y + 1, bottomF) - Math.max(y, topF);
+      if (cov <= 0) continue;
+      blendInto(i, y, wallColor, Math.min(1, cov));
     }
   }
 
+  // Sprites — enemies + projectiles.
   const t = ticks_ms();
   for (const e of enemies) {
     const dx = e[0] - px;
@@ -135,13 +243,17 @@ function renderWorld(): void {
     while (angle > Math.PI) angle -= 2 * Math.PI;
 
     if (Math.abs(angle) < FOV) {
-      const sx = (angle / FOV + 0.5) * 8;
-      const size = Math.max(1, Math.floor(6 / (dist + 0.5)));
+      // Project to a float screen-x — no quantisation.
+      const sx = (angle / FOV + 0.5) * W;
+      // Sprite size in cells scales with display resolution. The 0.75-of-min
+      // factor keeps roughly the same on-screen size across W and H.
+      const baseSize = (0.75 * Math.min(W, H)) / (dist + 0.5);
+      const size = Math.max(1, baseSize);
       const color = e[3] > 0
         ? [255, 255, 255]
         : [255, (Math.sin(t / 100) + 1) * 100, 0];
       if (e[3] > 0) e[3] -= 1;
-      drawSprite(sx, 3.5, dist, size, color);
+      drawSprite(sx, (H - 1) / 2, dist, size, color);
     }
   }
 
@@ -154,9 +266,14 @@ function renderWorld(): void {
     while (angle > Math.PI) angle -= 2 * Math.PI;
 
     if (Math.abs(angle) < FOV) {
-      const sx = (angle / FOV + 0.5) * 8;
-      const size = Math.max(1, 6 - dist * 4);
-      drawSprite(sx, 4, dist, size, [255, 255, 100]);
+      const sx = (angle / FOV + 0.5) * W;
+      // Projectiles GROW visually as they fly away from the player (close to
+      // the muzzle = tiny dot; near the wall they hit = chunkier flare).
+      const size = Math.max(
+        0.6,
+        (0.75 * Math.min(W, H)) / (dist + 0.5) - 0.5,
+      );
+      drawSprite(sx, H / 2, dist, size, [255, 255, 100]);
     }
   }
 }
@@ -167,7 +284,11 @@ function updateGame(): void {
     p[0] += Math.cos(p[2]) * 0.4;
     p[1] += Math.sin(p[2]) * 0.4;
 
-    if (worldMap[Math.floor(p[1])] && worldMap[Math.floor(p[1])][Math.floor(p[0])] === 1) continue;
+    if (
+      worldMap[Math.floor(p[1])] &&
+      worldMap[Math.floor(p[1])][Math.floor(p[0])] === 1
+    )
+      continue;
 
     let hitEnemy = false;
     for (const e of enemies) {
@@ -180,7 +301,10 @@ function updateGame(): void {
       }
     }
 
-    if (!hitEnemy && Math.sqrt((p[0] - px) ** 2 + (p[1] - py) ** 2) < MAX_DIST) {
+    if (
+      !hitEnemy &&
+      Math.sqrt((p[0] - px) ** 2 + (p[1] - py) ** 2) < MAX_DIST
+    ) {
       newProjs.push(p);
     }
   }
@@ -199,8 +323,14 @@ async function playDoom(): Promise<"exit" | "idle"> {
     if (screens.check_exit()) return "exit";
 
     let active = false;
-    if (JOY_LEFT.value() === 0) { pa -= 0.15; active = true; }
-    if (JOY_RIGHT.value() === 0) { pa += 0.15; active = true; }
+    if (JOY_LEFT.value() === 0) {
+      pa -= 0.15;
+      active = true;
+    }
+    if (JOY_RIGHT.value() === 0) {
+      pa += 0.15;
+      active = true;
+    }
 
     let nx = px, ny = py;
     if (JOY_UP.value() === 0) {
@@ -213,7 +343,10 @@ async function playDoom(): Promise<"exit" | "idle"> {
       ny -= Math.sin(pa) * 0.15;
       active = true;
     }
-    if (worldMap[Math.floor(ny)] && worldMap[Math.floor(ny)][Math.floor(nx)] === 0) {
+    if (
+      worldMap[Math.floor(ny)] &&
+      worldMap[Math.floor(ny)][Math.floor(nx)] === 0
+    ) {
       px = nx;
       py = ny;
     }
@@ -230,7 +363,7 @@ async function playDoom(): Promise<"exit" | "idle"> {
     }
 
     updateGame();
-    clearBuffer();
+    fillBackdrop();
     renderWorld();
     showBuffer();
 
@@ -240,14 +373,24 @@ async function playDoom(): Promise<"exit" | "idle"> {
   }
 }
 
-export async function run(neopixel: NeoPixel, joystick: Joystick): Promise<void> {
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
   np = neopixel;
   JOY_UP = joystick.up;
   JOY_DOWN = joystick.down;
   JOY_LEFT = joystick.left;
   JOY_RIGHT = joystick.right;
   JOY_SEL = joystick.center;
-  screens.init(neopixel, joystick);
+  W = display?.width ?? 8;
+  H = display?.height ?? 8;
+  N = W * H;
+  zBuffer = new Array(W).fill(MAX_DIST);
+  frameBuffer = Array.from({ length: N }, () => [0, 0, 0]);
+  screens.init(screensNp ?? neopixel, joystick);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const outcome = await playDoom();
