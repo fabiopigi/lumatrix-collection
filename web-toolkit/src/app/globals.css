@@ -131,3 +131,70 @@ body {
   border-radius: 4px;
   z-index: 10;
 }
+
+/* ============================================================
+   Simulator
+   ============================================================ */
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--sim-cell, 48px));
+  grid-template-rows: repeat(8, var(--sim-cell, 48px));
+  gap: var(--sim-gap, 6px);
+  padding: 10px;
+  border-radius: 10px;
+  background: #1a1a1f;
+}
+
+.sim-cell {
+  width: var(--sim-cell, 48px);
+  height: var(--sim-cell, 48px);
+  background: #0a0a0c;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  position: relative;
+  transition: box-shadow 0.05s linear;
+}
+
+.sim-cell.lit {
+  box-shadow:
+    0 0 14px var(--c),
+    0 0 4px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 1px 3px rgba(255, 255, 255, 0.25);
+}
+
+.sim-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--sim-cell, 48px) * 0.6);
+  font-weight: 800;
+  color: transparent;
+  font-family: var(--font-sans);
+  pointer-events: none;
+  user-select: none;
+}
+
+.sim-cell.mask-mode {
+  background: #060608;
+}
+.sim-cell.mask-mode .sim-letter {
+  color: #1e1e24;
+}
+.sim-cell.mask-mode.lit {
+  background: #060608;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.sim-cell.mask-mode.lit .sim-letter {
+  color: var(--c);
+  text-shadow:
+    0 0 8px var(--c),
+    0 0 2px var(--c);
+}
+.sim-cell.mask-mode.mask-blank .sim-letter {
+  font-size: calc(var(--sim-cell, 48px) * 0.42);
+  color: #18181d;
+}
