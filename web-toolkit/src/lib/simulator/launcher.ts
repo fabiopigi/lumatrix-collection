@@ -1,10 +1,33 @@
+import * as breakout from "./apps/breakout";
 import * as connect4 from "./apps/connect4";
+import * as dinojump from "./apps/dinojump";
+import * as doom from "./apps/doom";
+import * as flappy from "./apps/flappy";
+import * as invaders from "./apps/invaders";
+import * as pong from "./apps/pong";
 import * as reaction from "./apps/reaction";
+import * as simonsays from "./apps/simonsays";
+import * as snake from "./apps/snake";
+import * as watch from "./apps/watch";
 import { FONT_3X5, glyph } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
 import type { App, Joystick, NeoPixel, RGB } from "./types";
 
-const APPS: readonly App[] = [reaction, connect4];
+// Order matches python/main.py's APPS list so the on-display launcher's
+// bottom-track slot indices line up with the Pico build.
+const APPS: readonly App[] = [
+  reaction,
+  connect4,
+  pong,
+  breakout,
+  simonsays,
+  dinojump,
+  snake,
+  flappy,
+  invaders,
+  doom,
+  watch,
+];
 
 const NUM_LEDS = 64;
 const BRIGHTNESS = 0.25;
