@@ -10,6 +10,10 @@ export interface Joystick {
   readonly left: Pin;
   readonly right: Pin;
   readonly center: Pin;
+  /** Slide switch pin — attached by main.ts after construction. Apps that
+   *  need it read `joy.slide?.value()`, mirroring `joystick.get("slide")`
+   *  on the Pico (where it's optional). */
+  slide?: Pin;
   press(button: JoyButton): void;
   release(button: JoyButton): void;
   isPressed(button: JoyButton): boolean;

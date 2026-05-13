@@ -262,3 +262,67 @@ html, body {
   max-width: 420px;
   line-height: 1.5;
 }
+
+.app-menu {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.app-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.app-menu-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.app-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+}
+.app-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.app-btn:hover {
+  background: #22222a;
+  border-color: #3a3a42;
+}
+.app-btn:active {
+  background: #1a1a1f;
+}
+.app-btn-active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.app-btn-back {
+  font-size: 11px;
+  padding: 6px 10px;
+  color: var(--accent);
+  border-color: rgba(108, 204, 255, 0.4);
+  background: transparent;
+}
+.app-btn-back:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}

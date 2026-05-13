@@ -30,6 +30,33 @@ let _joy: Joystick | null = null;
 let _exitPressStart: number | null = null;
 let _exitConsumed = false;
 
+/** Set by the host UI (e.g. simulator menu) to interrupt whatever blocking
+ *  screen or game loop is currently running. Consumed once. */
+let _externalExit = false;
+/** When true, the next call to loading_screen() returns "start" immediately,
+ *  bypassing the spinner and the wait-for-tap. Used when the menu UI jumps
+ *  straight to a specific app. */
+let _skipNextLoading = false;
+
+/** Request an immediate exit from the currently running screen / app. The
+ *  next call to check_exit() (or any blocking screen's poll) returns "exit". */
+export function forceExit(): void {
+  _externalExit = true;
+}
+
+/** Make the next loading_screen() return "start" without waiting for input. */
+export function skipNextLoading(): void {
+  _skipNextLoading = true;
+}
+
+function _consumeExternalExit(): boolean {
+  if (_externalExit) {
+    _externalExit = false;
+    return true;
+  }
+  return false;
+}
+
 // Left-pointing arrow used on the End screen, in visual (x, y) with y=0 at top.
 const END_ARROW_PIXELS: ReadonlyArray<readonly [number, number]> = [
   [3, 3],
@@ -87,6 +114,7 @@ async function _waitRelease(): Promise<void> {
  * hold restarts. Call from inside a game loop.
  */
 export function check_exit(): boolean {
+  if (_consumeExternalExit()) return true;
   const j = _joy;
   if (!j) return false;
   if (j.center.value() === 0) {
@@ -109,6 +137,7 @@ type Decision = "restart" | "exit" | null;
 
 /** Tap any direction = restart, hold center 1.5 s = exit. Non-blocking. */
 function _decisionInput(): Decision {
+  if (_consumeExternalExit()) return "exit";
   const j = joy();
   if (j.center.value() === 0) {
     const now = ticks_ms();
@@ -149,6 +178,10 @@ async function _waitWithInput(ms: number): Promise<Decision> {
 }
 
 export async function loading_screen(): Promise<"start" | "exit"> {
+  if (_skipNextLoading) {
+    _skipNextLoading = false;
+    return "start";
+  }
   _exitPressStart = null;
   _exitConsumed = false;
   await _waitRelease();
@@ -164,6 +197,7 @@ export async function loading_screen(): Promise<"start" | "exit"> {
   const j = joy();
 
   while (true) {
+    if (_consumeExternalExit()) return "exit";
     const now = ticks_ms();
 
     if (j.center.value() === 0) {

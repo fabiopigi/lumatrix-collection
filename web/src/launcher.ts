@@ -11,16 +11,58 @@ import type { NeoPixel, RGB } from "./hardware/neopixel";
 import type { Joystick } from "./hardware/joystick";
 import { FONT_3X5, glyph } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
+import * as screens from "./screens";
 
 import * as reaction from "./apps/reaction";
 import * as connect4 from "./apps/connect4";
+import * as breakout from "./apps/breakout";
+import * as dinojump from "./apps/dinojump";
+import * as doom from "./apps/doom";
+import * as flappy from "./apps/flappy";
+import * as invaders from "./apps/invaders";
+import * as pong from "./apps/pong";
+import * as simonsays from "./apps/simonsays";
+import * as snake from "./apps/snake";
+import * as watch from "./apps/watch";
 
 export interface App {
   readonly NAME: string;
   run(np: NeoPixel, joy: Joystick): Promise<void>;
 }
 
-const APPS: readonly App[] = [reaction, connect4];
+const APPS: readonly App[] = [
+  reaction,
+  connect4,
+  pong,
+  breakout,
+  simonsays,
+  dinojump,
+  snake,
+  flappy,
+  invaders,
+  doom,
+  watch,
+];
+
+/** Read-only view of the registered apps. Used by the simulator's menu UI. */
+export function getApps(): readonly App[] {
+  return APPS;
+}
+
+/** Set by the menu UI to make the launcher jump straight to a specific app
+ *  on its next loop iteration. Combine with screens.forceExit() to interrupt
+ *  whatever is currently running. */
+let _pendingAppIndex: number | null = null;
+
+export function setPendingApp(index: number | null): void {
+  _pendingAppIndex = index;
+}
+
+function consumePending(): number | null {
+  const i = _pendingAppIndex;
+  _pendingAppIndex = null;
+  return i;
+}
 
 const NUM_LEDS = 64;
 const BRIGHTNESS = 0.25;
@@ -153,6 +195,10 @@ async function menuSelect(): Promise<number> {
   let lastStep = ticks_ms();
 
   while (true) {
+    // The menu UI may have set a pending app while we were waiting for input.
+    // Return any index — run() will pick up consumePending() on its own.
+    if (_pendingAppIndex !== null) return idx;
+
     const press = readInput();
     if (press === "center") {
       await waitRelease();
@@ -190,7 +236,30 @@ export async function run(neopixel: NeoPixel, joystick: Joystick): Promise<void>
 
   await bootAnimation();
   while (true) {
-    const i = await menuSelect();
+    let i: number;
+    let viaMenuUI = false;
+
+    const pending = consumePending();
+    if (pending !== null) {
+      i = pending;
+      viaMenuUI = true;
+    } else {
+      const selected = await menuSelect();
+      // menuSelect may have been interrupted by setPendingApp — re-check.
+      const pendingAfter = consumePending();
+      if (pendingAfter !== null) {
+        i = pendingAfter;
+        viaMenuUI = true;
+      } else {
+        i = selected;
+      }
+    }
+
+    if (viaMenuUI) {
+      // User picked via the host menu — skip the on-display loading spinner.
+      screens.skipNextLoading();
+    }
+
     clear();
     np.write();
     await sleep_ms(150);
