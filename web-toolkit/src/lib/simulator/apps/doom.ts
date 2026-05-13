@@ -5,14 +5,13 @@ import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 export const NAME = "Doom";
 
 /**
- * 1D raycaster — fires W rays per frame (was hardcoded 8), keeps a float
- * z-buffer per column, and projects walls with float heights + alpha-blended
- * top/bottom edges so the wall outline is smooth even at low resolutions.
+ * 1D raycaster — fires W rays per frame (was hardcoded 8) and keeps a float
+ * z-buffer per column. Walls and sprites are painted with solid integer
+ * pixels (no alpha blending — it was too slow on larger displays).
  *
  * Every frame starts with a subtle sky / floor gradient as the backdrop, so
- * empty cells aren't pure black — that hides the row-by-row stepping a lot
- * better than the previous "off cells are off" look. At 16×16 and 32×32 the
- * gradient + AA walls + scaled sprites give the raycaster room to breathe.
+ * empty cells aren't pure black. Walls and sprites overwrite the backdrop
+ * directly where they cover.
  */
 export const RESPONSIVE = true;
 
@@ -134,33 +133,21 @@ function showBuffer(): void {
   np.write();
 }
 
-/** Composite a colour onto the frame buffer at (px, py) (visual y) with the
- *  given alpha in [0, 1]. Alpha-blends additively over the backdrop. */
-function blendInto(
+/** Write a solid colour into the frame buffer at (ix, iy) (visual-y). */
+function setPixel(
   ix: number,
   iy: number,
   color: readonly number[],
-  alpha: number,
 ): void {
   if (ix < 0 || ix >= W || iy < 0 || iy >= H) return;
   const idx = iy * W + ix;
-  const a = Math.max(0, Math.min(1, alpha));
-  frameBuffer[idx][0] = Math.min(
-    255,
-    frameBuffer[idx][0] * (1 - a) + color[0] * a,
-  );
-  frameBuffer[idx][1] = Math.min(
-    255,
-    frameBuffer[idx][1] * (1 - a) + color[1] * a,
-  );
-  frameBuffer[idx][2] = Math.min(
-    255,
-    frameBuffer[idx][2] * (1 - a) + color[2] * a,
-  );
+  frameBuffer[idx][0] = color[0];
+  frameBuffer[idx][1] = color[1];
+  frameBuffer[idx][2] = color[2];
 }
 
-/** Draw a sprite with float position + float size, alpha-blending the
- *  partial-coverage edge cells against the existing backdrop / walls. */
+/** Draw a sprite as a solid block — paints every cell whose centre is inside
+ *  the float bounds, gated by the z-buffer per column. */
 function drawSprite(
   xPos: number,
   yPos: number,
@@ -169,28 +156,16 @@ function drawSprite(
   color: readonly number[],
 ): void {
   const halfS = size / 2;
-  const x0 = xPos - halfS;
-  const x1 = xPos + halfS;
-  const y0 = yPos - halfS;
-  const y1 = yPos + halfS;
-
-  const startX = Math.floor(x0);
-  const endX = Math.ceil(x1) - 1;
-  const startY = Math.floor(y0);
-  const endY = Math.ceil(y1) - 1;
-
-  for (let ix = startX; ix <= endX; ix++) {
+  const startX = Math.round(xPos - halfS);
+  const endX = Math.round(xPos + halfS);
+  const startY = Math.round(yPos - halfS);
+  const endY = Math.round(yPos + halfS);
+  for (let ix = startX; ix < endX; ix++) {
     if (ix < 0 || ix >= W) continue;
     if (dist >= zBuffer[ix]) continue;
-    // Horizontal coverage of this column [ix, ix+1] inside [x0, x1].
-    const xCov = Math.min(ix + 1, x1) - Math.max(ix, x0);
-    if (xCov <= 0) continue;
-    for (let iy = startY; iy <= endY; iy++) {
+    for (let iy = startY; iy < endY; iy++) {
       if (iy < 0 || iy >= H) continue;
-      const yCov = Math.min(iy + 1, y1) - Math.max(iy, y0);
-      if (yCov <= 0) continue;
-      const alpha = Math.min(1, xCov * yCov);
-      blendInto(ix, iy, color, alpha);
+      setPixel(ix, iy, color);
     }
   }
 }
@@ -211,24 +186,17 @@ function renderWorld(): void {
     const actualDist = d * Math.cos(rayAngle - pa);
     zBuffer[i] = actualDist;
 
-    // Float wall height in cells; clamp to keep the slab inside [0, H].
-    const wallH = Math.min(H, H / (actualDist + 0.01));
-    const topF = (H - wallH) / 2;
-    const bottomF = (H + wallH) / 2;
+    // Integer wall slab height, clamped to fit the display.
+    const wallH = Math.min(H, Math.max(1, Math.round(H / (actualDist + 0.01))));
+    const yStart = Math.max(0, Math.floor((H - wallH) / 2));
+    const yEnd = Math.min(H - 1, yStart + wallH - 1);
 
     // Closer = warmer wall colour; farther = cooler blue.
     const nz = Math.max(0, Math.min(1, 1 - actualDist / 7));
     const wallColor: RGB = [200 * nz, 50 * nz * nz, 255 * (1 - nz)];
 
-    // Walk every row the wall slab touches, including the partially-covered
-    // top/bottom rows. Alpha = the fraction of the row's vertical span that
-    // falls inside [topF, bottomF] — that's the per-row coverage.
-    const yStart = Math.max(0, Math.floor(topF));
-    const yEnd = Math.min(H - 1, Math.ceil(bottomF) - 1);
     for (let y = yStart; y <= yEnd; y++) {
-      const cov = Math.min(y + 1, bottomF) - Math.max(y, topF);
-      if (cov <= 0) continue;
-      blendInto(i, y, wallColor, Math.min(1, cov));
+      setPixel(i, y, wallColor);
     }
   }
 
