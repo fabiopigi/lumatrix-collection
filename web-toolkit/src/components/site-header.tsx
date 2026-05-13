@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/simulator", label: "Simulator" },
-  { href: "/pixel-designer", label: "Pixel Designer" },
+  { href: "/pixel-designer", label: "LumenDesigner" },
+  { href: "/simulator", label: "LumenSimulator" },
   { href: "/apps", label: "Apps" },
   { href: "/docs", label: "Docs" },
 ];
@@ -28,10 +28,7 @@ export function SiteHeader() {
       <div className="h-full flex items-center px-4 gap-4">
         <Link href="/" className="flex items-baseline gap-2 no-underline">
           <span className="text-[13px] font-semibold tracking-[0.06em] text-white">
-            LUMA<span className="text-accent">TRIX</span>
-          </span>
-          <span className="hidden sm:inline text-[11px] text-muted tracking-[0.12em] uppercase">
-            Toolkit
+            Lumen<span className="text-accent">Lab</span>
           </span>
         </Link>
 

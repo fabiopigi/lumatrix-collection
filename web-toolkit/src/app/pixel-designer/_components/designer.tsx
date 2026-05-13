@@ -854,7 +854,7 @@ export function Designer() {
     <div className="flex flex-col h-[calc(100vh-44px-44px)] min-h-[480px]">
       <div className="h-11 bg-panel border-b border-edge flex items-center px-3 gap-3 shrink-0">
         <h2 className="m-0 text-[13px] font-semibold tracking-[0.06em] text-white">
-          Pixel Designer
+          Lumen<span className="text-accent">Designer</span>
         </h2>
         <div className="flex gap-1.5">
           <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>

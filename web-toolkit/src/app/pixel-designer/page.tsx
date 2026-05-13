@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Designer } from "./_components/designer";
 
 export const metadata: Metadata = {
-  title: "Pixel Designer · LUMATRIX Toolkit",
+  title: "LumenDesigner · LumenLab",
   description:
-    "Design 8×8 (or arbitrary) LED-matrix screens, export to JSON / PNG.",
+    "Design LED-matrix screens and animations, export to JSON or PNG.",
 };
 
 export default function PixelDesignerPage() {

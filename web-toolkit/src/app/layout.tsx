@@ -4,8 +4,9 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
-  title: "LUMATRIX Toolkit",
-  description: "Browser-based tools for the ZHAW LUMATRIX kit.",
+  title: "LumenLab",
+  description:
+    "Pixel-art tools for LED matrices — design, animate, simulate, flash to your board.",
 };
 
 export default function RootLayout({
