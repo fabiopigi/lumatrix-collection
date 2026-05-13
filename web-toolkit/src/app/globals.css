@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0e0e10;
+  --foreground: #e9e9ef;
+  --panel: #16161a;
+  --panel-2: #1a1a1f;
+  --edge: #232328;
+  --muted: #8a8a96;
+  --accent: #6cf;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-edge: var(--edge);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "SF Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   LumenDesigner
+   ============================================================ */
+
+.pd-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 8), var(--cell-size, 50px));
+  grid-template-rows: repeat(var(--rows, 8), var(--cell-size, 50px));
+  gap: var(--gap-size, 4px);
+  position: relative;
+  z-index: 0;
+}
+
+.pd-cell {
+  width: var(--cell-size, 50px);
+  height: var(--cell-size, 50px);
+  background: #0a0a0c;
+  border-radius: 4px;
+  cursor: crosshair;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.pd-cell.lit {
+  box-shadow:
+    0 0 10px var(--c),
+    0 0 3px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.pd-cell.ghost::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 3px;
+  background: var(--gc);
+  opacity: 0.5;
+}
+
+.pd-cell.preview {
+  box-shadow:
+    0 0 8px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.pd-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: calc(var(--cell-size, 50px) * 0.72);
+  line-height: 1;
+  color: transparent;
+  user-select: none;
+}
+
+.pd-cell.mask-mode {
+  background: #060608;
+}
+.pd-cell.mask-mode .pd-letter {
+  color: #1c1c22;
+}
+.pd-cell.mask-mode.ghost::after {
+  display: none;
+}
+.pd-cell.mask-mode.ghost .pd-letter {
+  color: var(--gc);
+  opacity: 0.55;
+  text-shadow: 0 0 3px var(--gc);
+}
+.pd-cell.mask-mode.lit {
+  background: #060608;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.pd-cell.mask-mode.lit .pd-letter {
+  color: var(--c);
+  text-shadow:
+    0 0 8px var(--c),
+    0 0 2px var(--c);
+}
+.pd-cell.mask-mode.mask-blank .pd-letter {
+  font-size: calc(var(--cell-size, 50px) * 0.5);
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.pd-selection-rect {
+  position: absolute;
+  border: 1.5px dashed #6cf;
+  background: rgba(108, 204, 255, 0.07);
+  pointer-events: none;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+/* ============================================================
+   LumenSimulator
+   ============================================================ */
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--sim-cell, 48px));
+  grid-template-rows: repeat(8, var(--sim-cell, 48px));
+  gap: var(--sim-gap, 6px);
+  padding: 10px;
+  border-radius: 10px;
+  background: #1a1a1f;
+}
+
+.sim-cell {
+  width: var(--sim-cell, 48px);
+  height: var(--sim-cell, 48px);
+  background: #0a0a0c;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  position: relative;
+  transition: box-shadow 0.05s linear;
+}
+
+.sim-cell.lit {
+  box-shadow:
+    0 0 14px var(--c),
+    0 0 4px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 1px 3px rgba(255, 255, 255, 0.25);
+}
+
+.sim-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--sim-cell, 48px) * 0.6);
+  font-weight: 800;
+  color: transparent;
+  font-family: var(--font-sans);
+  pointer-events: none;
+  user-select: none;
+}
+
+.sim-cell.mask-mode {
+  background: #060608;
+}
+.sim-cell.mask-mode .sim-letter {
+  color: #1e1e24;
+}
+.sim-cell.mask-mode.lit {
+  background: #060608;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.sim-cell.mask-mode.lit .sim-letter {
+  color: var(--c);
+  text-shadow:
+    0 0 8px var(--c),
+    0 0 2px var(--c);
+}
+.sim-cell.mask-mode.mask-blank .sim-letter {
+  font-size: calc(var(--sim-cell, 48px) * 0.42);
+  color: #18181d;
+}
