@@ -72,29 +72,46 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
       [offset.x, offset.y, scale],
     );
 
-    /** Render the 8×8 source buffer onto the physical W×H grid. */
+    /** Render a buffer onto the physical W×H grid. Detects whether the buffer
+     *  is the 8×8 LUMATRIX source (length 64×3) or a direct full-display
+     *  buffer (length W×H×3) and chooses the rendering path. */
     const render = useCallback(
       (buffer: Uint8ClampedArray) => {
         lastBufferRef.current = buffer;
-        const isMask = modeRef.current === "mask" && isLumatrix(display);
+        const direct = buffer.length === display.width * display.height * 3;
+        const isMask = modeRef.current === "mask" && isLumatrix(display) && !direct;
 
         for (let py = 0; py < display.height; py++) {
           for (let px = 0; px < display.width; px++) {
             const cell = cellRefs.current[py * display.width + px];
             if (!cell) continue;
 
-            const src = sourceForCell(px, py);
             let r = 0;
             let g = 0;
             let b = 0;
             let lit = false;
+            let src: { sx: number; sy: number } | null = null;
 
-            if (src) {
-              const base = sourceLedIndex(src.sx, src.sy) * 3;
+            if (direct) {
+              // Direct: each physical cell maps 1:1 to the buffer.
+              // Indexing convention: row 0 = bottom (LUMATRIX), so visual y
+              // maps to LED row (H - 1 - y).
+              const ledRow = display.height - 1 - py;
+              const base = (ledRow * display.width + px) * 3;
               r = buffer[base];
               g = buffer[base + 1];
               b = buffer[base + 2];
               lit = r > 0 || g > 0 || b > 0;
+            } else {
+              // Scale-up: physical cell → source 8×8 cell → LED index.
+              src = sourceForCell(px, py);
+              if (src) {
+                const base = sourceLedIndex(src.sx, src.sy) * 3;
+                r = buffer[base];
+                g = buffer[base + 1];
+                b = buffer[base + 2];
+                lit = r > 0 || g > 0 || b > 0;
+              }
             }
 
             const color = `rgb(${boostByte(r)},${boostByte(g)},${boostByte(b)})`;
@@ -106,8 +123,9 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
 
             // Letter mask: only show a letter on the TOP-LEFT cell of each
             // scaled-up source block, so a 2×2 block at 16×16 doesn't show
-            // four copies of the same letter.
+            // four copies of the same letter. Only relevant in scale-up mode.
             const isBlockOrigin =
+              !direct &&
               src !== null &&
               (px - offset.x) % scale === 0 &&
               (py - offset.y) % scale === 0;

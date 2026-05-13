@@ -12,7 +12,18 @@ import * as watch from "./apps/watch";
 import { FONT_3X5, glyph } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
 import * as screens from "./screens";
-import type { App, Joystick, NeoPixel, RGB } from "./types";
+import type { App, DisplayDims, Joystick, NeoPixel, RGB } from "./types";
+
+/** Factory the simulator host supplies — produces a NeoPixel of the given
+ *  size with its flush callback already bound to the appropriate render path
+ *  (scale-up for 64-LED LUMATRIX buffers, direct for full-display buffers). */
+export type NeoPixelFactory = (numLeds: number) => NeoPixel;
+
+export interface LauncherDeps {
+  readonly joy: Joystick;
+  readonly display: DisplayDims;
+  readonly createNeoPixel: NeoPixelFactory;
+}
 
 // Order matches python/main.py's APPS list so the on-display launcher's
 // bottom-track slot indices line up with the Pico build.
@@ -247,12 +258,12 @@ async function menuSelect(): Promise<number> {
   }
 }
 
-export async function run(
-  neopixel: NeoPixel,
-  joystick: Joystick,
-): Promise<void> {
-  np = neopixel;
-  joy = joystick;
+export async function run(deps: LauncherDeps): Promise<void> {
+  joy = deps.joy;
+  const { display, createNeoPixel } = deps;
+  // The launcher's marquee + screens module are bound to the LUMATRIX 8×8
+  // source. Always use a 64-LED buffer for them.
+  np = createNeoPixel(NUM_LEDS);
 
   await bootAnimation();
   while (true) {
@@ -293,7 +304,18 @@ export async function run(
     screens.clearExternalExit();
 
     notifyAppChange(i); // entering app
-    await APPS[i].run(np, joy);
+    const app = APPS[i];
+    // Responsive apps get a NeoPixel sized for the physical display and a
+    // copy of its dimensions. Non-responsive apps keep using the 8×8 source
+    // NeoPixel; the simulator scales their output up for the user.
+    // The launcher's own 64-LED NeoPixel doubles as the screensNp for every
+    // app — that way screens.init() always renders to the LUMATRIX 8×8
+    // source (and gets scaled up) instead of getting mis-indexed into a
+    // responsive app's W×H buffer.
+    const appNp = app.RESPONSIVE
+      ? createNeoPixel(display.width * display.height)
+      : np;
+    await app.run(appNp, joy, display, np);
     await waitRelease();
     await sleep_ms(200);
   }

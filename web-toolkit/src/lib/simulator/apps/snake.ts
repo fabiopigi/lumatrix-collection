@@ -1,10 +1,20 @@
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { sleep_ms } from "../runtime/time";
 
 export const NAME = "Snake";
 
-const NUM_LEDS = 64;
+/**
+ * Snake is the cleanest fit for responsive scaling — the grid wrap-around
+ * already uses modular arithmetic, and the gameplay loop doesn't care about
+ * dimensions beyond W × H. A 16×16 display gives 256 cells of room; a 32×32
+ * gives 1024. The win condition (length === total cells) scales naturally.
+ *
+ * The screens module is still bound to the LUMATRIX 8×8 source buffer — its
+ * loading-spinner / game-over UI keeps rendering at 8×8 and the simulator
+ * scales that up. Only gameplay uses the W×H buffer directly.
+ */
+export const RESPONSIVE = true;
 
 const BODY_COLOR: RGB = [0, 40, 5];
 const HEAD_COLOR: RGB = [25, 55, 30];
@@ -19,16 +29,20 @@ const SPEEDUP_EVERY = 5;
 type Cell = readonly [number, number];
 type Dir = readonly [number, number];
 
+// Hardware bindings + display geometry are bound inside run().
 let np: NeoPixel;
 let JOY_UP: Pin, JOY_DOWN: Pin, JOY_LEFT: Pin, JOY_RIGHT: Pin;
+let W = 8;
+let H = 8;
 
 function clear(): void {
-  for (let i = 0; i < NUM_LEDS; i++) np[i] = [0, 0, 0];
+  const n = W * H;
+  for (let i = 0; i < n; i++) np[i] = [0, 0, 0];
 }
 
 function px(col: number, row: number, color: RGB): void {
-  if (col >= 0 && col <= 7 && row >= 0 && row <= 7) {
-    np[row * 8 + col] = color;
+  if (col >= 0 && col < W && row >= 0 && row < H) {
+    np[row * W + col] = color;
   }
 }
 
@@ -42,8 +56,8 @@ function readDir(): Dir | null {
 
 function spawnFood(snakeSet: Set<string>): Cell | null {
   const free: Cell[] = [];
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
       if (!snakeSet.has(`${c},${r}`)) free.push([c, r]);
     }
   }
@@ -66,8 +80,9 @@ function moveInterval(score: number): number {
 }
 
 async function winFlash(): Promise<void> {
+  const n = W * H;
   for (let i = 0; i < 5; i++) {
-    for (let j = 0; j < NUM_LEDS; j++) np[j] = WIN_COLOR;
+    for (let j = 0; j < n; j++) np[j] = WIN_COLOR;
     np.write();
     await sleep_ms(90);
     clear();
@@ -77,7 +92,15 @@ async function winFlash(): Promise<void> {
 }
 
 async function playOneGame(): Promise<number | null> {
-  const snake: Cell[] = [[3, 4], [4, 4], [5, 4]];
+  // Start the snake horizontally centred in the lower-middle of the playfield,
+  // a 3-cell segment. Scales to any reasonable W × H.
+  const startRow = Math.floor(H / 2);
+  const startCol = Math.max(1, Math.floor(W / 2) - 1);
+  const snake: Cell[] = [
+    [startCol, startRow],
+    [startCol + 1, startRow],
+    [startCol + 2, startRow],
+  ];
   const snakeSet = new Set(snake.map(([c, r]) => `${c},${r}`));
   let food = spawnFood(snakeSet);
   let score = 0;
@@ -114,11 +137,12 @@ async function playOneGame(): Promise<number | null> {
 
         const head = snake[snake.length - 1];
         const newHead: Cell = [
-          ((head[0] + currentDir[0]) % 8 + 8) % 8,
-          ((head[1] + currentDir[1]) % 8 + 8) % 8,
+          ((head[0] + currentDir[0]) % W + W) % W,
+          ((head[1] + currentDir[1]) % H + H) % H,
         ];
         const newKey = `${newHead[0]},${newHead[1]}`;
-        const ateFood = food !== null && newHead[0] === food[0] && newHead[1] === food[1];
+        const ateFood =
+          food !== null && newHead[0] === food[0] && newHead[1] === food[1];
 
         let collision = false;
         if (snakeSet.has(newKey)) {
@@ -126,7 +150,8 @@ async function playOneGame(): Promise<number | null> {
             collision = true;
           } else {
             const tail = snake[0];
-            if (newHead[0] !== tail[0] || newHead[1] !== tail[1]) collision = true;
+            if (newHead[0] !== tail[0] || newHead[1] !== tail[1])
+              collision = true;
           }
         }
 
@@ -157,13 +182,24 @@ async function playOneGame(): Promise<number | null> {
   }
 }
 
-export async function run(neopixel: NeoPixel, joystick: Joystick): Promise<void> {
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
   np = neopixel;
   JOY_UP = joystick.up;
   JOY_DOWN = joystick.down;
   JOY_LEFT = joystick.left;
   JOY_RIGHT = joystick.right;
-  screens.init(neopixel, joystick);
+  W = display?.width ?? 8;
+  H = display?.height ?? 8;
+  // screens.init keeps screens bound to the LUMATRIX 8×8 source buffer (the
+  // launcher's marquee NP); the simulator scales loading/game-over up to fit
+  // the actual display. screensNp falls back to `neopixel` only if the host
+  // didn't supply one (e.g., the app runs at 8×8 anyway).
+  screens.init(screensNp ?? neopixel, joystick);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();

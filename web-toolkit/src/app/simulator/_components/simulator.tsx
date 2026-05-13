@@ -11,7 +11,6 @@ import {
 import { createJoystick } from "@/lib/simulator/hardware/joystick";
 import { createNeoPixel } from "@/lib/simulator/hardware/neopixel";
 import { createSlide } from "@/lib/simulator/hardware/slide";
-import { NUM_LEDS } from "@/lib/simulator/letter-mask";
 import * as launcher from "@/lib/simulator/launcher";
 import { setRuntimeSignal } from "@/lib/simulator/runtime/time";
 import * as screens from "@/lib/simulator/screens";
@@ -76,20 +75,31 @@ export function Simulator() {
     const controller = new AbortController();
     setRuntimeSignal(controller.signal);
 
-    const np = createNeoPixel(NUM_LEDS, (buffer) => {
-      gridRef.current?.render(buffer);
-    });
+    // Single render path: each NeoPixel — whether a 64-LED LUMATRIX source
+    // (for non-responsive apps + the launcher) or a full W×H buffer (for
+    // responsive apps) — flushes here. The grid detects which by length and
+    // chooses scale-up vs direct rendering.
+    const createNp = (numLeds: number) =>
+      createNeoPixel(numLeds, (buffer) => {
+        gridRef.current?.render(buffer);
+      });
 
-    launcher.run(np, joy).catch((err: unknown) => {
-      const name = (err as { name?: string } | null)?.name;
-      if (name !== "AbortError") console.error("simulator:", err);
-    });
+    launcher
+      .run({ joy, display, createNeoPixel: createNp })
+      .catch((err: unknown) => {
+        const name = (err as { name?: string } | null)?.name;
+        if (name !== "AbortError") console.error("simulator:", err);
+      });
 
     return () => {
       controller.abort();
       setRuntimeSignal(null);
     };
-  }, [joy]);
+    // Restart the whole runtime when the physical display dimensions change.
+    // Responsive apps need NeoPixels of a different size; non-responsive apps
+    // need the grid to know the new geometry too. Easier than coordinating
+    // a hot-swap.
+  }, [joy, display.width, display.height]);
 
   useEffect(() => {
     gridRef.current?.setMode(mode);
