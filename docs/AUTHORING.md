@@ -12,7 +12,7 @@ It does **not** assume you've shipped MicroPython before.
 
 ## What an app is
 
-An app is a single `.py` file in `apps/` that exposes two things to the rest of the system:
+An app is a single `.py` file in `python/apps/` that exposes two things to the rest of the system:
 
 | Symbol | Purpose |
 |---|---|
@@ -22,6 +22,42 @@ An app is a single `.py` file in `apps/` that exposes two things to the rest of 
 That's the entire contract. Anything else (game state, helpers, constants) is private to your module.
 
 When `run()` returns, control goes back to the launcher and the user can pick a different app.
+
+---
+
+## Where to start: web simulator first?
+
+**Before writing any code, ask the user this question:**
+
+> **"Do you want to build this app for the web simulator first, then port it to the Pico — or go straight to MicroPython?"**
+
+There's almost always a good reason to start in the web simulator:
+
+- **Faster iteration.** No flashing, no Thonny disconnect dance. Save the file, the build watcher rebuilds, refresh the browser, see the result. Cycle time is a few seconds vs ~30 s on hardware.
+- **Real debugging.** Browser DevTools, breakpoints, console logs, time travel — none of which exist on a Pico.
+- **No "is the hardware to blame?" ambiguity.** When something breaks in the sim, it's your code. On the Pico it might be a wiring quirk, a brightness issue, a serial-port lock, or a soft brick.
+- **The port is mostly mechanical.** The TypeScript simulator under `web/src/` is a direct API mirror of the MicroPython codebase: same `np[i] = [r, g, b]` writes, same `pin.value() === 0` active-low, same `screens` and `fonts` modules. Once the sim works, translating to Python is rote — see [Porting from TypeScript to MicroPython](#porting-from-typescript-to-micropython).
+- **The user can test without a Pico.** They can open the sim in any browser, click the on-screen joystick or use keyboard, and tell you what feels off.
+
+Reasons to skip the sim and go straight to Python:
+
+- The app depends on something the simulator doesn't model (specific timing artifacts on the WS2812 strip, the slide switch in a way the sim doesn't simulate yet, USB serial input).
+- You're prototyping a one-off animation and don't care about cross-platform parity.
+- The user explicitly says they want hardware-only.
+
+**The default recommendation is web-first.** If unsure, ask the user — don't decide silently. The workflow then becomes:
+
+```
+1. Ask:   "Web simulator first, or straight to MicroPython?"
+2. Build: web/src/apps/<name>.ts + wire into web/src/launcher.ts
+3. Test:  user runs `npm run watch` in web/ and opens index.html
+4. Iterate based on user feedback in the browser.
+5. Port:  copy the .ts into python/apps/<name>.py with the mechanical
+          translation (await → blocking, [] → (), dict-access conventions).
+6. Test:  user flashes to the Pico, confirms it behaves the same.
+```
+
+If the user picks "straight to MicroPython", skip ahead to [Step-by-step: creating a new app](#step-by-step-creating-a-new-app) and ignore the web/ paths.
 
 ---
 
@@ -72,15 +108,39 @@ For passive apps, replace `game_over_screen(score)` with `end_screen()` and drop
 
 ```
 LumaMatrix/
-├── main.py                  ← launcher, gets renamed to main.py on the Pico
-├── fonts.json               ← font definitions (copy to Pico's filesystem root)
-├── apps/
-│   ├── _screens.py          ← shared lifecycle screens (loading/game-over/end)
-│   ├── _fonts.py            ← loads fonts.json, exposes FONT_3X5 / FONT_5X8
-│   ├── reaction.py          ← one of the games
-│   ├── flappy.py
-│   ├── ...
-│   └── <your_app>.py        ← your new app goes here
+├── python/
+│   ├── main.py              ← launcher, gets flashed as main.py on the Pico
+│   └── apps/
+│       ├── _screens.py      ← shared lifecycle screens (loading/game-over/end)
+│       ├── _fonts.py        ← loads fonts.json, exposes FONT_3X5 / FONT_5X8
+│       ├── reaction.py      ← one of the games
+│       ├── flappy.py
+│       ├── ...
+│       └── <your_app>.py    ← your new app goes here
+├── web/                     ← browser simulator (TypeScript)
+│   ├── index.html           ← the simulator UI
+│   ├── compile.mjs          ← esbuild bundler
+│   ├── package.json         ← `npm install && npm run watch`
+│   └── src/
+│       ├── main.ts          ← simulator entry point (mounts UI, boots launcher)
+│       ├── launcher.ts      ← port of main.py
+│       ├── screens.ts       ← port of _screens.py
+│       ├── fonts.ts         ← port of _fonts.py
+│       ├── letter-mask.ts   ← LUMATRIX word-clock mask helper
+│       ├── runtime/
+│       │   └── time.ts      ← ticks_ms / ticks_diff / sleep_ms
+│       ├── hardware/
+│       │   ├── neopixel.ts  ← NeoPixel buffer + flush callback
+│       │   ├── joystick.ts  ← Joystick with active-low pin.value()
+│       │   └── slide.ts     ← slide switch
+│       ├── ui/              ← grid renderer, mode toggle, on-screen joystick
+│       └── apps/
+│           ├── reaction.ts  ← port of reaction.py
+│           ├── connect4.ts
+│           ├── ...
+│           └── <your_app>.ts  ← your new app (web-first path)
+├── shared/
+│   └── fonts.json           ← font definitions (copy to Pico's filesystem root; also imported by the sim at build time)
 └── docs/
     ├── AUTHORING.md         ← this file
     └── apps/
@@ -90,17 +150,19 @@ LumaMatrix/
         └── <your_app>.md    ← your app's docs go here
 ```
 
+The two trees mirror each other. Every `python/apps/foo.py` ideally has a `web/src/apps/foo.ts` sibling, with both registered in their respective launcher (`python/main.py` and `web/src/launcher.ts`). Apps that only exist on one side are an in-progress state — not a permanent split.
+
 Two things to keep in mind:
 
-- `apps/` is on `sys.path` via the launcher's `sys.path.append("/apps")` at the top of `main.py`. That's why your app can `import _screens` directly without a package prefix.
-- The launcher and `apps/_screens.py` both run from the same `np` and `joystick` references; nothing is duplicated. Your app gets its own bindings via `run()`'s parameters.
+- On the Pico, `/apps` is on `sys.path` via the launcher's `sys.path.append("/apps")` at the top of `python/main.py`. That's why your app can `import _screens` directly without a package prefix.
+- The launcher and `python/apps/_screens.py` both run from the same `np` and `joystick` references; nothing is duplicated. Your app gets its own bindings via `run()`'s parameters.
 - The leading underscore on `_screens.py` and `_fonts.py` is a convention: it marks these as **internal shared modules**, visually separating them from the actual apps in the same folder. They behave like any other Python module. Most apps alias on import (`import _screens as screens`) so the in-code calls stay readable.
 
 ---
 
 ## The shared modules
 
-### `apps/_screens.py`
+### `python/apps/_screens.py`
 
 The single source of truth for entry, exit, and end-of-session UI. Every app imports it.
 
@@ -114,7 +176,7 @@ The single source of truth for entry, exit, and end-of-session UI. Every app imp
 | `check_exit()` | Non-blocking hold-center detector. Returns `True` once when the user has held center for 1.5 s. **Poll this every frame inside your game loop.** |
 | `any_input()` | True if any of up/down/left/right is currently held. Excludes center. Use for inactivity tracking in passive apps. |
 
-### `apps/_fonts.py`
+### `python/apps/_fonts.py`
 
 | Symbol | What it is |
 |---|---|
@@ -371,12 +433,14 @@ Use for "tap to jump" style controls where you don't want the action to repeat w
 
 Walk through the whole process from blank file to running in the launcher.
 
-### 1. Create `apps/<name>.py`
+> **Branching note:** if the user picked the web-first workflow ([Where to start](#where-to-start-web-simulator-first)), do [Authoring for the web simulator](#authoring-for-the-web-simulator) first, get the app feature-complete and signed off in the browser, then come back here for the port to Python. The two paths converge at step 6 (registering in the launcher).
 
-Names use lowercase, no separators (matches the existing files). The `import` name in `main.py` will be the same:
+### 1. Create `python/apps/<name>.py`
+
+Names use lowercase, no separators (matches the existing files). The `import` name in `python/main.py` will be the same:
 
 ```bash
-touch apps/coolgame.py
+touch python/apps/coolgame.py
 ```
 
 ### 2. Standard header
@@ -461,7 +525,7 @@ Calling `run()` once (not in a `while True:`) means hold-center 1.5 s actually e
 
 ### 6. Register in the launcher
 
-Edit `main.py`. There are two spots:
+Edit `python/main.py`. There are two spots:
 
 ```python
 # ... existing imports ...
@@ -602,19 +666,181 @@ The existing apps in `docs/apps/` are filled-in examples; copy the closest one a
 - ✅ **Match the existing visual conventions** — moderate brightness (rgb values ~30–60 of 255), per-game accent colors, dim background hues. Full `#ffffff` (255 white) at close range is painful.
 - ✅ **Test in standalone mode** (`Run` in Thonny) before integrating into the launcher. Standalone gives you a clean Ctrl-C escape if something hangs.
 - ✅ **Write your `docs/apps/<name>.md`** before considering the app done. If you can't describe the scoring in plain English, it probably needs another pass.
-- ✅ **Add your app to `APPS = [...]` in `main.py`** to make the launcher see it.
+- ✅ **Add your app to `APPS = [...]` in `python/main.py`** to make the launcher see it.
 
 ### Don't
 
 - ❌ **Don't construct `NeoPixel(...)` or `Pin(...)` at module top level.** Importing your app would allocate hardware the launcher already owns.
 - ❌ **Don't put `while True: run(_np, _joy)` in your `__main__` block.** Use a single `run(_np, _joy)`. Hold-center then returns to REPL during dev (which is what you want in Thonny). The internal restart loop inside `run()` already handles "user wants to play again".
 - ❌ **Don't reimplement game-over UI inside your app.** No private flash sequences, no private score marquees. Use `screens.game_over_screen(score)`.
-- ❌ **Don't read `sys.stdin` from a game loop unless you handle Ctrl-C explicitly.** The serial byte 0x03 gets eaten by `sys.stdin.read(1)` instead of triggering `KeyboardInterrupt`, which means Thonny can't break you out. See `apps/letters.py` for how to handle this.
+- ❌ **Don't read `sys.stdin` from a game loop unless you handle Ctrl-C explicitly.** The serial byte 0x03 gets eaten by `sys.stdin.read(1)` instead of triggering `KeyboardInterrupt`, which means Thonny can't break you out. See `python/apps/letters.py` for how to handle this.
 - ❌ **Don't block in `sleep_ms()` for longer than ~50 ms at a time** if you're between input checks. The user expects sub-100ms response to direction presses; a single `sleep_ms(500)` makes the joystick feel laggy.
 - ❌ **Don't run unbounded `while True:` loops without `sleep_ms()`.** Even if you have nothing to do, sleep at least 10 ms per iteration so Ctrl-C and `check_exit()` get a chance to fire.
 - ❌ **Don't hardcode the fonts.** Import from `_fonts.py`. There is one font module for the whole project.
 - ❌ **Don't design a scoring system that routinely produces 100+ scores.** It's not wrong, but it forces the marquee path on every game and waste's the static design's expressive range. Re-read [Scoring methodology](#scoring-methodology).
 - ❌ **Don't skip the loading screen.** Even for an app where it feels redundant, that 2×2 spinner is the user's "did I just launch the right thing?" confirmation. Always start with `screens.loading_screen()`.
+
+---
+
+## Authoring for the web simulator
+
+The web simulator under `web/` is a TypeScript reimplementation of the launcher and shared modules, designed so that an app written against the simulator's API ports to MicroPython with mostly mechanical edits.
+
+### Dev loop
+
+```bash
+cd web
+npm install          # one-time
+npm run watch        # rebuilds dist/ on every save
+```
+
+Open `web/index.html` in any modern browser (file:// is fine — no server required). You'll see the LUMATRIX matrix on the left and a virtual joystick + slide switch on the right. Keyboard works too: arrow keys = D-pad, space = center, S = slide.
+
+The watcher rebuilds in a few hundred ms. Refresh the browser after each save.
+
+### What's mirrored from MicroPython
+
+| Python | TypeScript | Notes |
+|---|---|---|
+| `from time import sleep_ms, ticks_ms, ticks_diff` | `import { sleep_ms, ticks_ms, ticks_diff } from "../runtime/time"` | Same semantics. |
+| `sleep_ms(50)` blocks the thread | `await sleep_ms(50)` suspends the async function | The only invasive runtime difference — see [Porting](#porting-from-typescript-to-micropython). |
+| `import _screens as screens` | `import * as screens from "../screens"` | Same surface: `init`, `loading_screen`, `game_over_screen`, `end_screen`, `check_exit`, `any_input`, `show_digit_briefly`. |
+| `screens.loading_screen()` returns `"start"` or `"exit"` | `await screens.loading_screen()` returns the same | All blocking screens are `async` in TS. |
+| `screens.check_exit()` sync, returns bool | `screens.check_exit()` sync, returns bool | Identical. |
+| `np[i] = (r, g, b)` tuple | `np[i] = [r, g, b]` array (typed as `RGB`) | TS uses arrays; treat the bytes the same way. |
+| `joystick["up"].value()` | `joystick.up.value()` | TS uses property access (object, not dict). |
+| `pin.value() == 0` means pressed | `pin.value() === 0` means pressed | Same active-low convention. |
+| `FONT_3X5["A"]` from `_fonts` | `FONT_3X5["A"]` from `./fonts` | Identical glyph data, loaded from the same `shared/fonts.json`. |
+
+### Standard shape of a TS app
+
+```ts
+import type { NeoPixel, RGB } from "../hardware/neopixel";
+import type { Joystick } from "../hardware/joystick";
+import * as screens from "../screens";
+import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
+
+export const NAME = "MyGame";
+
+const NUM_LEDS = 64;
+const FRAME_MS = 50;
+
+function clear(np: NeoPixel): void {
+  for (let i = 0; i < NUM_LEDS; i++) np[i] = [0, 0, 0];
+}
+
+function px(np: NeoPixel, col: number, row: number, color: RGB): void {
+  if (col >= 0 && col <= 7 && row >= 0 && row <= 7) {
+    np[row * 8 + col] = color;
+  }
+}
+
+type RoundResult = { kind: "score"; score: number } | { kind: "exit" };
+
+async function playOneRound(np: NeoPixel, joy: Joystick): Promise<RoundResult> {
+  let score = 0;
+  while (true) {
+    if (screens.check_exit()) return { kind: "exit" };
+    // ... game logic, updating `score` ...
+    // if (dead) return { kind: "score", score };
+    clear(np);
+    // ... render frame ...
+    np.write();
+    await sleep_ms(FRAME_MS);
+  }
+}
+
+export async function run(np: NeoPixel, joy: Joystick): Promise<void> {
+  screens.init(np, joy);
+  while (true) {
+    if ((await screens.loading_screen()) === "exit") return;
+    const result = await playOneRound(np, joy);
+    if (result.kind === "exit") return;
+    if ((await screens.game_over_screen(result.score)) === "exit") return;
+  }
+}
+```
+
+Notes:
+
+- `NAME` and `run` are the same contract as Python. The launcher (TS or PY) only cares about those two symbols.
+- The `RoundResult` discriminated union is the TS-friendly form of "return `None` for exit, score otherwise". It compiles away — at runtime it's just `{ kind: "exit" }` or `{ kind: "score", score: 42 }`.
+- `np` and `joy` are passed as arguments here (rather than stashed in module-level `let np`). Both styles work; argument-passing is more idiomatic in TS and avoids the import-time hardware allocation problem entirely. When you port to Python, the module-level `np = None` / bind-in-`run()` pattern is the equivalent.
+
+### Registering in the simulator launcher
+
+Edit `web/src/launcher.ts`. There are two spots, just like in `python/main.py`:
+
+```ts
+// ... existing imports ...
+import * as mygame from "./apps/mygame";              // ← add this
+
+// ...
+
+const APPS: readonly App[] = [reaction, connect4, mygame];
+//                                                  ↑ add here
+```
+
+The order in `APPS` defines the launcher slot index, matching the Pico exactly.
+
+### Per-app docs
+
+Per-app documentation lives in `docs/apps/<name>.md` regardless of which platform you targeted first. Write it once when the app is feature-complete on whichever side, then keep it accurate as you port.
+
+---
+
+## Porting from TypeScript to MicroPython
+
+Once the user has tested the web version and is happy, port it. The translation is mostly mechanical. Work top-to-bottom through the file.
+
+### Translation table
+
+| TypeScript | MicroPython | Notes |
+|---|---|---|
+| `import * as screens from "../screens";` | `import _screens as screens` | |
+| `import { sleep_ms, ticks_ms, ticks_diff } from "../runtime/time";` | `from time import sleep_ms, ticks_ms, ticks_diff` | |
+| `import type { NeoPixel, RGB } from "../hardware/neopixel";` | Delete. MicroPython has no static types. | |
+| `export const NAME = "MyGame";` | `NAME = "MyGame"` | |
+| `export async function run(np, joy) { ... }` | `def run(np, joy):` | Drop `async` and `export`. |
+| `await sleep_ms(50);` | `sleep_ms(50)` | Drop `await` everywhere. |
+| `await screens.loading_screen()` | `screens.loading_screen()` | |
+| `await screens.game_over_screen(score)` | `screens.game_over_screen(score)` | |
+| `np[i] = [r, g, b];` | `np[i] = (r, g, b)` | Arrays → tuples. |
+| `joy.up.value() === 0` | `joystick["up"].value() == 0` | Property → dict key. **Also**: the launcher passes a dict in Python and an object in TS; keep both consistent. |
+| `function play_one_round(np, joy) { ... }` | `def play_one_round():` and use module globals | Python apps in this repo stash `np` / joy pins in module globals bound during `run()`. |
+| `{ kind: "exit" } / { kind: "score", score }` discriminated union | `return None` for exit, `return score` for score | Then check `if score is None:` in `run()`. |
+| `const FOO: readonly RGB[] = [[0, 25, 60]]` | `FOO = ((0, 25, 60),)` | Tuples of tuples; drop annotations. |
+| `const FOO: Readonly<Record<string, RGB>> = { up: [...] }` | `FOO = {"up": (...)}` | Dict literal; drop annotation. |
+| `Math.floor(x)` | `int(x)` (truncates toward 0; for negatives use `math.floor`) | |
+| `Math.random()` | `random.random()` (import `random`) | |
+| `Array.from({ length: n }, () => 0)` | `[0] * n` | |
+| `for (const x of xs) { ... }` | `for x in xs:` | |
+| `for (let i = 0; i < n; i++) { ... }` | `for i in range(n):` | |
+| `xs.push(v)` | `xs.append(v)` | |
+| `xs.length` | `len(xs)` | |
+| `Object.keys/values/entries` | `.keys() / .values() / .items()` | |
+| `// comment` | `# comment` | |
+| `xs.slice(0, k)` | `xs[:k]` | |
+
+### Things that don't translate one-to-one
+
+- **Module-level hardware bindings.** TS apps can take `np` and `joy` as `run()` arguments and pass them around. Python apps in this repo use module-level `np = None` / `JOY_UP = None` set inside `run()` because reusing them across many small helpers is cleaner. Pick one when you port — usually the Python-globals pattern, since that's the house style and the templates in this guide assume it.
+- **Async control flow.** TS uses `await` for every blocking call. Python is plain blocking. If your TS app uses `Promise.all`, `Promise.race`, or any concurrency primitive, you need to redesign for MicroPython's single-threaded blocking model. Most apps don't do this — they just `await sleep_ms(...)` linearly — and translate trivially.
+- **TypeScript-only features.** Generics, discriminated unions, `readonly`, type assertions — all evaporate. Convert each pattern to its loose-Python equivalent. Functions still take the same args, just with no types.
+- **Standalone `__main__` block.** TS apps don't have one (the simulator builds the whole launcher into a single bundle). When porting, add the standard `if __name__ == "__main__":` block from the Python template so the app is also runnable directly in Thonny.
+
+### Port checklist
+
+After translating the file:
+
+1. Does it import cleanly when the launcher does `import <name>` (i.e. no syntax errors, no top-level hardware allocation)?
+2. Does `Run` in Thonny work on the file alone?
+3. Does it appear in the launcher when added to `APPS = [...]` in `python/main.py`?
+4. Does the behavior match the web simulator? Compare side-by-side on a long playthrough — animations, scoring, exit behavior.
+5. Is the docstring/comment style still consistent with the Python house style?
+6. Did you remove all `await` and `async` keywords? (`grep -E 'await|async' python/apps/<name>.py` should be empty.)
+
+If anything diverges between sim and hardware, the sim is usually right — it's deterministic and easier to debug. Fix the Python; if it's a sim modeling gap, document it in `docs/apps/<name>.md`.
 
 ---
 
@@ -698,6 +924,57 @@ if __name__ == "__main__":
     run(_np, _joy)
 ```
 
+### Game app (TypeScript, web simulator)
+
+```ts
+import type { NeoPixel, RGB } from "../hardware/neopixel";
+import type { Joystick } from "../hardware/joystick";
+import * as screens from "../screens";
+import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
+
+export const NAME = "MyGame";
+
+const NUM_LEDS = 64;
+const FRAME_MS = 50;
+
+function clear(np: NeoPixel): void {
+  for (let i = 0; i < NUM_LEDS; i++) np[i] = [0, 0, 0];
+}
+
+function px(np: NeoPixel, col: number, row: number, color: RGB): void {
+  if (col >= 0 && col <= 7 && row >= 0 && row <= 7) {
+    np[row * 8 + col] = color;
+  }
+}
+
+type RoundResult = { kind: "exit" } | { kind: "score"; score: number };
+
+async function playOneRound(np: NeoPixel, joy: Joystick): Promise<RoundResult> {
+  let score = 0;
+  while (true) {
+    if (screens.check_exit()) return { kind: "exit" };
+    // ... game logic, updating `score` ...
+    // if (dead) return { kind: "score", score };
+    clear(np);
+    // ... render frame ...
+    np.write();
+    await sleep_ms(FRAME_MS);
+  }
+}
+
+export async function run(np: NeoPixel, joy: Joystick): Promise<void> {
+  screens.init(np, joy);
+  while (true) {
+    if ((await screens.loading_screen()) === "exit") return;
+    const result = await playOneRound(np, joy);
+    if (result.kind === "exit") return;
+    if ((await screens.game_over_screen(result.score)) === "exit") return;
+  }
+}
+```
+
+After this is feature-complete and the user has signed off in the browser, port it to `python/apps/<name>.py` using the [translation table](#translation-table).
+
 ### Passive app (no score, ends on inactivity)
 
 ```python
@@ -770,7 +1047,7 @@ A few specific failure modes that came up during the migration of the existing a
 
 **Joystick still held when entering a screen.** The user just pressed center to launch your app, and your `loading_screen()` immediately fires because center is still held. `_screens.py` handles this — it calls `_wait_release()` first — but if you write your own input loops, you need the same wait. Otherwise the first "tap" your loop sees is a phantom press.
 
-**`sys.stdin.read(1)` swallows Ctrl-C.** MicroPython normally raises `KeyboardInterrupt` on byte 0x03, but if your code is actively reading from stdin (like the letters app does for serial input), you have to check for 0x03 yourself and return cleanly. `apps/letters.py` is the reference implementation:
+**`sys.stdin.read(1)` swallows Ctrl-C.** MicroPython normally raises `KeyboardInterrupt` on byte 0x03, but if your code is actively reading from stdin (like the letters app does for serial input), you have to check for 0x03 yourself and return cleanly. `python/apps/letters.py` is the reference implementation:
 
 ```python
 ch = sys.stdin.read(1)
@@ -798,7 +1075,7 @@ For when you need it. From the LUMATRIX cheat sheet:
 | Joystick center (click) | 8 | active-low |
 | Slide switch | 9 | toggle, 0 or 1 |
 
-The launcher constructs all of these in `main.py` and passes them as a dict to your `run()`. Don't repeat the constructors in your app file — let the launcher own them.
+The launcher constructs all of these in `python/main.py` and passes them as a dict to your `run()`. Don't repeat the constructors in your app file — let the launcher own them.
 
 ---
 
@@ -812,5 +1089,6 @@ Before merging a new app:
 4. Hit a game-over — does the score show? Does tap-to-restart work?
 5. Is there a doc at `docs/apps/<name>.md`?
 6. Are typical scores in the 10–60 range, with skilled scores ≤ 99 most of the time?
+7. **(If you started in the web simulator)** Does the Python version behave the same as the TS version side-by-side? Same animations, same scoring, same exit semantics?
 
-If all six are "yes", you're done.
+If all answers are "yes", you're done.
