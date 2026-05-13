@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRegisterHeaderActionsSlot } from "@/components/header-actions-slot";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -11,8 +13,18 @@ const NAV_LINKS = [
   { href: "/docs", label: "Docs" },
 ];
 
+function titleSuffixForPath(pathname: string | null): string {
+  if (!pathname) return "Lab";
+  if (pathname.startsWith("/pixel-designer")) return "Designer";
+  if (pathname.startsWith("/simulator")) return "Simulator";
+  return "Lab";
+}
+
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const suffix = titleSuffixForPath(pathname);
+  const registerSlot = useRegisterHeaderActionsSlot();
 
   useEffect(() => {
     if (!open) return;
@@ -24,13 +36,20 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className="relative h-11 bg-panel border-b border-edge">
+    <header className="relative h-14 bg-panel border-b border-edge">
       <div className="h-full flex items-center px-4 gap-4">
         <Link href="/" className="flex items-baseline gap-2 no-underline">
-          <span className="text-[13px] font-semibold tracking-[0.06em] text-white">
-            Lumen<span className="text-accent">Lab</span>
+          <span className="font-bitcount text-[30px] font-light tracking-[0.02em] text-white leading-none">
+            Lumen<span className="text-accent">{suffix}</span>
           </span>
         </Link>
+
+        <div className="flex-1" />
+
+        <div
+          ref={registerSlot}
+          className="flex items-center gap-1.5 min-w-0"
+        />
 
         <div className="flex-1" />
 
@@ -70,7 +89,7 @@ export function SiteHeader() {
           aria-label="Close menu"
           tabIndex={-1}
           onClick={() => setOpen(false)}
-          className="fixed inset-0 top-11 z-10 bg-black/40 cursor-default"
+          className="fixed inset-0 top-14 z-10 bg-black/40 cursor-default"
         />
       )}
 

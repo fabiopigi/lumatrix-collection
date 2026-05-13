@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useHeaderActionsSlot } from "@/components/header-actions-slot";
 import {
   CELL_GAP,
   computeCellSize,
@@ -850,33 +852,35 @@ export function Designer() {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-44px-44px)] min-h-[480px]">
-      <div className="h-11 bg-panel border-b border-edge flex items-center px-3 gap-3 shrink-0">
-        <h2 className="m-0 text-[13px] font-semibold tracking-[0.06em] text-white">
-          Lumen<span className="text-accent">Designer</span>
-        </h2>
-        <div className="flex gap-1.5">
-          <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>
-            ↶
-          </IconBtn>
-          <IconBtn title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={redo}>
-            ↷
-          </IconBtn>
-        </div>
-        <div className="flex-1" />
-        <div className="flex gap-1.5">
-          <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
-            Clear
-          </HeaderBtn>
-          <HeaderBtn onClick={handlePng} title="Export PNG snapshot">
-            PNG
-          </HeaderBtn>
-          <IconBtn title="Matrix configuration" onClick={() => setConfigOpen(true)}>
-            ⚙
-          </IconBtn>
-        </div>
+  const headerSlot = useHeaderActionsSlot();
+  const headerActions = (
+    <>
+      <div className="flex gap-1.5">
+        <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>
+          ↶
+        </IconBtn>
+        <IconBtn title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={redo}>
+          ↷
+        </IconBtn>
       </div>
+      <div className="w-px h-5 bg-edge mx-1" />
+      <div className="flex gap-1.5">
+        <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
+          Clear
+        </HeaderBtn>
+        <HeaderBtn onClick={handlePng} title="Export PNG snapshot">
+          PNG
+        </HeaderBtn>
+        <IconBtn title="Matrix configuration" onClick={() => setConfigOpen(true)}>
+          ⚙
+        </IconBtn>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-56px)] min-h-[480px]">
+      {headerSlot && createPortal(headerActions, headerSlot)}
 
       <div className="flex flex-1 min-h-0">
         <Toolbar tool={tool} onTool={handleSetTool} />
