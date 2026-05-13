@@ -2,7 +2,9 @@
 
 MicroPython apps for the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) kit — a Raspberry Pi Pico driving an 8×8 NeoPixel matrix with a 5-way joystick and a slide switch.
 
-`main.py` boots into a launcher that lets you pick from the installed apps. Center-click launches; left/right cycles through the list; hold-center-1.5 s from anywhere inside an app brings you back.
+`python/main.py` boots into a launcher that lets you pick from the installed apps. Center-click launches; left/right cycles through the list; hold-center-1.5 s from anywhere inside an app brings you back.
+
+A browser-based **simulator** of the LUMATRIX hardware lives in `web/` (TypeScript source). Run `cd web && npm install && npm run build` to compile a single self-contained file to `web-apps/simulator.html`.
 
 ![device](https://lumatrix.zhaw.ch)
 
@@ -23,9 +25,9 @@ MicroPython apps for the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) kit — a Ras
 
 To deploy to your LUMATRIX:
 
-1. Copy `main.py` to the Pico's filesystem root.
-2. Copy the entire `apps/` folder to the root.
-3. Copy `fonts.json` to the root.
+1. Copy `python/main.py` to the Pico's filesystem root.
+2. Copy the contents of `python/apps/` to `/apps/` on the Pico.
+3. Copy `shared/fonts.json` to the Pico's root as `_fonts.json`.
 4. Reset the Pico.
 
 The launcher boots automatically.
@@ -36,35 +38,35 @@ To run a single app standalone (for development) without going through the launc
 
 ```
 LumaMatrix/
-├── main.py                  ← launcher
-├── fonts.json               ← font definitions (deploy to Pico root)
-├── apps/
-│   ├── _screens.py          ← shared loading / game-over / end screens
-│   ├── _fonts.py            ← font loader, exposes FONT_3X5 / FONT_5X8
-│   ├── reaction.py
-│   ├── letters.py
-│   ├── flappy.py
-│   ├── pong.py
-│   ├── invaders.py
-│   ├── doom.py
-│   ├── breakout.py
-│   └── snake.py
+├── python/                  ← all MicroPython sources (deployed to the Pico)
+│   ├── main.py              ← launcher
+│   └── apps/
+│       ├── _screens.py      ← shared loading / game-over / end screens
+│       ├── _fonts.py        ← font loader, exposes FONT_3X5 / FONT_5X8
+│       ├── reaction.py
+│       ├── letters.py
+│       ├── ... (one .py per app)
+│       └── snake.py
+├── shared/
+│   └── fonts.json           ← font definitions (used by Python + simulator)
+├── web/                     ← TypeScript source for the browser simulator
+│   ├── src/
+│   └── compile.mjs          ← bundles into web-apps/simulator.html
+├── web-apps/                ← compiled / standalone browser tools
+│   ├── pixel-designer.html
+│   └── simulator.html
 └── docs/
-    ├── AUTHORING.md         ← how to write a new app
-    └── apps/                ← per-app documentation
+    ├── AUTHORING.md             ← how to write a new app
+    ├── pixel-designer-usage.md  ← Pixel Designer reference
+    └── apps/                    ← per-app documentation
         ├── reaction.md
-        ├── letters.md
-        ├── flappy.md
-        ├── pong.md
-        ├── invaders.md
-        ├── doom.md
-        ├── breakout.md
+        ├── ... (one .md per app)
         └── snake.md
 ```
 
 ## Designing screens with the Pixel Designer
 
-The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
+The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (local copy: `web-apps/pixel-designer.html`) is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
 
 ### Workflow
 

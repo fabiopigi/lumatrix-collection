@@ -16,6 +16,9 @@ import doom
 import breakout
 import snake
 import watch
+import simonsays
+import connect4
+import dinojump
 
 NUM_LEDS = 64
 np = NeoPixel(Pin(19, Pin.OUT), NUM_LEDS)
@@ -29,7 +32,7 @@ JOY = {
     "slide":  Pin(9, Pin.IN),
 }
 
-APPS = [pong, breakout]
+APPS = [pong, breakout, simonsays, connect4, dinojump]
 
 BRIGHTNESS = 0.25
 MARQUEE_STEP_MS = 180

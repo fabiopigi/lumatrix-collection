@@ -2,7 +2,7 @@
 
 A self-contained HTML pixel-art designer for LED matrix displays. Built originally for the ZHAW **LUMATRIX** 8×8 NeoPixel kit but configurable for any matrix size, color mode, and LED-chain layout.
 
-Single file. No build step. No dependencies. Open `index.html` in a modern browser and design.
+Single file. No build step. No dependencies. Open `web-apps/pixel-designer.html` in a modern browser and design.
 
 ![LUMATRIX Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
 
@@ -31,7 +31,7 @@ Single file. No build step. No dependencies. Open `index.html` in a modern brows
 
 ## Quick start
 
-1. Open `index.html` in a browser (Chrome, Safari, or Firefox, all current).
+1. Open `web-apps/pixel-designer.html` in a browser (Chrome, Safari, or Firefox, all current).
 2. Pick a color from the palette on the right.
 3. Click and drag on the grid to paint pixels.
 4. Hit **Export** in the side panel to dump JSON, or **PNG** in the header for an image.
@@ -150,7 +150,7 @@ Glyphs are separated by 1 blank column when rendering multi-character text. The 
 
 ### Using the fonts in your own code
 
-`fonts.json` in the project root contains both fonts in a machine-readable form (rows of `"X"`/`"."` strings) with embedded usage examples and case-fallback hints. Load it directly in Python/JavaScript/MicroPython to render the same text on hardware that the designer previews on screen.
+`shared/fonts.json` contains both fonts in a machine-readable form (rows of `"X"`/`"."` strings) with embedded usage examples and case-fallback hints. Load it directly in Python/JavaScript/MicroPython to render the same text on hardware that the designer previews on screen.
 
 ---
 
@@ -511,14 +511,18 @@ The Text tool stamps on **click**. Type in the field → hover the grid to see a
 
 ```
 LumaMatrix/
-├── index.html                  # the pixel designer (this tool)
-├── fonts.json                  # both pixel fonts in a machine-readable form
-├── pixel-designer-usage.md     # this document
+├── web-apps/
+│   ├── pixel-designer.html     # the pixel designer (this tool)
+│   └── simulator.html          # browser-based LUMATRIX simulator
+├── shared/
+│   └── fonts.json              # both pixel fonts in a machine-readable form
 ├── docs/
+│   ├── pixel-designer-usage.md # this document
 │   └── images/                 # screenshots referenced from this doc
-├── main.py                     # the active MicroPython app flashed to the Pico
-├── apps/                       # additional MicroPython apps (snake, breakout, …)
-└── README.md                   # (optional) top-level project readme
+├── python/
+│   ├── main.py                 # MicroPython launcher flashed to the Pico
+│   └── apps/                   # MicroPython app modules (snake, breakout, …)
+└── README.md                   # top-level project readme
 ```
 
-The designer is fully self-contained: open `index.html` directly from disk (no web server needed) and it works.
+The designer is fully self-contained: open `web-apps/pixel-designer.html` directly from disk (no web server needed) and it works.
