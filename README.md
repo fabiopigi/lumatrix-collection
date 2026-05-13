@@ -66,7 +66,7 @@ LumaMatrix/
 
 ## Designing screens with the Pixel Designer
 
-The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (local copy: `web-apps/pixel-designer.html`) is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
+The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
 
 ### Workflow
 
