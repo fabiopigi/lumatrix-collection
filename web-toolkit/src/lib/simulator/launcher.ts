@@ -11,6 +11,7 @@ import * as snake from "./apps/snake";
 import * as watch from "./apps/watch";
 import { FONT_3X5, glyph } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
+import * as screens from "./screens";
 import type { App, Joystick, NeoPixel, RGB } from "./types";
 
 // Order matches python/main.py's APPS list so the on-display launcher's
@@ -28,6 +29,43 @@ const APPS: readonly App[] = [
   doom,
   watch,
 ];
+
+/** Read-only view of the registered apps. The LumenSimulator's app launcher
+ *  panel uses this to list every app on the left rail. */
+export function getApps(): readonly App[] {
+  return APPS;
+}
+
+/** Set by the host UI (LumenSimulator app launcher) to make this launcher
+ *  jump straight to a specific app on its next iteration. Combine with
+ *  screens.forceExit() to interrupt whatever is currently running. */
+let _pendingAppIndex: number | null = null;
+
+export function setPendingApp(index: number | null): void {
+  _pendingAppIndex = index;
+}
+
+function consumePending(): number | null {
+  const i = _pendingAppIndex;
+  _pendingAppIndex = null;
+  return i;
+}
+
+/** Listeners are notified whenever the launcher enters / leaves an app, so the
+ *  host UI can sync its "active app" highlight with what's actually running. */
+type AppChangeListener = (idx: number | null) => void;
+const _appListeners = new Set<AppChangeListener>();
+
+export function onAppChange(cb: AppChangeListener): () => void {
+  _appListeners.add(cb);
+  return () => {
+    _appListeners.delete(cb);
+  };
+}
+
+function notifyAppChange(idx: number | null): void {
+  for (const l of _appListeners) l(idx);
+}
 
 const NUM_LEDS = 64;
 const BRIGHTNESS = 0.25;
@@ -174,6 +212,10 @@ async function menuSelect(): Promise<number> {
   let lastStep = ticks_ms();
 
   while (true) {
+    // The host UI may have queued an app while we were idling here — bail so
+    // run() can pick it up via consumePending().
+    if (_pendingAppIndex !== null) return idx;
+
     const press = readInput();
     if (press === "center") {
       await waitRelease();
@@ -214,10 +256,35 @@ export async function run(
 
   await bootAnimation();
   while (true) {
-    const i = await menuSelect();
+    let i: number;
+    let viaMenuUI = false;
+
+    const pending = consumePending();
+    if (pending !== null) {
+      i = pending;
+      viaMenuUI = true;
+    } else {
+      notifyAppChange(null); // entering on-display menu
+      const selected = await menuSelect();
+      // menuSelect may have been interrupted by setPendingApp — re-check.
+      const pendingAfter = consumePending();
+      if (pendingAfter !== null) {
+        i = pendingAfter;
+        viaMenuUI = true;
+      } else {
+        i = selected;
+      }
+    }
+
+    if (viaMenuUI) {
+      // User picked via the host menu — skip the on-display loading spinner.
+      screens.skipNextLoading();
+    }
+
     clear();
     np.write();
     await sleep_ms(150);
+    notifyAppChange(i); // entering app
     await APPS[i].run(np, joy);
     await waitRelease();
     await sleep_ms(200);
