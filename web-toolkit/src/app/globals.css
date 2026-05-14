@@ -139,8 +139,9 @@ body {
 
 .sim-grid {
   display: grid;
-  grid-template-columns: repeat(var(--sim-cols, 8), var(--sim-cell, 48px));
-  grid-template-rows: repeat(var(--sim-rows, 8), var(--sim-cell, 48px));
+  /* grid-template-columns / grid-template-rows are set inline by
+     SimulatorGrid so the column count comes through as a real integer
+     literal in `repeat()`. */
   gap: var(--sim-gap, 6px);
   padding: 10px;
   border-radius: 10px;

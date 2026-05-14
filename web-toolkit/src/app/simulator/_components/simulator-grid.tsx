@@ -216,8 +216,12 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
           className="sim-grid"
           style={
             {
-              "--sim-cols": display.width,
-              "--sim-rows": display.height,
+              // grid-template-* set inline rather than via CSS vars — browsers
+              // don't reliably resolve var() inside repeat()'s integer-count
+              // slot, which silently fell back to repeat(8, …) and produced
+              // an 8-wide layout regardless of the chosen display size.
+              gridTemplateColumns: `repeat(${display.width}, ${cellSize}px)`,
+              gridTemplateRows: `repeat(${display.height}, ${cellSize}px)`,
               "--sim-cell": `${cellSize}px`,
             } as React.CSSProperties
           }
