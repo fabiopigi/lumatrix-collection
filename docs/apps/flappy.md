@@ -81,3 +81,11 @@ To tighten the score ceiling toward 99, lower `WALL_TICK` over time (e.g. `param
 - Walls are stored as `{"col": int, "gap": int}` dicts in a list, ordered by spawn time.
 - The wall-collision check happens at the moment a wall transitions from column 1 to column 0, not while it sits at 0. This way the wall never visually overlaps the player.
 - Float mode is the more forgiving mode; great for kids or first-time players. Gravity mode is the "real" mode with the floor-hit-equals-death rule.
+
+## Responsive scaling
+
+**Feasibility: Yes — wider playfield, more walls visible.**
+
+The wall scroll is column-by-column, and the player column is fixed. A wider display means more anticipation time before each wall reaches the player; gap size, spawn cadence, and tick rates would want tuning. A taller display lets you increase `GAP_SIZE` (currently 3 cells) to keep the difficulty curve similar.
+
+Things to think about: the slide-switch float mode would feel quite different on a tall display — consider clamping float velocity to a fraction of the height.

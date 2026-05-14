@@ -52,3 +52,11 @@ This is a passive app — there's no win or lose state, no points, no game over.
 - Explicit Ctrl-C / Ctrl-D handling: the byte 0x03 gets swallowed by `sys.stdin.read(1)` instead of triggering `KeyboardInterrupt` like it normally would, so this app has to check for it manually and return cleanly.
 - The mask is small (20 unique lowercase letters cover all 64 LEDs). 6 letters never appear: `b c d j k m`. Typing those does nothing for the lowercase variant; the uppercase variant still works because it uses the font.
 - This is the only app in the collection that connects to serial — it expects Thonny to be **disconnected**. If Thonny is connected, the bytes go to Thonny instead of the running script.
+
+## Responsive scaling
+
+**Feasibility: No — bound to the LUMATRIX 8×8 word-clock layout.**
+
+The whole point of this app is to drive the physical word-clock mask cut into the LUMATRIX faceplate, which is exactly 8×8 with specific letter positions per LED. The MASK constant maps LED indices to letters in that layout. A different display size has no corresponding mask.
+
+If you want a Letters-style app on a larger display, the right move is a separate app with its own mask layout, not generalising this one.

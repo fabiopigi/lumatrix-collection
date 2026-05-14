@@ -1,13 +1,17 @@
-import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 
 export const NAME = "ArrowReaction";
 
-const NUM_LEDS = 64;
-
-type Direction = "up" | "down" | "left" | "right";
-const DIRS: readonly Direction[] = ["up", "down", "left", "right"];
+/**
+ * The gameplay loop — react to a random direction before the timing bar
+ * empties — doesn't gain depth from a bigger display. What does gain: the
+ * arrow grows to fill the available space, and the timing bar uses the full
+ * display width, so the user has a longer visual countdown to follow. The
+ * 8×8 arrow shapes are scaled up by an integer factor and centred.
+ */
+export const RESPONSIVE = true;
 
 const ARROW_PALETTE: readonly RGB[] = [
   [0, 25, 60],
@@ -25,6 +29,12 @@ const BAR_AMBER: RGB = [45, 25, 0];
 const BAR_RED: RGB = [55, 0, 0];
 const HIT_GREEN: RGB = [0, 60, 0];
 
+type Direction = "up" | "down" | "left" | "right";
+const DIRS: readonly Direction[] = ["up", "down", "left", "right"];
+
+// Arrow shapes are defined in 8×8 source space (col, row with row 0 = bottom).
+// The bottom row (row 0) is reserved for the timing bar in the source; the
+// arrows draw in rows 1..7.
 const ARROWS: Record<Direction, ReadonlyArray<readonly [number, number]>> = {
   up: [
     [3, 7], [4, 7],
@@ -64,30 +74,54 @@ const ARROWS: Record<Direction, ReadonlyArray<readonly [number, number]>> = {
 
 let np: NeoPixel;
 const PINS = {} as Record<Direction, Pin>;
+let W = 8;
+let H = 8;
+// Integer scale-up applied to the 8×8 arrow shapes.
+let ARROW_SCALE = 1;
+// Top-left offset of the arrow within the W×H display (centres the scaled-up
+// arrow). The arrow source uses rows 1..7; row 0 is reserved for the bar.
+let ARROW_OX = 0;
+let ARROW_OY = 0;
+// Width of the timing bar — always the full display width.
+let BAR_WIDTH = 8;
 
 function clear(): void {
-  for (let i = 0; i < NUM_LEDS; i++) np[i] = [0, 0, 0];
+  const n = W * H;
+  for (let i = 0; i < n; i++) np[i] = [0, 0, 0];
 }
 
 function px(col: number, row: number, color: RGB): void {
-  if (col >= 0 && col <= 7 && row >= 0 && row <= 7) {
-    np[row * 8 + col] = color;
+  if (col >= 0 && col < W && row >= 0 && row < H) {
+    np[row * W + col] = color;
+  }
+}
+
+/** Draw a source pixel at (sx, sy) as a scaled square in the W×H buffer. */
+function drawSource(sx: number, sy: number, color: RGB): void {
+  const dx0 = ARROW_OX + sx * ARROW_SCALE;
+  const dy0 = ARROW_OY + sy * ARROW_SCALE;
+  for (let i = 0; i < ARROW_SCALE; i++) {
+    for (let j = 0; j < ARROW_SCALE; j++) {
+      px(dx0 + i, dy0 + j, color);
+    }
   }
 }
 
 function drawArrow(direction: Direction, color: RGB): void {
-  for (const [c, r] of ARROWS[direction]) px(c, r, color);
+  for (const [c, r] of ARROWS[direction]) drawSource(c, r, color);
 }
 
 function barColor(length: number): RGB {
-  if (length >= 6) return BAR_GREEN;
-  if (length >= 3) return BAR_AMBER;
+  // Thresholds scale with the bar width so green/amber/red bands feel right
+  // at any display size.
+  if (length >= Math.ceil(BAR_WIDTH * 6 / 8)) return BAR_GREEN;
+  if (length >= Math.ceil(BAR_WIDTH * 3 / 8)) return BAR_AMBER;
   return BAR_RED;
 }
 
 function drawBar(length: number): void {
   const color = barColor(length);
-  for (let c = 0; c < 8; c++) {
+  for (let c = 0; c < BAR_WIDTH; c++) {
     px(c, 0, c < length ? color : [0, 0, 0]);
   }
 }
@@ -116,7 +150,7 @@ async function playRound(
   const direction = choice(DIRS);
   clear();
   drawArrow(direction, arrowColor);
-  let bar = 8;
+  let bar = BAR_WIDTH;
   drawBar(bar);
   np.write();
 
@@ -124,7 +158,7 @@ async function playRound(
   while (true) {
     if (screens.check_exit()) return { kind: "exit" };
     const elapsed = ticks_diff(ticks_ms(), start);
-    let newBar = 8 - Math.floor((elapsed * 8) / durationMs);
+    let newBar = BAR_WIDTH - Math.floor((elapsed * BAR_WIDTH) / durationMs);
     if (newBar < 0) newBar = 0;
     if (newBar !== bar) {
       bar = newBar;
@@ -173,6 +207,7 @@ async function playOneGame(): Promise<number | null> {
     const result = await playRound(duration, color);
     if (result.kind === "exit") return null;
     if (result.kind === "hit") {
+      // Hit reward scales with the bar — wider bar = more max reward per hit.
       score += result.bar;
       await flashHit(result.direction);
       if (duration > 600) duration -= 60;
@@ -185,13 +220,32 @@ async function playOneGame(): Promise<number | null> {
 export async function run(
   neopixel: NeoPixel,
   joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
 ): Promise<void> {
   np = neopixel;
   PINS.up = joystick.up;
   PINS.down = joystick.down;
   PINS.left = joystick.left;
   PINS.right = joystick.right;
-  screens.init(neopixel, joystick);
+  W = display?.width ?? 8;
+  H = display?.height ?? 8;
+
+  // Bar always spans the full display width.
+  BAR_WIDTH = W;
+
+  // The arrow shape is 8×8 source (cols 0-7, rows 0-7). Row 0 is the bar row;
+  // the arrow uses rows 1-7. We need 8 cells of usable height above the bar
+  // and 8 cells of width. Pick the largest integer scale that fits both, then
+  // centre.
+  ARROW_SCALE = Math.max(1, Math.min(Math.floor(W / 8), Math.floor((H - 1) / 7)));
+  ARROW_OX = Math.floor((W - 8 * ARROW_SCALE) / 2);
+  // Place the bar on row 0 (bottom) and the arrow above it. The arrow's
+  // own source rows 1..7 already start one row up; offset Y aligns row 1
+  // of source with the row just above the bar.
+  ARROW_OY = 0;
+
+  screens.init(screensNp ?? neopixel, joystick);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();

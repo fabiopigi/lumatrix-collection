@@ -72,3 +72,11 @@ You can't reverse 180° (a queued direction-change is rejected if it's the oppos
 - The "can't 180° reverse" rule is enforced when accepting input, not when applying it. Pressing the reverse direction simply doesn't change the queued direction.
 - Win condition (length = 64) is checked when `spawn_food()` returns `None`. The win flash is a 5×green strobe.
 - The game starts with `current_dir = (1, 0)` (right) but `started = False`, so the snake doesn't actually move until the user presses any valid direction. This gives the player a moment to orient.
+
+## Responsive scaling
+
+**Feasibility: Excellent — directly extends gameplay.**
+
+Snake is the cleanest fit for a bigger display: more grid cells = a longer game, more strategic routing, harder late-game self-collision. The grid wrap-around already uses modular arithmetic, so a different size works without changes. Win condition (length = grid_size) automatically scales.
+
+Things to think about: speed ramp (`move_interval`) is currently `START - score / SPEEDUP_EVERY`. On a 16×16 grid you may want to raise `START_INTERVAL` so the early game doesn't fly. Food rendering stays a single cell; consider 2×2 food blocks on bigger displays so it doesn't get lost.
