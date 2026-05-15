@@ -208,9 +208,9 @@ function _drawDigit(digit: string, xOffset: number, yOffset: number, color: RGB)
   const glyph = FONT_3X5[digit] || FONT_3X5[" "];
   if (!glyph) return;
   const n = np();
-  for (let gy = 0; gy < 5; gy++) {
+  for (let gy = 0; gy < glyph.length; gy++) {
     const row = glyph[gy];
-    for (let gx = 0; gx < 3; gx++) {
+    for (let gx = 0; gx < row.length; gx++) {
       if (row[gx] === "X") {
         const vx = xOffset + gx;
         const vy = yOffset + gy;
@@ -220,6 +220,11 @@ function _drawDigit(digit: string, xOffset: number, yOffset: number, color: RGB)
       }
     }
   }
+}
+
+function _glyphWidth(ch: string): number {
+  const g = FONT_3X5[ch] || FONT_3X5[" "];
+  return g && g[0] ? g[0].length : 0;
 }
 
 async function _flashSequence(): Promise<Decision> {
@@ -358,13 +363,15 @@ export async function show_digit_briefly(
   holdMs: number,
 ): Promise<"exit" | null> {
   const text = String(Math.trunc(typeof digit === "string" ? Number(digit) : digit));
-  const width = text.length * 3 + (text.length - 1);
+  const widths = [...text].map(_glyphWidth);
+  const width =
+    widths.reduce((a, b) => a + b, 0) + Math.max(0, widths.length - 1);
   const xOffset = Math.floor((8 - width) / 2);
   _clear();
   let pos = xOffset;
-  for (const ch of text) {
-    _drawDigit(ch, pos, 1, color);
-    pos += 4;
+  for (let i = 0; i < text.length; i++) {
+    _drawDigit(text[i], pos, 1, color);
+    pos += widths[i] + 1;
   }
   np().write();
   const t0 = ticks_ms();

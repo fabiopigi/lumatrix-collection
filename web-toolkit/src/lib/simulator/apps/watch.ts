@@ -48,9 +48,9 @@ function blend(a: RGB, b: RGB): RGB {
 function drawDigit(buf: RGB[], ch: string, xOff: number, yOff: number, color: RGB): void {
   const g = glyph(FONT_3X5, ch) || glyph(FONT_3X5, " ");
   if (!g) return;
-  for (let gy = 0; gy < 5; gy++) {
+  for (let gy = 0; gy < g.length; gy++) {
     const row = g[gy];
-    for (let gx = 0; gx < 3; gx++) {
+    for (let gx = 0; gx < row.length; gx++) {
       if (row[gx] === "X") {
         const vx = xOff + gx;
         const vy = yOff + gy;

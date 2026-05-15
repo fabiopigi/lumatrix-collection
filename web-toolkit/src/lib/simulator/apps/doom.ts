@@ -517,9 +517,9 @@ function updateEnemyFire(level: number): void {
 function drawDigit(ch: string, x0: number, y0: number, color: RGB): void {
   const g = FONT_3X5[ch];
   if (!g) return;
-  for (let gy = 0; gy < 5; gy++) {
+  for (let gy = 0; gy < g.length; gy++) {
     const row = g[gy];
-    for (let gx = 0; gx < 3; gx++) {
+    for (let gx = 0; gx < row.length; gx++) {
       if (row[gx] === "X") setPixel(x0 + gx, y0 + gy, color);
     }
   }
@@ -529,14 +529,19 @@ function drawDigit(ch: string, x0: number, y0: number, color: RGB): void {
  *  already in the frame buffer. Wide displays accommodate 2-digit levels. */
 function renderLevelOverlay(level: number, color: RGB): void {
   const text = String(level);
-  // 3 cells per digit + 1 cell between digits.
-  const totalWidth = text.length * 3 + (text.length - 1);
-  // If the display is too narrow to fit the whole number, just bail.
+  const widths = [...text].map((ch) => {
+    const g = FONT_3X5[ch];
+    return g && g[0] ? g[0].length : 0;
+  });
+  const totalWidth =
+    widths.reduce((a, b) => a + b, 0) + Math.max(0, widths.length - 1);
   if (totalWidth > W || H < 5) return;
   const x0 = Math.floor((W - totalWidth) / 2);
   const y0 = Math.floor((H - 5) / 2);
+  let pos = x0;
   for (let i = 0; i < text.length; i++) {
-    drawDigit(text[i], x0 + i * 4, y0, color);
+    drawDigit(text[i], pos, y0, color);
+    pos += widths[i] + 1;
   }
 }
 

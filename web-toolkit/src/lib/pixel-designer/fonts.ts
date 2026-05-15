@@ -1,6 +1,6 @@
 import type { FontKey, Point } from "./types";
 
-export const FONT_5X8: Record<string, string[]> = {
+const FONT_5X8_RAW: Record<string, string[]> = {
   " ": [".....", ".....", ".....", ".....", ".....", ".....", ".....", "....."],
   A: [".XXX.", "X...X", "X...X", "X...X", "XXXXX", "X...X", "X...X", "....."],
   B: ["XXXX.", "X...X", "X...X", "XXXX.", "X...X", "X...X", "XXXX.", "....."],
@@ -75,7 +75,7 @@ export const FONT_5X8: Record<string, string[]> = {
   z: [".....", ".....", "XXXXX", "...X.", "..X..", ".X...", "XXXXX", "....."],
 };
 
-export const FONT_3X5: Record<string, string[]> = {
+const FONT_3X5_RAW: Record<string, string[]> = {
   " ": ["...", "...", "...", "...", "..."],
   A: [".X.", "X.X", "XXX", "X.X", "X.X"],
   B: ["XX.", "X.X", "XX.", "X.X", "XX."],
@@ -122,7 +122,7 @@ export const FONT_3X5: Record<string, string[]> = {
   "+": ["...", ".X.", "XXX", ".X.", "..."],
 };
 
-export const FONT_7X9: Record<string, string[]> = {
+const FONT_7X9_RAW: Record<string, string[]> = {
   " ": ["....", "....", "....", "....", "....", "....", "....", "....", "....", "....", "....", "...."],
   A: ["...X....", "..XXX...", ".XXXXX..", "XXX.XXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "........", "........"],
   B: ["XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXX..", "........", "........"],
@@ -199,6 +199,39 @@ export const FONT_7X9: Record<string, string[]> = {
   '"': ["XX.XX.", "XX.XX.", "XX.XX.", "......", "......", "......", "......", "......", "......", "......", "......", "......"],
 };
 
+/** Strip leading + trailing all-dot columns from a glyph. Entirely-empty
+ *  glyphs (space) are preserved at their original width so they still
+ *  contribute horizontal space. */
+function trimGlyph(rows: string[]): string[] {
+  if (rows.length === 0) return rows;
+  const w = rows[0].length;
+  if (w === 0) return rows;
+  let left = 0;
+  while (left < w && rows.every((r) => r[left] === ".")) left++;
+  if (left === w) return rows;
+  let right = w - 1;
+  while (right > left && rows.every((r) => r[right] === ".")) right--;
+  if (left === 0 && right === w - 1) return rows;
+  return rows.map((r) => r.slice(left, right + 1));
+}
+
+function trimFont(
+  font: Record<string, string[]>,
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const ch of Object.keys(font)) {
+    out[ch] = trimGlyph(font[ch]);
+  }
+  return out;
+}
+
+export const FONT_3X5 = trimFont(FONT_3X5_RAW);
+export const FONT_5X8 = trimFont(FONT_5X8_RAW);
+export const FONT_7X9 = trimFont(FONT_7X9_RAW);
+
+/** Pixel gap inserted between glyphs when rendering text. */
+export const KERNING_GAP = 1;
+
 export function textPoints(
   text: string,
   font: FontKey,
@@ -207,7 +240,6 @@ export function textPoints(
 ): Point[] {
   const f =
     font === "7x9" ? FONT_7X9 : font === "5x8" ? FONT_5X8 : FONT_3X5;
-  const gap = font === "7x9" ? 0 : 1;
   const out: Point[] = [];
   let cursorX = x0;
   for (const ch of text) {
@@ -216,13 +248,14 @@ export function textPoints(
     const w = glyph[0].length;
     const h = glyph.length;
     for (let gy = 0; gy < h; gy++) {
+      const row = glyph[gy];
       for (let gx = 0; gx < w; gx++) {
-        if (glyph[gy][gx] === "X") {
+        if (row[gx] === "X") {
           out.push({ x: cursorX + gx, y: y0 + gy });
         }
       }
     }
-    cursorX += w + gap;
+    cursorX += w + KERNING_GAP;
   }
   return out;
 }

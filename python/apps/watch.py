@@ -61,9 +61,9 @@ def _draw_digit(buf, ch, x_off, y_off, color):
     glyph = FONT_3X5.get(ch) or FONT_3X5.get(" ")
     if not glyph:
         return
-    for gy in range(5):
+    for gy in range(len(glyph)):
         row = glyph[gy]
-        for gx in range(3):
+        for gx in range(len(row)):
             if row[gx] == "X":
                 vx = x_off + gx
                 vy = y_off + gy

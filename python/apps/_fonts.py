@@ -34,17 +34,47 @@ _FALLBACK_3X5 = {
 }
 
 
+def _trim_glyph(rows):
+    """Strip leading + trailing all-dot columns. Preserve all-empty glyphs
+    (space) at original width so they still contribute horizontal space."""
+    if not rows:
+        return rows
+    w = len(rows[0])
+    if w == 0:
+        return rows
+    left = 0
+    while left < w and all(r[left] == "." for r in rows):
+        left += 1
+    if left == w:
+        return rows
+    right = w - 1
+    while right > left and all(r[right] == "." for r in rows):
+        right -= 1
+    if left == 0 and right == w - 1:
+        return rows
+    return [r[left:right + 1] for r in rows]
+
+
+def _trim_font(font):
+    return {ch: _trim_glyph(rows) for ch, rows in font.items()}
+
+
 def _load():
     try:
         with open("/_fonts.json") as f:
             data = json.load(f)
         fonts = data["fonts"]
-        return fonts["3x5"]["glyphs"], fonts["5x8"]["glyphs"]
+        return _trim_font(fonts["3x5"]["glyphs"]), _trim_font(fonts["5x8"]["glyphs"])
     except (OSError, ValueError, KeyError):
-        return _FALLBACK_3X5, {}
+        return _trim_font(_FALLBACK_3X5), {}
 
 
 FONT_3X5, FONT_5X8 = _load()
+
+# Pixel gap inserted between glyphs when rendering text. All bundled fonts
+# are now proportional (no fully-empty leading/trailing columns); renderers
+# advance the cursor by (glyph_width + KERNING_GAP) per character.
+KERNING_GAP = 1
 
 
 def glyph(font, ch):

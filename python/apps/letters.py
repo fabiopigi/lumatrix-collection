@@ -75,10 +75,10 @@ def pixels_for_char(ch):
         if not glyph:
             return []
         out = []
-        for grow in range(8):
+        for grow in range(len(glyph)):
             line = glyph[grow]
             mrow = 7 - grow
-            for gcol in range(5):
+            for gcol in range(len(line)):
                 if line[gcol] == "X":
                     mcol = gcol + 1
                     out.append((mrow * 8 + mcol, color))

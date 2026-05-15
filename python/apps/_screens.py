@@ -181,14 +181,21 @@ def _draw_halftone(color):
 def _draw_digit(digit, x_offset, y_offset, color):
     """Draw a 3x5 glyph at visual (x_offset, y_offset). y_offset from top."""
     glyph = _FONT.get(digit) or _FONT[" "]
-    for gy in range(5):
+    for gy in range(len(glyph)):
         row = glyph[gy]
-        for gx in range(3):
+        for gx in range(len(row)):
             if row[gx] == "X":
                 vx = x_offset + gx
                 vy = y_offset + gy
                 if 0 <= vx <= 7 and 0 <= vy <= 7:
                     _np[(7 - vy) * 8 + vx] = color
+
+
+def _glyph_width(ch):
+    g = _FONT.get(ch) or _FONT.get(" ")
+    if not g or not g[0]:
+        return 0
+    return len(g[0])
 
 
 def _flash_sequence():
@@ -311,13 +318,14 @@ def show_digit_briefly(digit, color, hold_ms):
     transitions (level number, lives remaining, etc.). Returns 'exit' if the
     user holds center to bail mid-display, else None."""
     text = str(int(digit))
-    width = len(text) * 3 + (len(text) - 1)
+    widths = [_glyph_width(ch) for ch in text]
+    width = sum(widths) + max(0, len(widths) - 1)
     x_offset = (8 - width) // 2
     _clear()
     pos = x_offset
-    for ch in text:
+    for i, ch in enumerate(text):
         _draw_digit(ch, pos, 1, color)
-        pos += 4
+        pos += widths[i] + 1
     _np.write()
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < hold_ms:
