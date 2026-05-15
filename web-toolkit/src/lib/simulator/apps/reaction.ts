@@ -32,10 +32,14 @@ const HIT_GREEN: RGB = [0, 60, 0];
 type Direction = "up" | "down" | "left" | "right";
 const DIRS: readonly Direction[] = ["up", "down", "left", "right"];
 
-// Arrow shapes are defined in 8×8 source space (col, row with row 0 = bottom).
+// Arrow shapes are defined in source space (col, row with row 0 = bottom).
 // The bottom row (row 0) is reserved for the timing bar in the source; the
-// arrows draw in rows 1..7.
-const ARROWS: Record<Direction, ReadonlyArray<readonly [number, number]>> = {
+// arrows draw in rows 1..(H-1).
+type ArrowSet = Record<Direction, ReadonlyArray<readonly [number, number]>>;
+
+// 8×8 source — used at small displays (scaled by an integer factor for larger
+// ones that aren't exactly 16×16).
+const ARROWS_8: ArrowSet = {
   up: [
     [3, 7], [4, 7],
     [2, 6], [3, 6], [4, 6], [5, 6],
@@ -71,6 +75,66 @@ const ARROWS: Record<Direction, ReadonlyArray<readonly [number, number]>> = {
     [5, 1],
   ],
 };
+
+// 16×16 native — a more refined arrow than the 2× scale-up of the 8×8 shape.
+// Arrowhead is a 12-cell-wide triangle, stem is 4 cells wide × 6 cells deep.
+// Bar still occupies row 0 (drawn dynamically by drawBar).
+const ARROWS_16: ArrowSet = {
+  up: [
+    [7, 15], [8, 15],
+    [6, 14], [7, 14], [8, 14], [9, 14],
+    [5, 13], [6, 13], [7, 13], [8, 13], [9, 13], [10, 13],
+    [4, 12], [5, 12], [6, 12], [7, 12], [8, 12], [9, 12], [10, 12], [11, 12],
+    [3, 11], [4, 11], [5, 11], [6, 11], [7, 11], [8, 11], [9, 11], [10, 11], [11, 11], [12, 11],
+    [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10], [8, 10], [9, 10], [10, 10], [11, 10], [12, 10], [13, 10],
+    [6, 9], [7, 9], [8, 9], [9, 9],
+    [6, 8], [7, 8], [8, 8], [9, 8],
+    [6, 7], [7, 7], [8, 7], [9, 7],
+    [6, 6], [7, 6], [8, 6], [9, 6],
+    [6, 5], [7, 5], [8, 5], [9, 5],
+    [6, 4], [7, 4], [8, 4], [9, 4],
+  ],
+  down: [
+    [6, 12], [7, 12], [8, 12], [9, 12],
+    [6, 11], [7, 11], [8, 11], [9, 11],
+    [6, 10], [7, 10], [8, 10], [9, 10],
+    [6, 9], [7, 9], [8, 9], [9, 9],
+    [6, 8], [7, 8], [8, 8], [9, 8],
+    [6, 7], [7, 7], [8, 7], [9, 7],
+    [2, 6], [3, 6], [4, 6], [5, 6], [6, 6], [7, 6], [8, 6], [9, 6], [10, 6], [11, 6], [12, 6], [13, 6],
+    [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [9, 5], [10, 5], [11, 5], [12, 5],
+    [4, 4], [5, 4], [6, 4], [7, 4], [8, 4], [9, 4], [10, 4], [11, 4],
+    [5, 3], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3],
+    [6, 2], [7, 2], [8, 2], [9, 2],
+    [7, 1], [8, 1],
+  ],
+  left: [
+    [0, 8], [0, 7],
+    [1, 9], [1, 8], [1, 7], [1, 6],
+    [2, 10], [2, 9], [2, 8], [2, 7], [2, 6], [2, 5],
+    [3, 11], [3, 10], [3, 9], [3, 8], [3, 7], [3, 6], [3, 5], [3, 4],
+    [4, 12], [4, 11], [4, 10], [4, 9], [4, 8], [4, 7], [4, 6], [4, 5], [4, 4], [4, 3],
+    [5, 13], [5, 12], [5, 11], [5, 10], [5, 9], [5, 8], [5, 7], [5, 6], [5, 5], [5, 4], [5, 3], [5, 2],
+    [6, 9], [7, 9], [8, 9], [9, 9], [10, 9], [11, 9],
+    [6, 8], [7, 8], [8, 8], [9, 8], [10, 8], [11, 8],
+    [6, 7], [7, 7], [8, 7], [9, 7], [10, 7], [11, 7],
+    [6, 6], [7, 6], [8, 6], [9, 6], [10, 6], [11, 6],
+  ],
+  right: [
+    [4, 9], [5, 9], [6, 9], [7, 9], [8, 9], [9, 9],
+    [4, 8], [5, 8], [6, 8], [7, 8], [8, 8], [9, 8],
+    [4, 7], [5, 7], [6, 7], [7, 7], [8, 7], [9, 7],
+    [4, 6], [5, 6], [6, 6], [7, 6], [8, 6], [9, 6],
+    [10, 13], [10, 12], [10, 11], [10, 10], [10, 9], [10, 8], [10, 7], [10, 6], [10, 5], [10, 4], [10, 3], [10, 2],
+    [11, 12], [11, 11], [11, 10], [11, 9], [11, 8], [11, 7], [11, 6], [11, 5], [11, 4], [11, 3],
+    [12, 11], [12, 10], [12, 9], [12, 8], [12, 7], [12, 6], [12, 5], [12, 4],
+    [13, 10], [13, 9], [13, 8], [13, 7], [13, 6], [13, 5],
+    [14, 9], [14, 8], [14, 7], [14, 6],
+    [15, 8], [15, 7],
+  ],
+};
+
+let ARROWS: ArrowSet = ARROWS_8;
 
 let np: NeoPixel;
 const PINS = {} as Record<Direction, Pin>;
@@ -234,16 +298,23 @@ export async function run(
   // Bar always spans the full display width.
   BAR_WIDTH = W;
 
-  // The arrow shape is 8×8 source (cols 0-7, rows 0-7). Row 0 is the bar row;
-  // the arrow uses rows 1-7. We need 8 cells of usable height above the bar
-  // and 8 cells of width. Pick the largest integer scale that fits both, then
-  // centre.
-  ARROW_SCALE = Math.max(1, Math.min(Math.floor(W / 8), Math.floor((H - 1) / 7)));
-  ARROW_OX = Math.floor((W - 8 * ARROW_SCALE) / 2);
-  // Place the bar on row 0 (bottom) and the arrow above it. The arrow's
-  // own source rows 1..7 already start one row up; offset Y aligns row 1
-  // of source with the row just above the bar.
-  ARROW_OY = 0;
+  if (W === 16 && H === 16) {
+    // Native 16×16 shapes — no scaling, no offset.
+    ARROWS = ARROWS_16;
+    ARROW_SCALE = 1;
+    ARROW_OX = 0;
+    ARROW_OY = 0;
+  } else {
+    // 8×8 source scaled by an integer factor that fits both axes.
+    // Row 0 is the bar; the arrow uses source rows 1..7 (7 cells of height).
+    ARROWS = ARROWS_8;
+    ARROW_SCALE = Math.max(
+      1,
+      Math.min(Math.floor(W / 8), Math.floor((H - 1) / 7)),
+    );
+    ARROW_OX = Math.floor((W - 8 * ARROW_SCALE) / 2);
+    ARROW_OY = 0;
+  }
 
   screens.init(screensNp ?? neopixel, joystick);
   while (true) {
