@@ -11,6 +11,12 @@
  * actually USE the extra resolution) is a follow-up — see each app's doc.
  */
 
+import {
+  HARDWARE_PRESETS,
+  presetIdFor as basePresetIdFor,
+  type HardwarePreset,
+} from "@/lib/hardware-presets";
+
 export interface DisplayConfig {
   readonly width: number;
   readonly height: number;
@@ -21,20 +27,8 @@ export const SOURCE_HEIGHT = 8;
 
 export const DEFAULT_DISPLAY: DisplayConfig = { width: 8, height: 8 };
 
-export interface DisplayPreset {
-  readonly id: string;
-  readonly label: string;
-  readonly width: number;
-  readonly height: number;
-}
-
-export const DISPLAY_PRESETS: readonly DisplayPreset[] = [
-  { id: "8x8", label: "8×8 (LUMATRIX)", width: 8, height: 8 },
-  { id: "16x16", label: "16×16", width: 16, height: 16 },
-  { id: "32x16", label: "32×16 (landscape)", width: 32, height: 16 },
-  { id: "16x32", label: "16×32 (portrait)", width: 16, height: 32 },
-  { id: "32x32", label: "32×32", width: 32, height: 32 },
-];
+export type DisplayPreset = HardwarePreset;
+export const DISPLAY_PRESETS = HARDWARE_PRESETS;
 
 const STORAGE_KEY = "lumatrix-simulator-display";
 const MIN_DIM = 8;
@@ -106,8 +100,5 @@ export function isLumatrix(cfg: DisplayConfig): boolean {
 }
 
 export function presetIdFor(cfg: DisplayConfig): string {
-  const match = DISPLAY_PRESETS.find(
-    (p) => p.width === cfg.width && p.height === cfg.height,
-  );
-  return match?.id ?? "custom";
+  return basePresetIdFor(cfg.width, cfg.height);
 }

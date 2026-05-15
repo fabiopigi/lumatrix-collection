@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG, LUMATRIX_MASK } from "@/lib/pixel-designer/config";
 import { computeLedIndex } from "@/lib/pixel-designer/led-index";
 import { COLOR_MODE_LABELS } from "@/lib/pixel-designer/palette";
 import type { Axis, ColorMode, Config, Origin } from "@/lib/pixel-designer/types";
+import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
 import { ModalShell } from "./modal-shell";
 
 interface ConfigModalProps {
@@ -13,14 +14,6 @@ interface ConfigModalProps {
   onClose: () => void;
   onSave: (next: Config) => void;
 }
-
-const PRESETS: Array<[number, number]> = [
-  [8, 8],
-  [16, 16],
-  [32, 8],
-  [16, 8],
-  [32, 32],
-];
 
 export function ConfigModal(props: ConfigModalProps) {
   if (!props.open) return null;
@@ -107,17 +100,18 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
           </NumLabel>
         </div>
         <div className="flex gap-1.5 mt-2 flex-wrap">
-          {PRESETS.map(([w, h]) => (
+          {HARDWARE_PRESETS.map((p) => (
             <button
-              key={`${w}x${h}`}
+              key={p.id}
               type="button"
+              title={p.label}
               onClick={() => {
-                setWidth(w);
-                setHeight(h);
+                setWidth(p.width);
+                setHeight(p.height);
               }}
               className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
             >
-              {w}×{h}
+              {p.width}×{p.height}
             </button>
           ))}
         </div>
