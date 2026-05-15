@@ -122,13 +122,92 @@ export const FONT_3X5: Record<string, string[]> = {
   "+": ["...", ".X.", "XXX", ".X.", "..."],
 };
 
+export const FONT_7X9: Record<string, string[]> = {
+  " ": ["....", "....", "....", "....", "....", "....", "....", "....", "....", "....", "....", "...."],
+  A: ["...X....", "..XXX...", ".XXXXX..", "XXX.XXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "........", "........"],
+  B: ["XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXX..", "........", "........"],
+  C: [".XXXXX..", "XXXXXXX.", "XXX..XX.", "XX......", "XX......", "XX......", "XX......", "XXX..XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  D: ["XXXXXX..", "XXXXXXX.", "XX..XXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX..XXX.", "XXXXXXX.", "XXXXXX..", "........", "........"],
+  E: ["XXXXXX.", "XXXXXX.", "XX.....", "XX.....", "XXXXX..", "XXXXX..", "XX.....", "XX.....", "XXXXXX.", "XXXXXX.", ".......", "......."],
+  F: ["XXXXXX.", "XXXXXX.", "XX.....", "XX.....", "XXXXX..", "XXXXX..", "XX.....", "XX.....", "XX.....", "XX.....", ".......", "......."],
+  G: [".XXXXX..", "XXXXXXX.", "XXX..XX.", "XX......", "XX.XXXX.", "XX.XXXX.", "XX...XX.", "XXX..XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  H: ["XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "........", "........"],
+  I: ["XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "...", "..."],
+  J: ["....XX.", "....XX.", "....XX.", "....XX.", "....XX.", "....XX.", "....XX.", "XX.XXX.", "XXXXXX.", ".XXXX..", ".......", "......."],
+  K: ["XX..XX.", "XX..XX.", "XX..XX.", "XX.XX..", "XXXX...", "XXXXX..", "XX.XXX.", "XX..XX.", "XX..XX.", "XX..XX.", ".......", "......."],
+  L: ["XX....", "XX....", "XX....", "XX....", "XX....", "XX....", "XX....", "XX....", "XXXXX.", "XXXXX.", "......", "......"],
+  M: ["XX.....XX.", "XXX...XXX.", "XXXX.XXXX.", "XXXXXXXXX.", "XX.XXX.XX.", "XX..X..XX.", "XX.....XX.", "XX.....XX.", "XX.....XX.", "XX.....XX.", "..........", ".........."],
+  N: ["XXX...XX.", "XXX...XX.", "XXXX..XX.", "XXXX..XX.", "XXXXX.XX.", "XX.XX.XX.", "XX.XXXXX.", "XX..XXXX.", "XX..XXXX.", "XX...XXX.", ".........", "........."],
+  O: [".XXXXX..", "XXXXXXX.", "XXX.XXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXX.XXX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  P: ["XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXX..", "XX......", "XX......", "XX......", "........", "........"],
+  Q: [".XXXXX..", "XXXXXXX.", "XXX.XXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXX.XXX.", "XXXXXX..", ".XXX.XX.", "........", "........"],
+  R: ["XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "........", "........"],
+  S: [".XXXXX..", "XXXXXXX.", "XX...XX.", "XX......", "XXXXXX..", ".XXXXXX.", ".....XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  T: ["XXXXXX.", "XXXXXX.", "..XX...", "..XX...", "..XX...", "..XX...", "..XX...", "..XX...", "..XX...", "..XX...", ".......", "......."],
+  U: ["XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXX.XXX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  V: ["XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXX.XXX.", ".XXXXX..", "..XXX...", "...X....", "........", "........"],
+  W: ["XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XXXXXXXXXX.", ".XXX..XXX..", "..X....X...", "...........", "..........."],
+  X: ["XX...XX.", "XX...XX.", "XXX.XXX.", ".XXXXX..", "..XXX...", ".XXXXX..", "XXX.XXX.", "XX...XX.", "XX...XX.", "XX...XX.", "........", "........"],
+  Y: ["XX....XX.", "XX....XX.", "XX....XX.", "XX....XX.", "XXX..XXX.", ".XXXXXX..", "..XXXX...", "...XX....", "...XX....", "...XX....", ".........", "........."],
+  Z: ["XXXXXXXX.", "XXXXXXXX.", ".....XXX.", "....XXX..", "...XXX...", "..XXX....", ".XXX.....", "XXX......", "XXXXXXXX.", "XXXXXXXX.", ".........", "........."],
+  a: ["........", "........", ".XXXXX..", "XXXXXXX.", ".....XX.", ".XXXXXX.", "XXXXXXX.", "XX...XX.", "XXXXXXX.", ".XXX.XX.", "........", "........"],
+  b: ["XX......", "XX......", "XX.XXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXX..", "........", "........"],
+  c: ["........", "........", ".XXXXX..", "XXXXXXX.", "XX...XX.", "XX......", "XX......", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  d: [".....XX.", ".....XX.", ".XXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXX.XX.", "........", "........"],
+  e: ["........", "........", ".XXXXX..", "XXXXXXX.", "XX...XX.", "XXXXXXX.", "XXXXXXX.", "XX......", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  f: ["..XXX.", ".XXXX.", ".XX...", "XXXXX.", "XXXXX.", ".XX...", ".XX...", ".XX...", ".XX...", ".XX...", "......", "......"],
+  g: ["........", "........", ".XXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXX.XX.", ".....XX.", "XXXXXXX.", ".XXXXX.."],
+  h: ["XX......", "XX......", "XX.XXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "........", "........"],
+  i: ["XX.", "XX.", "...", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "...", "..."],
+  j: [".XX.", ".XX.", "....", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", "XXX.", "XX.."],
+  k: ["XX.....", "XX.....", "XX..XX.", "XX..XX.", "XX.XX..", "XXXX...", "XX.XX..", "XX..XX.", "XX..XX.", "XX..XX.", ".......", "......."],
+  l: ["XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "...", "..."],
+  m: ["...........", "...........", "XX.XX..XX..", "XXXXXXXXXX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "...........", "..........."],
+  n: ["........", "........", "XX.XXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "........", "........"],
+  o: ["........", "........", ".XXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  p: ["........", "........", "XX.XXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", "XXXXXX..", "XX......", "XX......"],
+  q: ["........", "........", ".XXXXXX.", "XXXXXXX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXX.XX.", ".....XX.", ".....XX."],
+  r: [".......", ".......", "XX.XX..", "XXXXXX.", "XXX.X..", "XX.....", "XX.....", "XX.....", "XX.....", "XX.....", ".......", "......."],
+  s: [".......", ".......", ".XXXX..", "XXXXXX.", "XX.....", "XXXXX..", ".XXXXX.", "....XX.", "XXXXXX.", ".XXXX..", ".......", "......."],
+  t: ["..X...", ".XX...", ".XX...", "XXXXX.", "XXXXX.", ".XX...", ".XX...", ".XX...", ".XXXX.", "..XXX.", "......", "......"],
+  u: ["........", "........", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXX.XX.", "........", "........"],
+  v: ["........", "........", "XX...XX.", "XX...XX.", "XX...XX.", "XX...XX.", "XXX.XXX.", ".XXXXX..", "..XXX...", "...X....", "........", "........"],
+  w: ["...........", "...........", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XX..XX..XX.", "XXX.XX.XXX.", ".XXXXXXXX..", "..XX..XX...", "...........", "..........."],
+  x: ["........", "........", "XX...XX.", "XXX.XXX.", ".XXXXX..", "..XXX...", ".XXXXX..", "XXX.XXX.", "XX...XX.", "XX...XX.", "........", "........"],
+  y: [".......", ".......", "XX..XX.", "XX..XX.", "XX..XX.", "XX..XX.", "XXX.XX.", ".XXXXX.", "..XXX..", ".XXX...", "XXX....", "XX....."],
+  z: ["........", "........", "XXXXXXX.", "XXXXXXX.", "....XXX.", "...XXX..", "..XXX...", ".XXX....", "XXXXXXX.", "XXXXXXX.", "........", "........"],
+  "0": [".XXXX..", "XXXXXX.", "XX..XX.", "XX..XX.", "XX..XX.", "XX..XX.", "XX..XX.", "XX..XX.", "XXXXXX.", ".XXXX..", ".......", "......."],
+  "1": ["XXX.", "XXX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", ".XX.", "....", "...."],
+  "2": [".XXXXX..", "XXXXXXX.", "XX...XX.", "....XXX.", "...XXX..", "..XXX...", ".XXX....", "XXX.....", "XXXXXXX.", "XXXXXXX.", "........", "........"],
+  "3": [".XXXXX..", "XXXXXXX.", "XX...XX.", ".....XX.", "..XXXX..", "..XXXX..", ".....XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  "4": ["....XX.", "...XXX.", "..XXXX.", ".XX.XX.", "XX..XX.", "XX..XX.", "XXXXXX.", "XXXXXX.", "....XX.", "....XX.", ".......", "......."],
+  "5": ["XXXXXX.", "XXXXXX.", "XX.....", "XX.....", "XXXXX..", ".XXXXX.", "....XX.", "XX..XX.", "XXXXXX.", ".XXXX..", ".......", "......."],
+  "6": [".XXXXX..", "XXXXXXX.", "XX...XX.", "XX......", "XXXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  "7": ["XXXXXX.", "XXXXXX.", "....XX.", "....XX.", "...XXX.", "..XXX..", "..XXX..", "..XX...", "..XX...", "..XX...", ".......", "......."],
+  "8": [".XXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", ".XXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  "9": [".XXXXX..", "XXXXXXX.", "XX...XX.", "XX...XX.", "XXXXXXX.", ".XXXXXX.", ".....XX.", "XX...XX.", "XXXXXXX.", ".XXXXX..", "........", "........"],
+  ".": ["...", "...", "...", "...", "...", "...", "...", "...", "XX.", "XX.", "...", "..."],
+  ",": ["...", "...", "...", "...", "...", "...", "...", "...", "XX.", "XX.", ".X.", "X.."],
+  "!": ["XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "XX.", "...", "XX.", "XX.", "...", "..."],
+  "?": [".XXXX..", "XXXXXX.", "XX..XX.", "...XXX.", "..XXX..", "..XX...", "..XX...", ".......", "..XX...", "..XX...", ".......", "......."],
+  ":": ["...", "...", "XX.", "XX.", "...", "...", "...", "...", "XX.", "XX.", "...", "..."],
+  "-": [".......", ".......", ".......", ".......", "XXXXXX.", "XXXXXX.", ".......", ".......", ".......", ".......", ".......", "......."],
+  "+": [".......", ".......", "..XX...", "..XX...", "XXXXXX.", "XXXXXX.", "..XX...", "..XX...", ".......", ".......", ".......", "......."],
+  "@": ["..XXXXXXX...", ".XXXXXXXXX..", "XXX.....XXX.", "XX..XXXX.XX.", "XX.XXXXX.XX.", "XX.XX.XX.XX.", "XX.XXXXX.XX.", "XX..XX.XXX..", "XXX.........", ".XXXXXXXX...", "..XXXXXX....", "............"],
+  "#": ["....XX..XX..", "....XX..XX..", "..XXXXXXXXX.", "...XX..XX...", "...XX..XX...", "..XX..XX....", "..XX..XX....", "XXXXXXXXX...", ".XX..XX.....", ".XX..XX.....", "............", "............"],
+  "'": ["XX.", "XX.", "XX.", "...", "...", "...", "...", "...", "...", "...", "...", "..."],
+  '"': ["XX.XX.", "XX.XX.", "XX.XX.", "......", "......", "......", "......", "......", "......", "......", "......", "......"],
+};
+
 export function textPoints(
   text: string,
   font: FontKey,
   x0: number,
   y0: number,
 ): Point[] {
-  const f = font === "5x8" ? FONT_5X8 : FONT_3X5;
+  const f =
+    font === "7x9" ? FONT_7X9 : font === "5x8" ? FONT_5X8 : FONT_3X5;
+  const gap = font === "7x9" ? 0 : 1;
   const out: Point[] = [];
   let cursorX = x0;
   for (const ch of text) {
@@ -143,7 +222,7 @@ export function textPoints(
         }
       }
     }
-    cursorX += w + 1;
+    cursorX += w + gap;
   }
   return out;
 }

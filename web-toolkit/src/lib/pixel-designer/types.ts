@@ -19,7 +19,7 @@ export type Axis = "row" | "col";
 
 export type Mode = "pixel" | "mask";
 
-export type FontKey = "3x5" | "5x8";
+export type FontKey = "3x5" | "5x8" | "7x9";
 
 export type Tool =
   | "pencil"

@@ -132,6 +132,12 @@ export function SidePanel(props: SidePanelProps) {
             >
               5×8
             </ToggleButton>
+            <ToggleButton
+              on={props.font === "7x9"}
+              onClick={() => props.onFont("7x9")}
+            >
+              7×9
+            </ToggleButton>
           </div>
         </div>
         <input
