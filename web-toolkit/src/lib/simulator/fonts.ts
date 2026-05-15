@@ -1,6 +1,6 @@
-import { FONT_3X5, FONT_5X8 } from "@/lib/pixel-designer/fonts";
+import { FONT_3X5, FONT_5X8, FONT_7X9 } from "@/lib/pixel-designer/fonts";
 
-export { FONT_3X5, FONT_5X8 };
+export { FONT_3X5, FONT_5X8, FONT_7X9 };
 
 export function glyph(
   font: Record<string, string[]>,
