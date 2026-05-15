@@ -7,7 +7,10 @@ import {
   buildPresetExportJSON,
   pickPage,
 } from "@/lib/pixel-designer/json-io";
-import { exportPngSheet, type PngSection } from "@/lib/pixel-designer/png-export";
+import {
+  exportPngGrid,
+  type PngGridSection,
+} from "@/lib/pixel-designer/png-export";
 import type { Design, Mode } from "@/lib/pixel-designer/types";
 import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
 import { ModalShell } from "./modal-shell";
@@ -86,71 +89,81 @@ function ExportModalInner({
   };
 
   // ──────── PNG actions ────────
+  // Convention: variants run left/right (columns), pages run top/bottom (rows).
 
-  const sectionsForPage = (pageIdx: number): PngSection[] => {
+  const sectionFor = (pageIdx: number, presetId: string): PngGridSection | null => {
     const p = design.pages[pageIdx];
-    if (!p) return [];
-    return Object.entries(p.variants).map(([presetId, v]) => ({
-      title: `${p.label} — ${presetSizeLabel(presetId)}`,
+    const v = p?.variants[presetId];
+    if (!p || !v) return null;
+    return {
       config: activeConfig(design, presetId),
       pixels: v.pixels.slice(),
-    }));
-  };
-
-  const sectionsForPreset = (presetId: string): PngSection[] => {
-    const cfg = activeConfig(design, presetId);
-    return design.pages
-      .map((p, i) => ({ p, i, v: p.variants[presetId] }))
-      .filter((x) => x.v !== undefined)
-      .map(({ p, i, v }) => ({
-        title: `#${i + 1}  ${p.label}`,
-        config: cfg,
-        pixels: v!.pixels.slice(),
-      }));
+    };
   };
 
   const handlePngVariant = () => {
     if (!page || !page.variants[activePreset]) return;
-    exportPngSheet(
-      [
-        {
-          title: `${page.label} — ${presetSizeLabel(activePreset)}`,
-          config: activeConfig(design, activePreset),
-          pixels: page.variants[activePreset].pixels.slice(),
-        },
-      ],
+    exportPngGrid({
+      sections: [[sectionFor(activePage, activePreset)]],
+      rowLabels: [`#${activePage + 1}  ${page.label}`],
+      columnLabels: [presetFullLabel(activePreset)],
       mode,
-      `${pageLabel}-${activePreset}.png`,
-    );
+      filename: `${pageLabel}-${activePreset}.png`,
+    });
   };
 
   const handlePngPageVariants = () => {
     if (!page) return;
-    exportPngSheet(
-      sectionsForPage(activePage),
+    const cols = Object.keys(page.variants);
+    if (cols.length === 0) return;
+    exportPngGrid({
+      sections: [cols.map((id) => sectionFor(activePage, id))],
+      rowLabels: [`#${activePage + 1}  ${page.label}`],
+      columnLabels: cols.map(presetFullLabel),
       mode,
-      `${pageLabel}-all-variants.png`,
-    );
+      filename: `${pageLabel}-all-variants.png`,
+    });
   };
 
   const handlePngPresetPages = () => {
-    exportPngSheet(
-      sectionsForPreset(activePreset),
+    const rowsWithVariant = design.pages
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => p.variants[activePreset] !== undefined);
+    if (rowsWithVariant.length === 0) return;
+    exportPngGrid({
+      sections: rowsWithVariant.map(({ i }) => [sectionFor(i, activePreset)]),
+      rowLabels: rowsWithVariant.map(({ p, i }) => `#${i + 1}  ${p.label}`),
+      columnLabels: [presetFullLabel(activePreset)],
       mode,
-      `design-${activePreset}-all-pages.png`,
-    );
+      filename: `design-${activePreset}-all-pages.png`,
+    });
   };
 
   const handlePngEverything = () => {
-    const sections: PngSection[] = [];
-    for (let i = 0; i < design.pages.length; i++) {
-      sections.push(...sectionsForPage(i));
+    // Use every preset that any page has, ordered by HARDWARE_PRESETS first
+    // (so the canonical sizes line up predictably), then any custom ones.
+    const presetsUsed = new Set<string>();
+    for (const p of design.pages) {
+      for (const id of Object.keys(p.variants)) presetsUsed.add(id);
     }
-    exportPngSheet(
-      sections,
+    const ordered: string[] = [];
+    for (const p of HARDWARE_PRESETS) {
+      if (presetsUsed.has(p.id)) ordered.push(p.id);
+    }
+    for (const id of presetsUsed) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+    if (ordered.length === 0) return;
+
+    exportPngGrid({
+      sections: design.pages.map((_, pageIdx) =>
+        ordered.map((presetId) => sectionFor(pageIdx, presetId)),
+      ),
+      rowLabels: design.pages.map((p, i) => `#${i + 1}  ${p.label}`),
+      columnLabels: ordered.map(presetFullLabel),
       mode,
-      `design-all-${design.pages.length}p-${totalVariants}v.png`,
-    );
+      filename: `design-all-${design.pages.length}p-${ordered.length}v.png`,
+    });
   };
 
   return (
