@@ -1307,17 +1307,19 @@ export function Designer() {
                       ✕
                     </button>
                   </div>
-                  <PageMetaRow
-                    page={design.pages[pi]}
-                    onChange={(patch) => setPageMeta(pi, patch)}
-                  />
-                  <VariantsStrip
-                    design={design}
-                    pageIdx={pi}
-                    activePreset={activePreset}
-                    onSelectVariant={setActivePreset}
-                    onAddClicked={() => setAddVariantFor(pi)}
-                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <VariantsStrip
+                      design={design}
+                      pageIdx={pi}
+                      activePreset={activePreset}
+                      onSelectVariant={setActivePreset}
+                      onAddClicked={() => setAddVariantFor(pi)}
+                    />
+                    <PageMetaRow
+                      page={design.pages[pi]}
+                      onChange={(patch) => setPageMeta(pi, patch)}
+                    />
+                  </div>
                   {design.pages[pi]?.variants[activePreset] ? (
                     <div
                       onMouseDown={(e) => onMouseDown(e, pi)}
@@ -1483,37 +1485,30 @@ function PageMetaRow({
     return Math.round(n);
   };
   return (
-    <div className="flex items-center gap-2 px-1.5">
-      <span className="text-[9px] text-[#555] uppercase tracking-wider font-semibold">
-        Auto-play
-      </span>
-      <label className="flex items-center gap-1 text-[10px] text-[#777]">
-        <span>Duration</span>
-        <input
-          type="number"
-          min={0}
-          step={100}
-          value={fmt(page.duration)}
-          placeholder="—"
-          onChange={(e) => onChange({ duration: parse(e.target.value) })}
-          className="w-16 bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10.5px] outline-none focus:border-[#4a90e2] text-right"
-        />
-        <span>ms</span>
-      </label>
-      <span className="text-[#3a3a42]">·</span>
-      <label className="flex items-center gap-1 text-[10px] text-[#777]">
-        <span>Fade in</span>
-        <input
-          type="number"
-          min={0}
-          step={50}
-          value={fmt(page.fadeInTime)}
-          placeholder="—"
-          onChange={(e) => onChange({ fadeInTime: parse(e.target.value) })}
-          className="w-16 bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10.5px] outline-none focus:border-[#4a90e2] text-right"
-        />
-        <span>ms</span>
-      </label>
+    <div className="flex items-center gap-1 px-1.5 shrink-0">
+      <input
+        type="number"
+        min={0}
+        step={100}
+        value={fmt(page.duration)}
+        placeholder="Duration"
+        title="Page duration when auto-playing (ms)"
+        onChange={(e) => onChange({ duration: parse(e.target.value) })}
+        className="w-[68px] bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10px] outline-none focus:border-[#4a90e2] text-right placeholder:text-[#555]"
+      />
+      <span className="text-[9.5px] text-[#666]">ms</span>
+      <span className="text-[#3a3a42] mx-1">·</span>
+      <input
+        type="number"
+        min={0}
+        step={50}
+        value={fmt(page.fadeInTime)}
+        placeholder="Fade in"
+        title="Fade-in time when auto-playing (ms)"
+        onChange={(e) => onChange({ fadeInTime: parse(e.target.value) })}
+        className="w-[68px] bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10px] outline-none focus:border-[#4a90e2] text-right placeholder:text-[#555]"
+      />
+      <span className="text-[9.5px] text-[#666]">ms</span>
     </div>
   );
 }
