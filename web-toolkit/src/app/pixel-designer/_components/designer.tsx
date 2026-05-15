@@ -56,6 +56,7 @@ import {
   type AddVariantResult,
 } from "./add-variant-modal";
 import { ConfigModal } from "./config-modal";
+import { DeletePageModal } from "./delete-page-modal";
 import { ExportModal } from "./export-modal";
 import { PixelGrid } from "./pixel-grid";
 import { SidePanel } from "./side-panel";
@@ -279,6 +280,7 @@ export function Designer() {
   const [addVariantResult, setAddVariantResult] =
     useState<AddVariantResult | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -523,8 +525,6 @@ export function Designer() {
 
   const deletePage = useCallback(
     (idx: number) => {
-      if (pages.length <= 1) return;
-      if (!window.confirm(`Delete "${pages[idx].label}"?`)) return;
       setPages((prev) => {
         const next = prev.slice();
         next.splice(idx, 1);
@@ -534,7 +534,24 @@ export function Designer() {
         return next;
       });
     },
-    [pages, currentPage, pushHistory],
+    [currentPage, pushHistory],
+  );
+
+  /** Remove only one variant from one page, leaving the page (and any other
+   *  variants on it) in place. */
+  const deletePageVariant = useCallback(
+    (pageIdx: number, presetId: string) => {
+      setDesign((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p, i) => {
+          if (i !== pageIdx) return p;
+          const { [presetId]: _dropped, ...remaining } = p.variants;
+          return { ...p, variants: remaining };
+        }),
+      }));
+      queueMicrotask(() => pushHistory());
+    },
+    [setDesign, pushHistory],
   );
 
   const renamePage = useCallback((idx: number, label: string) => {
@@ -1299,9 +1316,12 @@ export function Designer() {
                     />
                     <button
                       type="button"
-                      onClick={() => deletePage(pi)}
-                      disabled={pages.length <= 1}
-                      title="Delete page"
+                      onClick={() => setDeletePromptFor(pi)}
+                      disabled={
+                        pages.length <= 1 &&
+                        Object.keys(design.pages[pi]?.variants ?? {}).length <= 1
+                      }
+                      title="Delete page or variant"
                       className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#3a2020] hover:text-[#ff8888] hover:border-[#5a3030] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
                     >
                       ✕
@@ -1453,6 +1473,38 @@ export function Designer() {
         activePreset={activePreset}
         mode={mode}
         onClose={() => setExportOpen(false)}
+      />
+      <DeletePageModal
+        open={deletePromptFor !== null}
+        pageLabel={
+          deletePromptFor !== null
+            ? (design.pages[deletePromptFor]?.label ?? "")
+            : ""
+        }
+        pageIndex={deletePromptFor ?? 0}
+        variantCount={
+          deletePromptFor !== null
+            ? Object.keys(design.pages[deletePromptFor]?.variants ?? {}).length
+            : 0
+        }
+        activePresetLabel={activePresetLabel}
+        canDeleteVariant={
+          deletePromptFor !== null &&
+          Object.keys(design.pages[deletePromptFor]?.variants ?? {}).length >
+            1 &&
+          design.pages[deletePromptFor]?.variants[activePreset] !== undefined
+        }
+        canDeletePage={design.pages.length > 1}
+        onClose={() => setDeletePromptFor(null)}
+        onDeletePage={() => {
+          if (deletePromptFor !== null) deletePage(deletePromptFor);
+          setDeletePromptFor(null);
+        }}
+        onDeleteVariant={() => {
+          if (deletePromptFor !== null)
+            deletePageVariant(deletePromptFor, activePreset);
+          setDeletePromptFor(null);
+        }}
       />
     </div>
   );
