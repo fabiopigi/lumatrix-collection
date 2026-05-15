@@ -42,7 +42,7 @@ import type {
   Snapshot,
   Tool,
 } from "@/lib/pixel-designer/types";
-import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
 import {
   centerVariant,
   scaleVariant,
@@ -86,13 +86,35 @@ function clonePages(pages: Page[]): Page[] {
   return pages.map((p) => ({ label: p.label, pixels: p.pixels.slice() }));
 }
 
-/** Read the active-variant view of a design's pages. The result is the
- *  Page[] shape that tools/renderers expect (label + flat pixels array). */
-function viewPagesFromDesign(d: Design, presetId: string): Page[] {
-  const hw = d.hardware[presetId];
-  const n = hw ? hw.width * hw.height : 0;
-  return d.pages.map((p) => {
+/** Pick a sensible variant id for page `i` given a per-page preference list
+ *  and the design's current state. Falls back to the page's first variant in
+ *  canonical order if the stored preference is stale (e.g., after an undo
+ *  removed the variant the user had selected). */
+function resolveActivePresetFor(
+  d: Design,
+  presetByPage: string[],
+  i: number,
+): string {
+  const page = d.pages[i];
+  if (!page) return DEFAULT_PRESET_ID;
+  const stored = presetByPage[i];
+  if (stored && page.variants[stored]) return stored;
+  const ordered = presetIdsInOrder(Object.keys(page.variants));
+  return ordered[0] ?? DEFAULT_PRESET_ID;
+}
+
+/** Read the active-variant view of a design's pages. Each page resolves to
+ *  its own preset from `presetByPage` — so different pages can show different
+ *  variants. */
+function viewPagesFromDesign(
+  d: Design,
+  presetByPage: string[],
+): Page[] {
+  return d.pages.map((p, i) => {
+    const presetId = resolveActivePresetFor(d, presetByPage, i);
     const variant = p.variants[presetId];
+    const hw = d.hardware[presetId];
+    const n = hw ? hw.width * hw.height : 0;
     return {
       label: p.label,
       pixels: variant ? variant.pixels.slice() : new Array(n).fill(null),
@@ -100,22 +122,37 @@ function viewPagesFromDesign(d: Design, presetId: string): Page[] {
   });
 }
 
-/** Write a Page[] view back into a design's pages for one preset. Pages
- *  beyond the current design.pages length become new pages with only this
- *  preset's variant; pages dropped from the view are dropped from storage. */
+/** Write a per-page view back into the design — each page's view pixels go
+ *  into the variant for that page's currently-active preset. Pages whose
+ *  active preset has no variant are left untouched. */
 function applyPageViewToDesign(
   d: Design,
-  presetId: string,
+  presetByPage: string[],
   view: Page[],
 ): Design {
   return {
     ...d,
     pages: view.map((vp, i) => {
       const existing = d.pages[i];
+      const presetId = resolveActivePresetFor(d, presetByPage, i);
+      if (!existing) {
+        // New page (added via splice) — nothing to merge with; this path
+        // shouldn't fire under current call sites but is here for safety.
+        return {
+          label: vp.label,
+          variants: presetId
+            ? { [presetId]: { pixels: vp.pixels.slice() } }
+            : {},
+        };
+      }
+      if (!presetId || !existing.variants[presetId]) {
+        return { ...existing, label: vp.label };
+      }
       return {
+        ...existing,
         label: vp.label,
         variants: {
-          ...(existing?.variants ?? {}),
+          ...existing.variants,
           [presetId]: { pixels: vp.pixels.slice() },
         },
       };
@@ -177,8 +214,11 @@ export function Designer() {
   const [design, _setDesignBase] = useState<Design>(() =>
     cloneDesign(DEFAULT_DESIGN),
   );
-  const [activePreset, _setActivePresetBase] = useState<string>(
-    DEFAULT_PRESET_ID,
+  // Per-page active variant. Each entry is the preset id whose pixels show
+  // on that page. Stale entries (variant deleted) are resolved at read time
+  // by resolveActivePresetFor — they don't have to be normalised eagerly.
+  const [activePresetByPage, _setActivePresetByPageBase] = useState<string[]>(
+    () => [DEFAULT_PRESET_ID],
   );
   const [currentPage, _setCurrentPageBase] = useState(0);
 
@@ -186,7 +226,7 @@ export function Designer() {
   // (after a state update but before the next render) can read the just-
   // committed state without waiting for React's commit phase.
   const designRef = useRef(design);
-  const activePresetRef = useRef(activePreset);
+  const activePresetByPageRef = useRef<string[]>([DEFAULT_PRESET_ID]);
   const currentPageRef = useRef(currentPage);
 
   const setDesign = useCallback(
@@ -203,12 +243,19 @@ export function Designer() {
     [],
   );
 
-  const setActivePreset = useCallback((id: string) => {
-    _setActivePresetBase(() => {
-      activePresetRef.current = id;
-      return id;
-    });
-  }, []);
+  const setActivePresetByPage = useCallback(
+    (updater: string[] | ((prev: string[]) => string[])) => {
+      _setActivePresetByPageBase((prev) => {
+        const next =
+          typeof updater === "function"
+            ? (updater as (p: string[]) => string[])(prev)
+            : updater;
+        activePresetByPageRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   const setCurrentPage = useCallback(
     (val: number | ((prev: number) => number)) => {
@@ -224,44 +271,81 @@ export function Designer() {
     [],
   );
 
+  /** Update one page's active preset. Used by the variants strip on each
+   *  page tab and (for the current page) by the header preset selector. */
+  const setActivePresetForPage = useCallback(
+    (pageIdx: number, presetId: string) => {
+      setActivePresetByPage((prev) => {
+        if (prev[pageIdx] === presetId) return prev;
+        const next = prev.slice();
+        next[pageIdx] = presetId;
+        return next;
+      });
+    },
+    [setActivePresetByPage],
+  );
+
+  /** Sugar for `setActivePresetForPage(currentPage, …)` — what the header
+   *  hardware picker calls when the user changes the dropdown. */
+  const setActivePreset = useCallback(
+    (presetId: string) => {
+      setActivePresetForPage(currentPageRef.current, presetId);
+    },
+    [setActivePresetForPage],
+  );
+
   // Derived view: tools/renderers consume `config` and `pages` exactly as
-  // before; reads go through the active variant.
+  // before; reads go through each page's own active variant.
+  const activePreset = resolveActivePresetFor(
+    design,
+    activePresetByPage,
+    currentPage,
+  );
   const config = useMemo(
     () => activeConfig(design, activePreset),
     [design, activePreset],
   );
   const pages = useMemo<Page[]>(
-    () => viewPagesFromDesign(design, activePreset),
-    [design, activePreset],
+    () => viewPagesFromDesign(design, activePresetByPage),
+    [design, activePresetByPage],
   );
 
-  /** Wrapped setter that accepts a Page[] view and routes writes to the
-   *  active variant of the source-of-truth Design. */
+  /** Wrapped setter that accepts a Page[] view and routes writes back to
+   *  each page's currently-active variant. */
   const setPages = useCallback(
     (value: Page[] | ((prev: Page[]) => Page[])) => {
       setDesign((prev) => {
-        const view = viewPagesFromDesign(prev, activePresetRef.current);
+        const view = viewPagesFromDesign(prev, activePresetByPageRef.current);
         const nextView =
           typeof value === "function"
             ? (value as (p: Page[]) => Page[])(view)
             : value;
-        return applyPageViewToDesign(prev, activePresetRef.current, nextView);
+        return applyPageViewToDesign(
+          prev,
+          activePresetByPageRef.current,
+          nextView,
+        );
       });
     },
     [setDesign],
   );
 
-  /** Wrapped setter that accepts a Config and edits the active variant's
-   *  hardware entry on the design. */
+  /** Wrapped setter that accepts a Config and edits the current page's
+   *  active preset's hardware entry on the design. */
   const setConfig = useCallback(
     (value: Config | ((prev: Config) => Config)) => {
       setDesign((prev) => {
-        const prevCfg = activeConfig(prev, activePresetRef.current);
+        const presetId = resolveActivePresetFor(
+          prev,
+          activePresetByPageRef.current,
+          currentPageRef.current,
+        );
+        const prevCfg = activeConfig(prev, presetId);
         const nextCfg =
           typeof value === "function"
             ? (value as (p: Config) => Config)(prevCfg)
             : value;
-        return applyConfigToDesign(prev, activePresetRef.current, nextCfg);
+        return applyConfigToDesign(prev, presetId, nextCfg);
       });
     },
     [setDesign],
@@ -337,14 +421,13 @@ export function Designer() {
         nextPages !== undefined
           ? applyPageViewToDesign(
               baseDesign,
-              activePresetRef.current,
+              activePresetByPageRef.current,
               nextPages,
             )
           : baseDesign;
       const snap: Snapshot = {
         design: cloneDesign(designForSnap),
         activePage: nextCurrent ?? currentPageRef.current,
-        activePreset: activePresetRef.current,
       };
       setHistory((prev) => {
         let h = prev.slice(0, historyIndex + 1);
@@ -360,14 +443,13 @@ export function Designer() {
   const applySnapshot = useCallback(
     (snap: Snapshot) => {
       setDesign(cloneDesign(snap.design));
-      setActivePreset(snap.activePreset);
       setCurrentPage(
         Math.min(snap.activePage, snap.design.pages.length - 1),
       );
       setSelection(null);
       setPreview(null);
     },
-    [setDesign, setActivePreset, setCurrentPage],
+    [setDesign, setCurrentPage],
   );
 
   const undo = useCallback(() => {
@@ -393,18 +475,21 @@ export function Designer() {
     const persisted = loadDesign();
     /* eslint-disable react-hooks/set-state-in-effect */
     setDesign(cloneDesign(persisted));
-    // Pick an active preset that actually exists in the loaded design.
-    const firstPresetId =
-      DEFAULT_PRESET_ID in persisted.hardware
-        ? DEFAULT_PRESET_ID
-        : Object.keys(persisted.hardware)[0] ?? DEFAULT_PRESET_ID;
-    setActivePreset(firstPresetId);
+    // Each page starts with its first canonical-order variant active. If a
+    // page has no variants (shouldn't happen for a valid design), fall back
+    // to the default preset id so the array stays page-length-aligned.
+    const presetByPage = persisted.pages.map((p) => {
+      const ordered = presetIdsInOrder(Object.keys(p.variants));
+      return ordered[0] ?? DEFAULT_PRESET_ID;
+    });
+    setActivePresetByPage(
+      presetByPage.length > 0 ? presetByPage : [DEFAULT_PRESET_ID],
+    );
     setColor(getDefaultColor(persisted.colorMode));
     setHistory([
       {
         design: cloneDesign(persisted),
         activePage: 0,
-        activePreset: firstPresetId,
       },
     ]);
     setHistoryIndex(0);
@@ -419,19 +504,23 @@ export function Designer() {
       writer: (px: (string | null)[]) => void,
       commit = true,
     ) => {
+      // Read currentPage from the ref so writes that follow a setActivePage()
+      // (e.g., first click on a different page) land on the just-focused page,
+      // not the previously-focused one that's still in the closure.
+      const pi = currentPageRef.current;
       setPages((prev) => {
         const next = prev.slice();
-        const target = next[currentPage].pixels.slice();
+        const target = next[pi].pixels.slice();
         writer(target);
-        next[currentPage] = { ...next[currentPage], pixels: target };
+        next[pi] = { ...next[pi], pixels: target };
         if (commit) {
           // schedule history push after state settles
-          queueMicrotask(() => pushHistory(next, currentPage));
+          queueMicrotask(() => pushHistory(next, pi));
         }
         return next;
       });
     },
-    [currentPage, pushHistory],
+    [pushHistory],
   );
 
   // ============ selection ============
@@ -454,19 +543,20 @@ export function Designer() {
   );
 
   const commitSelection = useCallback(() => {
+    const pi = currentPageRef.current;
     setSelection((sel) => {
       if (!sel || !sel.floating) return sel;
       setPages((prev) => {
         const next = prev.slice();
-        const target = next[currentPage].pixels.slice();
+        const target = next[pi].pixels.slice();
         commitSelectionInto(sel, target);
-        next[currentPage] = { ...next[currentPage], pixels: target };
-        queueMicrotask(() => pushHistory(next, currentPage));
+        next[pi] = { ...next[pi], pixels: target };
+        queueMicrotask(() => pushHistory(next, pi));
         return next;
       });
       return null;
     });
-  }, [currentPage, commitSelectionInto, pushHistory]);
+  }, [commitSelectionInto, pushHistory]);
 
   // ============ tool/mode/color ============
 
@@ -475,12 +565,13 @@ export function Designer() {
       setSelection((sel) => {
         if (sel?.floating) {
           // commit floating selection on tool switch
+          const pi = currentPageRef.current;
           setPages((prev) => {
             const np = prev.slice();
-            const target = np[currentPage].pixels.slice();
+            const target = np[pi].pixels.slice();
             commitSelectionInto(sel, target);
-            np[currentPage] = { ...np[currentPage], pixels: target };
-            queueMicrotask(() => pushHistory(np, currentPage));
+            np[pi] = { ...np[pi], pixels: target };
+            queueMicrotask(() => pushHistory(np, pi));
             return np;
           });
           return null;
@@ -492,7 +583,7 @@ export function Designer() {
       setPreview(null);
       setTool(next);
     },
-    [commitSelectionInto, currentPage, pushHistory],
+    [commitSelectionInto, pushHistory],
   );
 
   // ============ pages ============
@@ -513,8 +604,9 @@ export function Designer() {
       // after, so adding a page never silently drops variants the user is
       // designing for. `copy` controls pixel content per variant; the variant
       // shape (which presets exist) is always inherited.
+      const insertAt = currentPageRef.current + 1;
       setDesign((prev) => {
-        const sourcePage = prev.pages[currentPage];
+        const sourcePage = prev.pages[currentPageRef.current];
         if (!sourcePage) return prev;
         const newVariants: Record<string, { pixels: (string | null)[] }> = {};
         for (const presetId of Object.keys(sourcePage.variants)) {
@@ -531,29 +623,44 @@ export function Designer() {
           label: `Page ${prev.pages.length + 1}`,
           variants: newVariants,
         };
-        const insertAt = currentPage + 1;
         const nextPages = prev.pages.slice();
         nextPages.splice(insertAt, 0, newPage);
         queueMicrotask(() => pushHistory(undefined, insertAt));
         return { ...prev, pages: nextPages };
       });
-      setCurrentPage((cp) => cp + 1);
+      // Mirror the same insertion in the per-page active-preset array — new
+      // page inherits the source page's active preset.
+      setActivePresetByPage((prev) => {
+        const next = prev.slice();
+        const inherited = prev[currentPageRef.current] ?? DEFAULT_PRESET_ID;
+        next.splice(insertAt, 0, inherited);
+        return next;
+      });
+      setCurrentPage(insertAt);
     },
-    [setDesign, currentPage, pushHistory, setCurrentPage],
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
   );
 
   const deletePage = useCallback(
     (idx: number) => {
-      setPages((prev) => {
+      setDesign((prev) => {
+        if (prev.pages.length <= 1) return prev;
+        const nextPages = prev.pages.slice();
+        nextPages.splice(idx, 1);
+        const nextCurrent = Math.min(currentPageRef.current, nextPages.length - 1);
+        queueMicrotask(() => pushHistory(undefined, nextCurrent));
+        if (currentPageRef.current >= nextPages.length) {
+          setCurrentPage(nextPages.length - 1);
+        }
+        return { ...prev, pages: nextPages };
+      });
+      setActivePresetByPage((prev) => {
         const next = prev.slice();
         next.splice(idx, 1);
-        const nextCurrent = Math.min(currentPage, next.length - 1);
-        queueMicrotask(() => pushHistory(next, nextCurrent));
-        if (currentPage >= next.length) setCurrentPage(next.length - 1);
         return next;
       });
     },
-    [currentPage, pushHistory],
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
   );
 
   /** Remove only one variant from one page, leaving the page (and any other
@@ -1068,8 +1175,14 @@ export function Designer() {
       init: AddVariantInit,
       applyToAll: boolean,
     ) => {
-      const sourcePresetId = activePresetRef.current;
       const baseDesign = designRef.current;
+      // Source for the copy is whichever variant the user is currently
+      // looking at on the page where they clicked "+ Add".
+      const sourcePresetId = resolveActivePresetFor(
+        baseDesign,
+        activePresetByPageRef.current,
+        pageIdx,
+      );
       const sourceHw = baseDesign.hardware[sourcePresetId];
 
       // Resolve target hardware up-front (same logic for single-page and bulk).
@@ -1172,7 +1285,15 @@ export function Designer() {
               : p,
           ),
         }));
-        setActivePreset(targetPresetId);
+        // For each page that just got a new variant, switch its active
+        // preset to the new one so the canvas reflects what was created.
+        setActivePresetByPage((prev) => {
+          const next = prev.slice();
+          for (const i of newPixelsByPage.keys()) {
+            next[i] = targetPresetId;
+          }
+          return next;
+        });
         queueMicrotask(() => pushHistory());
       }
 
@@ -1192,7 +1313,7 @@ export function Designer() {
         setAddVariantFor(null);
       }
     },
-    [setDesign, setActivePreset, pushHistory],
+    [setDesign, setActivePresetByPage, pushHistory],
   );
 
   // ============ JSON import ============
@@ -1208,13 +1329,15 @@ export function Designer() {
         if (!ok) return;
       }
       setDesign(cloneDesign(result.design));
-      // Prefer the previously-active preset if the imported design has it;
-      // otherwise fall back to whatever preset sorts first.
-      const presetId =
-        activePresetRef.current in result.design.hardware
-          ? activePresetRef.current
-          : Object.keys(result.design.hardware)[0] ?? DEFAULT_PRESET_ID;
-      setActivePreset(presetId);
+      // Rebuild per-page active variants from the imported design — each
+      // page defaults to its first variant in canonical order.
+      const presetByPage = result.design.pages.map((p) => {
+        const ordered = presetIdsInOrder(Object.keys(p.variants));
+        return ordered[0] ?? DEFAULT_PRESET_ID;
+      });
+      setActivePresetByPage(
+        presetByPage.length > 0 ? presetByPage : [DEFAULT_PRESET_ID],
+      );
       setCurrentPage(0);
       setSelection(null);
       queueMicrotask(() => pushHistory(undefined, 0));
@@ -1222,7 +1345,14 @@ export function Designer() {
     } catch (err) {
       setImportError(`Import error: ${(err as Error).message}`);
     }
-  }, [jsonValue, design, setDesign, setActivePreset, setCurrentPage, pushHistory]);
+  }, [
+    jsonValue,
+    design,
+    setDesign,
+    setActivePresetByPage,
+    setCurrentPage,
+    pushHistory,
+  ]);
 
   // ============ config save ============
 
@@ -1247,7 +1377,6 @@ export function Designer() {
           {
             design: cloneDesign(latest),
             activePage: 0,
-            activePreset: activePresetRef.current,
           },
         ]);
         setHistoryIndex(0);
@@ -1318,6 +1447,22 @@ export function Designer() {
           <div className="flex flex-col gap-[18px] items-center w-full">
             {pages.map((page, pi) => {
               const isActive = pi === currentPage;
+              const pageActivePreset = resolveActivePresetFor(
+                design,
+                activePresetByPage,
+                pi,
+              );
+              const pageConfig = activeConfig(design, pageActivePreset);
+              const pageCellSize = computeCellSize(
+                pageConfig.width,
+                pageConfig.height,
+              );
+              const pageHasVariant = !!design.pages[pi]?.variants[
+                pageActivePreset
+              ];
+              const pageLabelForPreset =
+                HARDWARE_PRESETS.find((p) => p.id === pageActivePreset)?.label ??
+                `${pageConfig.width}×${pageConfig.height}`;
               return (
                 <div
                   key={pi}
@@ -1372,11 +1517,14 @@ export function Designer() {
                   <VariantsStrip
                     design={design}
                     pageIdx={pi}
-                    activePreset={activePreset}
-                    onSelectVariant={setActivePreset}
+                    activePreset={pageActivePreset}
+                    onSelectVariant={(id) => {
+                      setActivePresetForPage(pi, id);
+                      if (pi !== currentPage) setActivePage(pi);
+                    }}
                     onAddClicked={() => setAddVariantFor(pi)}
                   />
-                  {design.pages[pi]?.variants[activePreset] ? (
+                  {pageHasVariant ? (
                     <div
                       onMouseDown={(e) => onMouseDown(e, pi)}
                       onContextMenu={(e) => {
@@ -1386,10 +1534,10 @@ export function Designer() {
                     >
                       <PixelGrid
                         ref={setGridRef(pi)}
-                        config={config}
+                        config={pageConfig}
                         pixels={page.pixels}
                         mode={mode}
-                        cellSize={cellSize}
+                        cellSize={pageCellSize}
                         preview={isActive ? preview : null}
                         selection={isActive ? selection : null}
                         isActive={isActive}
@@ -1400,7 +1548,7 @@ export function Designer() {
                       <div className="text-[12px] text-[#777] text-center max-w-[280px] leading-[1.5]">
                         No variant for{" "}
                         <span className="font-mono text-[#aaa]">
-                          {activePresetLabel}
+                          {pageLabelForPreset}
                         </span>{" "}
                         on this page yet.
                       </div>
@@ -1409,7 +1557,7 @@ export function Designer() {
                         onClick={() => setAddVariantFor(pi)}
                         className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
                       >
-                        + Add variant for {activePresetLabel}
+                        + Add variant for {pageLabelForPreset}
                       </button>
                     </div>
                   )}

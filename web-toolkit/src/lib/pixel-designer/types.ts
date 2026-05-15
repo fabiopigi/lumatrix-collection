@@ -121,10 +121,12 @@ export interface Selection {
   transient?: boolean;
 }
 
-/** Undo/redo snapshot. Captures the full design plus the editor cursors so
- *  undoing a stroke can also restore which page/variant was active. */
+/** Undo/redo snapshot. Captures the full design plus which page was focused
+ *  so undoing a stroke also restores cursor position. Per-page active variant
+ *  is ephemeral UI state and not part of the snapshot — the resolver falls
+ *  back to the first available variant if the stored selection becomes
+ *  stale after an undo. */
 export interface Snapshot {
   design: Design;
   activePage: number;
-  activePreset: string;
 }
