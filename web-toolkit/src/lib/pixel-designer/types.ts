@@ -35,6 +35,40 @@ export type Tool =
   | "text"
   | "stamp";
 
+/** Per-preset hardware settings. Shared by every variant of the same preset
+ *  across every page — wiring/origin/mask describe the physical device, not
+ *  the artwork. Stored once in Design.hardware, keyed by presetId. */
+export interface Hardware {
+  presetId: string; // one of HARDWARE_PRESETS ids, or "custom"
+  width: number;
+  height: number;
+  origin: Origin;
+  axis: Axis;
+  serpentine: boolean;
+  letterMask: string;
+}
+
+/** One variant of one page — the pixel data for that page on that hardware. */
+export interface Variant {
+  pixels: (string | null)[];
+}
+
+/** A page in storage: a label plus a map of variants keyed by presetId. */
+export interface DesignPage {
+  label: string;
+  variants: Record<string, Variant>;
+}
+
+/** Whole-design source of truth. Persisted; what undo/redo snapshots. */
+export interface Design {
+  version: 4;
+  colorMode: ColorMode;
+  hardware: Record<string, Hardware>;
+  pages: DesignPage[];
+}
+
+/** Editor "view" of the active variant — what tools and renderers operate on.
+ *  Derived from a Design + (activePage, activePreset). Not persisted. */
 export interface Config {
   width: number;
   height: number;
@@ -45,6 +79,7 @@ export interface Config {
   letterMask: string;
 }
 
+/** View-shape page: label + the flat pixels array for the active preset. */
 export interface Page {
   label: string;
   pixels: (string | null)[];
@@ -74,7 +109,10 @@ export interface Selection {
   transient?: boolean;
 }
 
+/** Undo/redo snapshot. Captures the full design plus the editor cursors so
+ *  undoing a stroke can also restore which page/variant was active. */
 export interface Snapshot {
-  pages: Page[];
-  currentPage: number;
+  design: Design;
+  activePage: number;
+  activePreset: string;
 }

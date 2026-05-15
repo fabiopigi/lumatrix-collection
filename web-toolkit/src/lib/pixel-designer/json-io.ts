@@ -1,5 +1,6 @@
 import { computeFromLed, computeLedIndex } from "./led-index";
-import type { Config, Page } from "./types";
+import { activeConfig } from "./config";
+import type { Config, Design, Hardware } from "./types";
 
 function buildIndexFormulaPseudo(cfg: Config): string {
   const W = cfg.width;
@@ -40,36 +41,31 @@ function buildIndexFormulaPseudo(cfg: Config): string {
   return lines.join("\n");
 }
 
-export function buildExportInstructions(cfg: Config) {
-  const N = cfg.width * cfg.height;
-  const originY = cfg.origin.startsWith("top") ? "top" : "bottom";
-  const originX = cfg.origin.endsWith("left") ? "left" : "right";
-  const axisDesc =
-    cfg.axis === "row" ? "horizontal rows" : "vertical columns";
-  const serpDesc = cfg.serpentine
+function hardwareToConfig(hw: Hardware, colorMode: Config["colorMode"]): Config {
+  return {
+    width: hw.width,
+    height: hw.height,
+    colorMode,
+    origin: hw.origin,
+    axis: hw.axis,
+    serpentine: hw.serpentine,
+    letterMask: hw.letterMask,
+  };
+}
+
+function buildVariantIndexing(hw: Hardware, colorMode: Config["colorMode"]) {
+  const cfg = hardwareToConfig(hw, colorMode);
+  const N = hw.width * hw.height;
+  const originY = hw.origin.startsWith("top") ? "top" : "bottom";
+  const originX = hw.origin.endsWith("left") ? "left" : "right";
+  const axisDesc = hw.axis === "row" ? "horizontal rows" : "vertical columns";
+  const serpDesc = hw.serpentine
     ? "alternating direction every strip (serpentine / zigzag wiring)"
     : "all strips running in the same direction";
-
-  const colorNote =
-    cfg.colorMode === "rgb"
-      ? 'Color mode is "rgb": colors are arbitrary 24-bit values.'
-      : `Color mode is "${cfg.colorMode}": colors are constrained (e.g., brightness ramp of a single channel, or a fixed multi-color palette). Send the listed RGB values directly — they already encode the intended on-hardware appearance.`;
-
   return {
-    purpose:
-      `Pixel-art design for a ${cfg.width}×${cfg.height} LED matrix. An LLM or agent can read this file ` +
-      `and translate it into driver code (e.g., MicroPython for NeoPixel/WS2812) by iterating each page's ` +
-      `pixels and writing each color to the LED at the given "index", leaving unspecified LEDs off (black).`,
-    schema:
-      "Top level: { version, config, pages, instructions }. " +
-      "config: { width, height, colorMode, origin, axis, serpentine }. " +
-      "pages: ordered array of { label, pixels }. " +
-      "pixels: array of { index, x, y, color } — only LIT cells are listed; absent cells are OFF (#000000).",
-    pages_meaning:
-      "Each page is one screen/frame to display on the matrix. To play a design, render pages sequentially in array order with a delay between them (the delay is up to the player). Single-page designs are a static image.",
     coordinates:
-      `"x" is the visual column (0 = leftmost, ${cfg.width - 1} = rightmost). ` +
-      `"y" is the visual row (0 = topmost, ${cfg.height - 1} = bottommost). ` +
+      `"x" is the visual column (0 = leftmost, ${hw.width - 1} = rightmost). ` +
+      `"y" is the visual row (0 = topmost, ${hw.height - 1} = bottommost). ` +
       "These are how the design APPEARS to a viewer looking at the matrix, regardless of how the LEDs are wired.",
     led_indexing:
       `LED chain index 0 is at the ${originY}-${originX} corner. The chain runs in ${axisDesc}, ${serpDesc}. ` +
@@ -77,121 +73,231 @@ export function buildExportInstructions(cfg: Config) {
     index_formula_pseudocode: buildIndexFormulaPseudo(cfg),
     index_examples_visual_to_chain: {
       "(0, 0) — top-left corner": computeLedIndex(0, 0, cfg),
-      [`(${cfg.width - 1}, 0) — top-right corner`]: computeLedIndex(
-        cfg.width - 1,
+      [`(${hw.width - 1}, 0) — top-right corner`]: computeLedIndex(
+        hw.width - 1,
         0,
         cfg,
       ),
-      [`(0, ${cfg.height - 1}) — bottom-left corner`]: computeLedIndex(
+      [`(0, ${hw.height - 1}) — bottom-left corner`]: computeLedIndex(
         0,
-        cfg.height - 1,
+        hw.height - 1,
         cfg,
       ),
-      [`(${cfg.width - 1}, ${cfg.height - 1}) — bottom-right corner`]:
-        computeLedIndex(cfg.width - 1, cfg.height - 1, cfg),
+      [`(${hw.width - 1}, ${hw.height - 1}) — bottom-right corner`]:
+        computeLedIndex(hw.width - 1, hw.height - 1, cfg),
     },
+  };
+}
+
+export function buildExportInstructions(design: Design) {
+  const colorNote =
+    design.colorMode === "rgb"
+      ? 'Color mode is "rgb": colors are arbitrary 24-bit values.'
+      : `Color mode is "${design.colorMode}": colors are constrained (e.g., brightness ramp of a single channel, or a fixed multi-color palette). Send the listed RGB values directly — they already encode the intended on-hardware appearance.`;
+
+  return {
+    purpose:
+      "Pixel-art design for an LED matrix, with one or more hardware variants. " +
+      "An LLM or agent can read this file and translate it into driver code (e.g., MicroPython for NeoPixel/WS2812) " +
+      "by picking the hardware variant matching the target device and iterating each page's `variants[presetId]` " +
+      'array, writing each color to the LED at the given "index". Unspecified LEDs are OFF (black).',
+    schema:
+      "Top level: { version, colorMode, hardware, pages, instructions }. " +
+      "hardware: map of presetId → { presetId, width, height, origin, axis, serpentine, letterMask }. " +
+      "pages: ordered array of { label, variants }. " +
+      "variants: map of presetId → array of { index, x, y, color } — only LIT cells are listed; absent cells are OFF (#000000). " +
+      "Per-variant LED-chain wiring is described under instructions.variant_indexing[presetId].",
+    pages_meaning:
+      "Each page is one screen/frame to display on the matrix. To play a design, pick a hardware variant (e.g., '8x8') and render each page's variant for that preset sequentially, with a delay between pages. Single-page designs are static images.",
     color_format:
       'Colors are CSS hex strings "#RRGGBB". Convert to (r, g, b) tuples in [0, 255] for typical drivers. ' +
       "NeoPixels at full intensity are uncomfortably bright; consider scaling all RGB values to 20–25% for indoor use.",
     color_mode_note: colorNote,
     rendering_hint_micropython:
-      'Example MicroPython per page: `for p in page["pixels"]: np[p["index"]] = hex_to_rgb(p["color"]); np.write()`. ' +
+      'Example MicroPython per page: `for p in page["variants"]["8x8"]: np[p["index"]] = hex_to_rgb(p["color"]); np.write()`. ' +
       "Clear unset LEDs first with `for i in range(NUM_LEDS): np[i] = (0, 0, 0)` before each page.",
+    variant_indexing: Object.fromEntries(
+      Object.entries(design.hardware).map(([id, hw]) => [
+        id,
+        buildVariantIndexing(hw, design.colorMode),
+      ]),
+    ),
   };
 }
 
-export function buildExportJSON(config: Config, pages: Page[]) {
+export function buildExportJSON(design: Design) {
   return {
-    version: 3,
-    config: { ...config },
-    pages: pages.map((page) => {
-      const arr: Array<{ index: number; x: number; y: number; color: string }> = [];
-      for (let y = 0; y < config.height; y++) {
-        for (let x = 0; x < config.width; x++) {
-          const c = page.pixels[y * config.width + x];
-          if (c) {
-            arr.push({
-              index: computeLedIndex(x, y, config),
-              x,
-              y,
-              color: c.toLowerCase(),
-            });
+    version: 4,
+    colorMode: design.colorMode,
+    hardware: Object.fromEntries(
+      Object.entries(design.hardware).map(([id, hw]) => [id, { ...hw }]),
+    ),
+    pages: design.pages.map((page) => ({
+      label: page.label,
+      variants: Object.fromEntries(
+        Object.entries(page.variants).map(([presetId, v]) => {
+          const hw = design.hardware[presetId];
+          if (!hw) return [presetId, []];
+          const cfg = hardwareToConfig(hw, design.colorMode);
+          const lit: Array<{
+            index: number;
+            x: number;
+            y: number;
+            color: string;
+          }> = [];
+          for (let y = 0; y < hw.height; y++) {
+            for (let x = 0; x < hw.width; x++) {
+              const c = v.pixels[y * hw.width + x];
+              if (c) {
+                lit.push({
+                  index: computeLedIndex(x, y, cfg),
+                  x,
+                  y,
+                  color: c.toLowerCase(),
+                });
+              }
+            }
           }
+          return [presetId, lit];
+        }),
+      ),
+    })),
+    instructions: buildExportInstructions(design),
+  };
+}
+
+export interface ParseResult {
+  design: Design;
+  hardwareChanged: boolean;
+}
+
+interface ImportedPixel {
+  index?: number;
+  x?: number;
+  y?: number;
+  row?: number;
+  col?: number;
+  color: string;
+}
+
+function placePixel(
+  pixels: (string | null)[],
+  hw: Hardware,
+  colorMode: Config["colorMode"],
+  p: ImportedPixel,
+) {
+  const cfg = hardwareToConfig(hw, colorMode);
+  let x: number, y: number;
+  if (typeof p.index === "number") {
+    const v = computeFromLed(p.index, cfg);
+    x = v.x;
+    y = v.y;
+  } else if (typeof p.x === "number" && typeof p.y === "number") {
+    x = p.x;
+    y = p.y;
+  } else if (typeof p.row === "number" && typeof p.col === "number") {
+    x = p.col;
+    y = hw.height - 1 - p.row;
+  } else return;
+  if (x < 0 || x >= hw.width || y < 0 || y >= hw.height) return;
+  pixels[y * hw.width + x] = p.color;
+}
+
+function hardwareDiffers(
+  current: Record<string, Hardware>,
+  incoming: Record<string, Hardware>,
+): boolean {
+  const ids = new Set([...Object.keys(current), ...Object.keys(incoming)]);
+  for (const id of ids) {
+    const a = current[id];
+    const b = incoming[id];
+    if (!a || !b) return true;
+    if (
+      a.width !== b.width ||
+      a.height !== b.height ||
+      a.origin !== b.origin ||
+      a.axis !== b.axis ||
+      a.serpentine !== b.serpentine ||
+      a.letterMask !== b.letterMask
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function parseImport(raw: string, current: Design): ParseResult {
+  const data = JSON.parse(raw);
+  if (!data || typeof data !== "object") {
+    throw new Error("Expected a JSON object");
+  }
+  if (data.version !== 4) {
+    throw new Error(
+      `Unsupported design version ${data.version ?? "?"}; expected v4`,
+    );
+  }
+  const colorMode = data.colorMode ?? current.colorMode;
+  const hardware: Record<string, Hardware> = {};
+  for (const [id, raw] of Object.entries<unknown>(data.hardware ?? {})) {
+    const r = raw as Partial<Hardware>;
+    if (
+      !r ||
+      typeof r.width !== "number" ||
+      typeof r.height !== "number" ||
+      typeof r.origin !== "string" ||
+      typeof r.axis !== "string"
+    ) {
+      throw new Error(`Hardware entry ${id} is malformed`);
+    }
+    hardware[id] = {
+      presetId: r.presetId ?? id,
+      width: r.width,
+      height: r.height,
+      origin: r.origin as Hardware["origin"],
+      axis: r.axis as Hardware["axis"],
+      serpentine: !!r.serpentine,
+      letterMask: r.letterMask ?? "",
+    };
+  }
+  if (Object.keys(hardware).length === 0) {
+    throw new Error("Design has no hardware entries");
+  }
+
+  const pagesIn: unknown[] = Array.isArray(data.pages) ? data.pages : [];
+  const pages = pagesIn.map((rawPage, i) => {
+    const p = rawPage as { label?: string; variants?: Record<string, unknown> };
+    const variants: Record<string, { pixels: (string | null)[] }> = {};
+    for (const [presetId, rawList] of Object.entries(p.variants ?? {})) {
+      const hw = hardware[presetId];
+      if (!hw) continue; // ignore variants for unknown hardware
+      const pixels: (string | null)[] = new Array(hw.width * hw.height).fill(
+        null,
+      );
+      if (Array.isArray(rawList)) {
+        for (const px of rawList as ImportedPixel[]) {
+          placePixel(pixels, hw, colorMode, px);
         }
       }
-      return { label: page.label, pixels: arr };
-    }),
-    instructions: buildExportInstructions(config),
-  };
-}
-
-interface ParseResult {
-  pages: Page[];
-  config: Config | null;
-  configMismatch: boolean;
-}
-
-export function parseImport(raw: string, current: Config): ParseResult {
-  const data = JSON.parse(raw);
-  let resultConfig: Config | null = null;
-  let mismatch = false;
-  if (data && typeof data === "object" && data.config && typeof data.config === "object") {
-    const incoming = data.config;
-    mismatch =
-      incoming.width !== current.width ||
-      incoming.height !== current.height ||
-      incoming.colorMode !== current.colorMode ||
-      incoming.origin !== current.origin ||
-      incoming.axis !== current.axis ||
-      incoming.serpentine !== current.serpentine;
-    resultConfig = { ...current, ...incoming };
-  }
-
-  const cfg = resultConfig ?? current;
-  const N = cfg.width * cfg.height;
-
-  const placePixel = (
-    pixels: (string | null)[],
-    p: { index?: number; x?: number; y?: number; row?: number; col?: number; color: string },
-  ) => {
-    let x: number, y: number;
-    if (typeof p.index === "number") {
-      const v = computeFromLed(p.index, cfg);
-      x = v.x;
-      y = v.y;
-    } else if (typeof p.x === "number" && typeof p.y === "number") {
-      x = p.x;
-      y = p.y;
-    } else if (typeof p.row === "number" && typeof p.col === "number") {
-      x = p.col;
-      y = cfg.height - 1 - p.row;
-    } else return;
-    if (x < 0 || x >= cfg.width || y < 0 || y >= cfg.height) return;
-    pixels[y * cfg.width + x] = p.color;
-  };
-
-  let pages: Page[];
-  if (data && Array.isArray(data.pages)) {
-    pages = data.pages.map(
-      (
-        p: { label?: string; pixels?: Array<Parameters<typeof placePixel>[1]> },
-        i: number,
-      ) => {
-        const pixels: (string | null)[] = new Array(N).fill(null);
-        (p.pixels || []).forEach((px) => placePixel(pixels, px));
-        return { label: p.label || `Page ${i + 1}`, pixels };
-      },
-    );
-    if (pages.length === 0) {
-      pages = [{ label: "Page 1", pixels: new Array(N).fill(null) }];
+      variants[presetId] = { pixels };
     }
-  } else {
-    const arr = Array.isArray(data) ? data : data.pixels;
-    if (!Array.isArray(arr)) throw new Error("Expected pages, pixels, or an array");
-    const pixels: (string | null)[] = new Array(N).fill(null);
-    for (const p of arr) placePixel(pixels, p);
-    pages = [{ label: "Page 1", pixels }];
+    return { label: p.label || `Page ${i + 1}`, variants };
+  });
+
+  if (pages.length === 0) {
+    // Don't return an empty design — produce one blank page so the editor
+    // always has something to render. Use whichever hardware entry sorts first.
+    const firstId = Object.keys(hardware)[0];
+    const hw = hardware[firstId];
+    pages.push({
+      label: "Page 1",
+      variants: {
+        [firstId]: {
+          pixels: new Array(hw.width * hw.height).fill(null),
+        },
+      },
+    });
   }
 
-  return { pages, config: resultConfig, configMismatch: mismatch };
+  const design: Design = { version: 4, colorMode, hardware, pages };
+  return { design, hardwareChanged: hardwareDiffers(current.hardware, hardware) };
 }

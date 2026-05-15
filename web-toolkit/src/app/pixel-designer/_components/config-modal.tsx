@@ -88,7 +88,19 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
 
   return (
     <ModalShell onClose={onClose} width={560} className="max-h-[88vh] overflow-y-auto">
-      <h2 className="m-0 mb-3 text-[13px] font-semibold">Matrix configuration</h2>
+      <h2 className="m-0 mb-3 text-[13px] font-semibold">
+        Variant settings —{" "}
+        <span className="text-accent font-mono">
+          {HARDWARE_PRESETS.find(
+            (p) => p.width === current.width && p.height === current.height,
+          )?.label ?? `${current.width}×${current.height}`}
+        </span>
+      </h2>
+      <p className="text-[10.5px] text-[#777] -mt-2 mb-3 leading-[1.4]">
+        These fields describe the active variant&apos;s hardware (size, wiring,
+        letter mask) plus the design&apos;s global colour mode. Other variants
+        keep their own wiring.
+      </p>
 
       <CfgSection title="Dimensions">
         <div className="flex gap-1.5 items-center">

@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useHeaderActionsSlot } from "@/components/header-actions-slot";
 import {
+  activeConfig,
   CELL_GAP,
+  cloneDesign,
   computeCellSize,
-  DEFAULT_CONFIG,
+  DEFAULT_DESIGN,
+  DEFAULT_PRESET_ID,
   isMaskAvailable,
-  loadConfig,
-  saveConfig,
+  loadDesign,
+  saveDesign,
 } from "@/lib/pixel-designer/config";
 import { textPoints } from "@/lib/pixel-designer/fonts";
 import {
@@ -29,7 +32,9 @@ import { exportPng } from "@/lib/pixel-designer/png-export";
 import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
   Config,
+  Design,
   FontKey,
+  Hardware,
   Mode,
   Page,
   Point,
@@ -38,11 +43,20 @@ import type {
   Snapshot,
   Tool,
 } from "@/lib/pixel-designer/types";
+import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import {
+  centerVariant,
+  scaleVariant,
+  type VariantSource,
+} from "@/lib/pixel-designer/variants";
 import { AddPageModal } from "./add-page-modal";
+import { AddVariantModal, type AddVariantInit } from "./add-variant-modal";
 import { ConfigModal } from "./config-modal";
 import { PixelGrid } from "./pixel-grid";
 import { SidePanel } from "./side-panel";
 import { Toolbar } from "./toolbar";
+import { VariantPicker } from "./variant-picker";
+import { VariantsStrip } from "./variants-strip";
 
 type DragMode =
   | "free"
@@ -63,12 +77,186 @@ function clonePages(pages: Page[]): Page[] {
   return pages.map((p) => ({ label: p.label, pixels: p.pixels.slice() }));
 }
 
+/** Read the active-variant view of a design's pages. The result is the
+ *  Page[] shape that tools/renderers expect (label + flat pixels array). */
+function viewPagesFromDesign(d: Design, presetId: string): Page[] {
+  const hw = d.hardware[presetId];
+  const n = hw ? hw.width * hw.height : 0;
+  return d.pages.map((p) => {
+    const variant = p.variants[presetId];
+    return {
+      label: p.label,
+      pixels: variant ? variant.pixels.slice() : new Array(n).fill(null),
+    };
+  });
+}
+
+/** Write a Page[] view back into a design's pages for one preset. Pages
+ *  beyond the current design.pages length become new pages with only this
+ *  preset's variant; pages dropped from the view are dropped from storage. */
+function applyPageViewToDesign(
+  d: Design,
+  presetId: string,
+  view: Page[],
+): Design {
+  return {
+    ...d,
+    pages: view.map((vp, i) => {
+      const existing = d.pages[i];
+      return {
+        label: vp.label,
+        variants: {
+          ...(existing?.variants ?? {}),
+          [presetId]: { pixels: vp.pixels.slice() },
+        },
+      };
+    }),
+  };
+}
+
+/** Apply a Config edit to a design — colorMode goes global, the rest goes
+ *  to the active preset's Hardware entry. On size change, the variant's
+ *  pixels for that preset are resized (rows/cols preserved where they
+ *  overlap; new cells start blank). */
+function applyConfigToDesign(
+  d: Design,
+  presetId: string,
+  next: Config,
+): Design {
+  const prev = activeConfig(d, presetId);
+  const prevHw = d.hardware[presetId];
+  const nextHw: Hardware = {
+    presetId: prevHw?.presetId ?? presetId,
+    width: next.width,
+    height: next.height,
+    origin: next.origin,
+    axis: next.axis,
+    serpentine: next.serpentine,
+    letterMask: next.letterMask,
+  };
+  const sizeChanged =
+    next.width !== prev.width || next.height !== prev.height;
+  return {
+    ...d,
+    colorMode: next.colorMode,
+    hardware: { ...d.hardware, [presetId]: nextHw },
+    pages: sizeChanged
+      ? d.pages.map((p) => {
+          const oldVariant = p.variants[presetId];
+          const oldPixels = oldVariant ? oldVariant.pixels : [];
+          const newPixels: (string | null)[] = new Array(
+            next.width * next.height,
+          ).fill(null);
+          const minW = Math.min(prev.width, next.width);
+          const minH = Math.min(prev.height, next.height);
+          for (let y = 0; y < minH; y++) {
+            for (let x = 0; x < minW; x++) {
+              newPixels[y * next.width + x] =
+                oldPixels[y * prev.width + x] ?? null;
+            }
+          }
+          return {
+            ...p,
+            variants: { ...p.variants, [presetId]: { pixels: newPixels } },
+          };
+        })
+      : d.pages,
+  };
+}
+
 export function Designer() {
-  const [config, setConfig] = useState<Config>(() => ({ ...DEFAULT_CONFIG }));
-  const [pages, setPages] = useState<Page[]>(() => [
-    { label: "Page 1", pixels: makeEmptyPixels(DEFAULT_CONFIG) },
-  ]);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [design, _setDesignBase] = useState<Design>(() =>
+    cloneDesign(DEFAULT_DESIGN),
+  );
+  const [activePreset, _setActivePresetBase] = useState<string>(
+    DEFAULT_PRESET_ID,
+  );
+  const [currentPage, _setCurrentPageBase] = useState(0);
+
+  // Refs mirror the latest values so that callbacks fired via queueMicrotask
+  // (after a state update but before the next render) can read the just-
+  // committed state without waiting for React's commit phase.
+  const designRef = useRef(design);
+  const activePresetRef = useRef(activePreset);
+  const currentPageRef = useRef(currentPage);
+
+  const setDesign = useCallback(
+    (updater: Design | ((prev: Design) => Design)) => {
+      _setDesignBase((prev) => {
+        const next =
+          typeof updater === "function"
+            ? (updater as (p: Design) => Design)(prev)
+            : updater;
+        designRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const setActivePreset = useCallback((id: string) => {
+    _setActivePresetBase(() => {
+      activePresetRef.current = id;
+      return id;
+    });
+  }, []);
+
+  const setCurrentPage = useCallback(
+    (val: number | ((prev: number) => number)) => {
+      _setCurrentPageBase((prev) => {
+        const next =
+          typeof val === "function"
+            ? (val as (p: number) => number)(prev)
+            : val;
+        currentPageRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Derived view: tools/renderers consume `config` and `pages` exactly as
+  // before; reads go through the active variant.
+  const config = useMemo(
+    () => activeConfig(design, activePreset),
+    [design, activePreset],
+  );
+  const pages = useMemo<Page[]>(
+    () => viewPagesFromDesign(design, activePreset),
+    [design, activePreset],
+  );
+
+  /** Wrapped setter that accepts a Page[] view and routes writes to the
+   *  active variant of the source-of-truth Design. */
+  const setPages = useCallback(
+    (value: Page[] | ((prev: Page[]) => Page[])) => {
+      setDesign((prev) => {
+        const view = viewPagesFromDesign(prev, activePresetRef.current);
+        const nextView =
+          typeof value === "function"
+            ? (value as (p: Page[]) => Page[])(view)
+            : value;
+        return applyPageViewToDesign(prev, activePresetRef.current, nextView);
+      });
+    },
+    [setDesign],
+  );
+
+  /** Wrapped setter that accepts a Config and edits the active variant's
+   *  hardware entry on the design. */
+  const setConfig = useCallback(
+    (value: Config | ((prev: Config) => Config)) => {
+      setDesign((prev) => {
+        const prevCfg = activeConfig(prev, activePresetRef.current);
+        const nextCfg =
+          typeof value === "function"
+            ? (value as (p: Config) => Config)(prevCfg)
+            : value;
+        return applyConfigToDesign(prev, activePresetRef.current, nextCfg);
+      });
+    },
+    [setDesign],
+  );
   const [tool, setTool] = useState<Tool>("pencil");
   const [color, setColor] = useState<string>(getDefaultColor("rgb"));
   const [mode, setMode] = useState<Mode>("pixel");
@@ -83,6 +271,7 @@ export function Designer() {
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [addPageOpen, setAddPageOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [addVariantFor, setAddVariantFor] = useState<number | null>(null);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -114,16 +303,35 @@ export function Designer() {
   const palette = useMemo(() => getPalette(config.colorMode), [config.colorMode]);
   const maskAvailable = useMemo(() => isMaskAvailable(config), [config]);
 
+  const activePresetLabel = useMemo(() => {
+    const preset = HARDWARE_PRESETS.find((p) => p.id === activePreset);
+    if (preset) return preset.label;
+    const hw = design.hardware[activePreset];
+    return hw ? `${hw.width}×${hw.height}` : activePreset;
+  }, [design.hardware, activePreset]);
+
   // ============ helpers ============
 
   const pushHistory = useCallback(
-    (
-      nextPages: Page[] = pages,
-      nextCurrent: number = currentPage,
-    ) => {
+    (nextPages?: Page[], nextCurrent?: number) => {
+      // Snapshot the latest design (via ref so it reflects the most recently
+      // committed state, even if pushHistory is fired from queueMicrotask).
+      // If a caller is in the middle of writing pages and hasn't waited for
+      // React to re-render, they can pass the new Page[] view and the new
+      // current-page index explicitly — those are merged into the snapshot.
+      const baseDesign = designRef.current;
+      const designForSnap =
+        nextPages !== undefined
+          ? applyPageViewToDesign(
+              baseDesign,
+              activePresetRef.current,
+              nextPages,
+            )
+          : baseDesign;
       const snap: Snapshot = {
-        pages: clonePages(nextPages),
-        currentPage: nextCurrent,
+        design: cloneDesign(designForSnap),
+        activePage: nextCurrent ?? currentPageRef.current,
+        activePreset: activePresetRef.current,
       };
       setHistory((prev) => {
         let h = prev.slice(0, historyIndex + 1);
@@ -133,15 +341,21 @@ export function Designer() {
         return h;
       });
     },
-    [pages, currentPage, historyIndex],
+    [historyIndex],
   );
 
-  const applySnapshot = useCallback((snap: Snapshot) => {
-    setPages(clonePages(snap.pages));
-    setCurrentPage(Math.min(snap.currentPage, snap.pages.length - 1));
-    setSelection(null);
-    setPreview(null);
-  }, []);
+  const applySnapshot = useCallback(
+    (snap: Snapshot) => {
+      setDesign(cloneDesign(snap.design));
+      setActivePreset(snap.activePreset);
+      setCurrentPage(
+        Math.min(snap.activePage, snap.design.pages.length - 1),
+      );
+      setSelection(null);
+      setPreview(null);
+    },
+    [setDesign, setActivePreset, setCurrentPage],
+  );
 
   const undo = useCallback(() => {
     if (historyIndex <= 0) return;
@@ -157,23 +371,32 @@ export function Designer() {
     applySnapshot(history[ni]);
   }, [applySnapshot, history, historyIndex]);
 
-  // ============ load persisted config + initial history snapshot ============
+  // ============ load persisted design + initial history snapshot ============
 
   // One-shot hydration from localStorage. The effect-with-setState pattern is the
   // correct shape here: a lazy useState initializer would compute different values
   // on server vs. client, causing a hydration mismatch.
   useEffect(() => {
-    const persisted = loadConfig();
+    const persisted = loadDesign();
     /* eslint-disable react-hooks/set-state-in-effect */
-    setConfig(persisted);
-    const initialPages: Page[] = [
-      { label: "Page 1", pixels: makeEmptyPixels(persisted) },
-    ];
-    setPages(initialPages);
+    setDesign(cloneDesign(persisted));
+    // Pick an active preset that actually exists in the loaded design.
+    const firstPresetId =
+      DEFAULT_PRESET_ID in persisted.hardware
+        ? DEFAULT_PRESET_ID
+        : Object.keys(persisted.hardware)[0] ?? DEFAULT_PRESET_ID;
+    setActivePreset(firstPresetId);
     setColor(getDefaultColor(persisted.colorMode));
-    setHistory([{ pages: clonePages(initialPages), currentPage: 0 }]);
+    setHistory([
+      {
+        design: cloneDesign(persisted),
+        activePage: 0,
+        activePreset: firstPresetId,
+      },
+    ]);
     setHistoryIndex(0);
     /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============ pixel writes ============
@@ -769,40 +992,111 @@ export function Designer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, maskAvailable, redo, undo, handleSetTool, commitSelection, pushHistory]);
 
+  // ============ variants ============
+
+  const handleAddVariant = useCallback(
+    (pageIdx: number, targetPresetId: string, init: AddVariantInit) => {
+      const sourcePresetId = activePresetRef.current;
+      setDesign((prev) => {
+        const page = prev.pages[pageIdx];
+        const sourceHw = prev.hardware[sourcePresetId];
+        const sourceVariant = page?.variants[sourcePresetId];
+        if (!page || !sourceHw || !sourceVariant) return prev;
+
+        // Resolve target hardware. If the design already has this preset id
+        // wired up elsewhere (e.g. another page already added it), reuse that.
+        // Otherwise look up the canonical preset and seed wiring from the
+        // source so the user has sensible defaults to tweak.
+        const existingTargetHw = prev.hardware[targetPresetId];
+        const preset = HARDWARE_PRESETS.find((p) => p.id === targetPresetId);
+        const targetHw: Hardware | null =
+          existingTargetHw ??
+          (preset
+            ? {
+                presetId: preset.id,
+                width: preset.width,
+                height: preset.height,
+                origin: sourceHw.origin,
+                axis: sourceHw.axis,
+                serpentine: sourceHw.serpentine,
+                letterMask: "",
+              }
+            : null);
+        if (!targetHw) return prev;
+
+        const src: VariantSource = {
+          width: sourceHw.width,
+          height: sourceHw.height,
+          pixels: sourceVariant.pixels,
+        };
+        const fn = init === "scale" ? scaleVariant : centerVariant;
+        const newPixels = fn(src, {
+          width: targetHw.width,
+          height: targetHw.height,
+        });
+        if (!newPixels) return prev;
+
+        return {
+          ...prev,
+          hardware: { ...prev.hardware, [targetPresetId]: targetHw },
+          pages: prev.pages.map((p, i) =>
+            i === pageIdx
+              ? {
+                  ...p,
+                  variants: {
+                    ...p.variants,
+                    [targetPresetId]: { pixels: newPixels },
+                  },
+                }
+              : p,
+          ),
+        };
+      });
+      setActivePreset(targetPresetId);
+      setAddVariantFor(null);
+      queueMicrotask(() => pushHistory());
+    },
+    [setDesign, setActivePreset, pushHistory],
+  );
+
   // ============ JSON ============
 
   const handleExport = useCallback(() => {
-    const out = buildExportJSON(config, pages);
+    const out = buildExportJSON(design);
     setJsonValue(JSON.stringify(out, null, 2));
     setImportError(null);
-  }, [config, pages]);
+  }, [design]);
 
   const handleImport = useCallback(() => {
     try {
-      const result = parseImport(jsonValue, config);
-      if (result.config && result.configMismatch) {
+      const result = parseImport(jsonValue, design);
+      if (result.hardwareChanged) {
         const ok = window.confirm(
-          `Imported design uses different matrix config (${result.config.width}×${result.config.height}, ${result.config.colorMode}). Apply?`,
+          "Imported design uses different hardware variants. Replace the current design?",
         );
-        if (ok) {
-          setConfig(result.config);
-          saveConfig(result.config);
-        }
+        if (!ok) return;
       }
-      setPages(result.pages);
+      setDesign(cloneDesign(result.design));
+      // Prefer the previously-active preset if the imported design has it;
+      // otherwise fall back to whatever preset sorts first.
+      const presetId =
+        activePresetRef.current in result.design.hardware
+          ? activePresetRef.current
+          : Object.keys(result.design.hardware)[0] ?? DEFAULT_PRESET_ID;
+      setActivePreset(presetId);
       setCurrentPage(0);
       setSelection(null);
-      pushHistory(result.pages, 0);
+      queueMicrotask(() => pushHistory(undefined, 0));
       setImportError(null);
     } catch (err) {
       setImportError(`Import error: ${(err as Error).message}`);
     }
-  }, [jsonValue, config, pushHistory]);
+  }, [jsonValue, design, setDesign, setActivePreset, setCurrentPage, pushHistory]);
 
   const handleCopy = useCallback(async () => {
     let toCopy = jsonValue;
     if (!toCopy) {
-      const out = buildExportJSON(config, pages);
+      const out = buildExportJSON(design);
       toCopy = JSON.stringify(out, null, 2);
       setJsonValue(toCopy);
     }
@@ -813,36 +1107,41 @@ export function Designer() {
     } catch {
       // fallback: leave the textarea filled; user can select+copy
     }
-  }, [jsonValue, config, pages]);
+  }, [jsonValue, design]);
 
   // ============ config save ============
 
   const handleConfigSave = useCallback(
     (next: Config) => {
-      saveConfig(next);
+      // setConfig already routes through applyConfigToDesign — that handles
+      // colorMode, the active preset's hardware entry, and pixel-buffer
+      // resizing for every page in one pass. We just need to deal with the
+      // side effects (palette swap, mode reset, history reset, persist).
       setConfig(next);
-      const N = next.width * next.height;
-      const remapped = pages.map((p) => ({
-        label: p.label,
-        pixels:
-          p.pixels.length === N
-            ? p.pixels.slice()
-            : new Array(N).fill(null),
-      }));
-      setPages(remapped);
       const pal = COLOR_MODES[next.colorMode]?.palette ?? [];
       const norm = (c: string) => c.toLowerCase();
       if (!pal.map(norm).includes(norm(color))) {
         setColor(getDefaultColor(next.colorMode));
       }
       setSelection(null);
-      setHistory([{ pages: clonePages(remapped), currentPage: 0 }]);
-      setHistoryIndex(0);
-      setCurrentPage((c) => Math.min(c, remapped.length - 1));
+      // Persist + reset history once the design state has settled.
+      queueMicrotask(() => {
+        const latest = designRef.current;
+        saveDesign(latest);
+        setHistory([
+          {
+            design: cloneDesign(latest),
+            activePage: 0,
+            activePreset: activePresetRef.current,
+          },
+        ]);
+        setHistoryIndex(0);
+      });
+      setCurrentPage((c) => Math.min(c, designRef.current.pages.length - 1));
       if (!isMaskAvailable(next) && mode === "mask") setMode("pixel");
       setConfigOpen(false);
     },
-    [pages, color, mode],
+    [setConfig, setCurrentPage, color, mode],
   );
 
   // ============ derived UI ============
@@ -864,6 +1163,12 @@ export function Designer() {
         </IconBtn>
       </div>
       <div className="w-px h-5 bg-edge mx-1" />
+      <VariantPicker
+        design={design}
+        activePreset={activePreset}
+        onChange={setActivePreset}
+      />
+      <div className="w-px h-5 bg-edge mx-1" />
       <div className="flex gap-1.5">
         <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
           Clear
@@ -871,7 +1176,7 @@ export function Designer() {
         <HeaderBtn onClick={handlePng} title="Export PNG snapshot">
           PNG
         </HeaderBtn>
-        <IconBtn title="Matrix configuration" onClick={() => setConfigOpen(true)}>
+        <IconBtn title="Variant settings" onClick={() => setConfigOpen(true)}>
           ⚙
         </IconBtn>
       </div>
@@ -930,24 +1235,50 @@ export function Designer() {
                       ✕
                     </button>
                   </div>
-                  <div
-                    onMouseDown={(e) => onMouseDown(e, pi)}
-                    onContextMenu={(e) => {
-                      if ((e.target as HTMLElement).closest(".pd-grid"))
-                        e.preventDefault();
-                    }}
-                  >
-                    <PixelGrid
-                      ref={setGridRef(pi)}
-                      config={config}
-                      pixels={page.pixels}
-                      mode={mode}
-                      cellSize={cellSize}
-                      preview={isActive ? preview : null}
-                      selection={isActive ? selection : null}
-                      isActive={isActive}
-                    />
-                  </div>
+                  <VariantsStrip
+                    design={design}
+                    pageIdx={pi}
+                    activePreset={activePreset}
+                    onSelectVariant={setActivePreset}
+                    onAddClicked={() => setAddVariantFor(pi)}
+                  />
+                  {design.pages[pi]?.variants[activePreset] ? (
+                    <div
+                      onMouseDown={(e) => onMouseDown(e, pi)}
+                      onContextMenu={(e) => {
+                        if ((e.target as HTMLElement).closest(".pd-grid"))
+                          e.preventDefault();
+                      }}
+                    >
+                      <PixelGrid
+                        ref={setGridRef(pi)}
+                        config={config}
+                        pixels={page.pixels}
+                        mode={mode}
+                        cellSize={cellSize}
+                        preview={isActive ? preview : null}
+                        selection={isActive ? selection : null}
+                        isActive={isActive}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#3a3a42] rounded-lg bg-[#0a0a0c]/40 px-6 py-8 min-h-[140px]">
+                      <div className="text-[12px] text-[#777] text-center max-w-[280px] leading-[1.5]">
+                        No variant for{" "}
+                        <span className="font-mono text-[#aaa]">
+                          {activePresetLabel}
+                        </span>{" "}
+                        on this page yet.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAddVariantFor(pi)}
+                        className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+                      >
+                        + Add variant for {activePresetLabel}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1023,6 +1354,18 @@ export function Designer() {
         current={config}
         onClose={() => setConfigOpen(false)}
         onSave={handleConfigSave}
+      />
+      <AddVariantModal
+        open={addVariantFor !== null}
+        design={design}
+        pageIdx={addVariantFor ?? 0}
+        sourcePreset={activePreset}
+        onClose={() => setAddVariantFor(null)}
+        onAdd={(targetId, init) => {
+          if (addVariantFor !== null) {
+            handleAddVariant(addVariantFor, targetId, init);
+          }
+        }}
       />
     </div>
   );

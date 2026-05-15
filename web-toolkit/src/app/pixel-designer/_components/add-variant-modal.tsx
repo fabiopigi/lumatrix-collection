@@ -1,0 +1,212 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import type { Design } from "@/lib/pixel-designer/types";
+import { fits } from "@/lib/pixel-designer/variants";
+import { ModalShell } from "./modal-shell";
+
+export type AddVariantInit = "scale" | "center";
+
+interface AddVariantModalProps {
+  open: boolean;
+  design: Design;
+  pageIdx: number;
+  sourcePreset: string;
+  onClose: () => void;
+  onAdd: (targetPresetId: string, init: AddVariantInit) => void;
+}
+
+export function AddVariantModal(props: AddVariantModalProps) {
+  if (!props.open) return null;
+  return <AddVariantModalInner {...props} />;
+}
+
+function AddVariantModalInner({
+  design,
+  pageIdx,
+  sourcePreset,
+  onClose,
+  onAdd,
+}: Omit<AddVariantModalProps, "open">) {
+  const page = design.pages[pageIdx];
+  const sourceHw = design.hardware[sourcePreset];
+
+  // Eligible targets: every standard preset that doesn't already have a
+  // variant on this page, plus any custom preset already present in
+  // design.hardware that this page hasn't covered yet.
+  const eligible = useMemo(() => {
+    if (!page) return [];
+    const taken = new Set(Object.keys(page.variants));
+    const seen = new Set<string>();
+    const out: Array<{ id: string; label: string; width: number; height: number }> = [];
+    for (const p of HARDWARE_PRESETS) {
+      if (taken.has(p.id)) continue;
+      seen.add(p.id);
+      out.push({ id: p.id, label: p.label, width: p.width, height: p.height });
+    }
+    for (const [id, hw] of Object.entries(design.hardware)) {
+      if (taken.has(id) || seen.has(id)) continue;
+      out.push({
+        id,
+        label: `${hw.width}×${hw.height} (custom)`,
+        width: hw.width,
+        height: hw.height,
+      });
+    }
+    return out;
+  }, [design, page]);
+
+  const [targetId, setTargetId] = useState<string>(eligible[0]?.id ?? "");
+  const [init, setInit] = useState<AddVariantInit>("scale");
+
+  const target = eligible.find((p) => p.id === targetId);
+  const sourceFits =
+    sourceHw && target
+      ? fits(
+          { width: sourceHw.width, height: sourceHw.height, pixels: [] },
+          { width: target.width, height: target.height },
+        )
+      : false;
+
+  const sourceLabel = sourceHw
+    ? `${sourceHw.width}×${sourceHw.height}`
+    : sourcePreset;
+  const refusalReason =
+    sourceHw && target && !sourceFits
+      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Shrinking variants isn't supported — pick a target at least as big as the source, or design the smaller variant from scratch later.`
+      : null;
+
+  const handleAdd = () => {
+    if (!target || !sourceFits) return;
+    onAdd(target.id, init);
+  };
+
+  return (
+    <ModalShell onClose={onClose} className="w-[440px]">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="text-[15px] font-semibold text-foreground">
+            Add variant
+          </div>
+          <div className="text-[11px] text-[#777] mt-0.5">
+            For{" "}
+            <span className="font-mono text-[#aaa]">
+              {page?.label ?? `Page ${pageIdx + 1}`}
+            </span>
+            {" — source: "}
+            <span className="font-mono text-[#aaa]">{sourceLabel}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      {eligible.length === 0 ? (
+        <p className="text-[12px] text-[#888] py-4">
+          This page already has every available hardware variant. Add a new
+          hardware preset to design for from the variant settings (⚙).
+        </p>
+      ) : (
+        <>
+          <Section title="Target hardware">
+            <select
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              className="w-full bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] cursor-pointer"
+            >
+              {eligible.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Section>
+
+          <Section title="Initialise from source">
+            <label className="flex items-start gap-2 cursor-pointer py-1">
+              <input
+                type="radio"
+                name="init"
+                checked={init === "scale"}
+                onChange={() => setInit("scale")}
+                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
+              />
+              <span className="text-xs leading-[1.4]">
+                <span className="text-foreground">Scale to size</span>
+                <span className="block text-[10.5px] text-[#777]">
+                  Nearest-neighbour integer upscale of the source, centred on
+                  the new canvas. Empty cells stay empty.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer py-1">
+              <input
+                type="radio"
+                name="init"
+                checked={init === "center"}
+                onChange={() => setInit("center")}
+                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
+              />
+              <span className="text-xs leading-[1.4]">
+                <span className="text-foreground">Center unscaled</span>
+                <span className="block text-[10.5px] text-[#777]">
+                  Paste the source pixels 1:1 in the centre of the new canvas;
+                  the surround starts blank.
+                </span>
+              </span>
+            </label>
+          </Section>
+
+          {refusalReason && (
+            <div className="mb-3 text-[11px] text-[#ff8888] bg-[#3a1818] border border-[#5a2a2a] rounded p-2 leading-[1.4]">
+              {refusalReason}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!sourceFits}
+              title={refusalReason ?? undefined}
+              className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#4a90e2]"
+            >
+              Add variant
+            </button>
+          </div>
+        </>
+      )}
+    </ModalShell>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-[#777] mb-1.5 font-semibold">
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
