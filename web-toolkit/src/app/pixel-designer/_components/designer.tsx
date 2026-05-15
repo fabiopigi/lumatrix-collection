@@ -22,13 +22,12 @@ import {
   rectPoints,
 } from "@/lib/pixel-designer/geometry";
 import { computeLedIndex } from "@/lib/pixel-designer/led-index";
-import { buildExportJSON, parseImport } from "@/lib/pixel-designer/json-io";
+import { parseImport } from "@/lib/pixel-designer/json-io";
 import {
   COLOR_MODES,
   getDefaultColor,
   getPalette,
 } from "@/lib/pixel-designer/palette";
-import { exportPng } from "@/lib/pixel-designer/png-export";
 import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
   Config,
@@ -56,6 +55,7 @@ import {
   type AddVariantResult,
 } from "./add-variant-modal";
 import { ConfigModal } from "./config-modal";
+import { ExportModal } from "./export-modal";
 import { PixelGrid } from "./pixel-grid";
 import { SidePanel } from "./side-panel";
 import { Toolbar } from "./toolbar";
@@ -272,12 +272,12 @@ export function Designer() {
   const [hover, setHover] = useState<Point | null>(null);
   const [jsonValue, setJsonValue] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
-  const [copyLabel, setCopyLabel] = useState("Copy");
   const [addPageOpen, setAddPageOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [addVariantFor, setAddVariantFor] = useState<number | null>(null);
   const [addVariantResult, setAddVariantResult] =
     useState<AddVariantResult | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -917,10 +917,6 @@ export function Designer() {
     });
   }, [writePixels]);
 
-  const handlePng = useCallback(() => {
-    exportPng(config, pages, mode);
-  }, [config, pages, mode]);
-
   // ============ keyboard ============
 
   useEffect(() => {
@@ -1127,13 +1123,8 @@ export function Designer() {
     [setDesign, setActivePreset, pushHistory],
   );
 
-  // ============ JSON ============
-
-  const handleExport = useCallback(() => {
-    const out = buildExportJSON(design);
-    setJsonValue(JSON.stringify(out, null, 2));
-    setImportError(null);
-  }, [design]);
+  // ============ JSON import ============
+  // (Export lives in ExportModal; this side covers paste-and-import only.)
 
   const handleImport = useCallback(() => {
     try {
@@ -1160,22 +1151,6 @@ export function Designer() {
       setImportError(`Import error: ${(err as Error).message}`);
     }
   }, [jsonValue, design, setDesign, setActivePreset, setCurrentPage, pushHistory]);
-
-  const handleCopy = useCallback(async () => {
-    let toCopy = jsonValue;
-    if (!toCopy) {
-      const out = buildExportJSON(design);
-      toCopy = JSON.stringify(out, null, 2);
-      setJsonValue(toCopy);
-    }
-    try {
-      await navigator.clipboard.writeText(toCopy);
-      setCopyLabel("Copied!");
-      setTimeout(() => setCopyLabel("Copy"), 1200);
-    } catch {
-      // fallback: leave the textarea filled; user can select+copy
-    }
-  }, [jsonValue, design]);
 
   // ============ config save ============
 
@@ -1241,8 +1216,11 @@ export function Designer() {
         <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
           Clear
         </HeaderBtn>
-        <HeaderBtn onClick={handlePng} title="Export PNG snapshot">
-          PNG
+        <HeaderBtn
+          onClick={() => setExportOpen(true)}
+          title="Export JSON or PNG"
+        >
+          Export…
         </HeaderBtn>
         <IconBtn title="Variant settings" onClick={() => setConfigOpen(true)}>
           ⚙
@@ -1401,10 +1379,7 @@ export function Designer() {
           }}
           jsonValue={jsonValue}
           onJsonChange={setJsonValue}
-          onExport={handleExport}
           onImport={handleImport}
-          onCopy={handleCopy}
-          copyLabel={copyLabel}
           importError={importError}
         />
       </div>
@@ -1438,6 +1413,14 @@ export function Designer() {
             handleAddVariant(addVariantFor, targetId, init, applyToAll);
           }
         }}
+      />
+      <ExportModal
+        open={exportOpen}
+        design={design}
+        activePage={currentPage}
+        activePreset={activePreset}
+        mode={mode}
+        onClose={() => setExportOpen(false)}
       />
     </div>
   );

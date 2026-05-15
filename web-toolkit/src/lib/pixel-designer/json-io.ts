@@ -125,6 +125,103 @@ export function buildExportInstructions(design: Design) {
   };
 }
 
+/** Subset a design to a single page (with all of its variants intact). Used
+ *  by the "this page + its variants" export option. */
+export function pickPage(design: Design, pageIdx: number): Design {
+  const page = design.pages[pageIdx];
+  if (!page) return design;
+  // Trim hardware to entries the surviving page actually uses, so the export
+  // doesn't carry presets the consumer can't see in the data.
+  const used = new Set(Object.keys(page.variants));
+  const hardware: Record<string, Hardware> = {};
+  for (const id of used) {
+    if (design.hardware[id]) hardware[id] = design.hardware[id];
+  }
+  return {
+    version: 4,
+    colorMode: design.colorMode,
+    hardware,
+    pages: [page],
+  };
+}
+
+/** Flat per-hardware export: one preset, all pages that have a variant for
+ *  it. Shape matches the single-hardware case directly — `config` describes
+ *  the hardware, `pages[].pixels` is the lit-cell list. Designed for
+ *  downstream device/agent code that just wants one matrix's worth of data
+ *  without drilling through the variant map. */
+export function buildPresetExportJSON(design: Design, presetId: string) {
+  const hw = design.hardware[presetId];
+  if (!hw) {
+    throw new Error(`No hardware entry for preset '${presetId}'`);
+  }
+  const cfg = hardwareToConfig(hw, design.colorMode);
+  const pages = design.pages
+    .map((page) => ({ page, variant: page.variants[presetId] }))
+    .filter((x) => x.variant !== undefined)
+    .map(({ page, variant }) => {
+      const lit: Array<{
+        index: number;
+        x: number;
+        y: number;
+        color: string;
+      }> = [];
+      for (let y = 0; y < hw.height; y++) {
+        for (let x = 0; x < hw.width; x++) {
+          const c = variant!.pixels[y * hw.width + x];
+          if (c) {
+            lit.push({
+              index: computeLedIndex(x, y, cfg),
+              x,
+              y,
+              color: c.toLowerCase(),
+            });
+          }
+        }
+      }
+      return { label: page.label, pixels: lit };
+    });
+  return {
+    version: 4,
+    kind: "preset-extract" as const,
+    preset: presetId,
+    config: {
+      width: hw.width,
+      height: hw.height,
+      colorMode: design.colorMode,
+      origin: hw.origin,
+      axis: hw.axis,
+      serpentine: hw.serpentine,
+      letterMask: hw.letterMask,
+    },
+    pages,
+    instructions: {
+      purpose:
+        `Pixel-art design extracted for the ${presetId} (${hw.width}×${hw.height}) hardware variant. ` +
+        "An LLM or agent can read this file and translate it into driver code by iterating each page's " +
+        '`pixels` array and writing each color to the LED at the given "index". Unspecified LEDs are OFF (#000000).',
+      schema:
+        "Top level: { version, kind: 'preset-extract', preset, config, pages, instructions }. " +
+        "config: { width, height, colorMode, origin, axis, serpentine, letterMask }. " +
+        "pages: ordered array of { label, pixels }. " +
+        "pixels: array of { index, x, y, color } — only LIT cells are listed.",
+      pages_meaning:
+        "Each page is one frame. Render sequentially in array order with a delay; single-page = static image.",
+      ...buildVariantIndexing(hw, design.colorMode),
+      color_format:
+        'Colors are CSS hex strings "#RRGGBB". Convert to (r, g, b) tuples for typical drivers. ' +
+        "Scale to 20–25% for indoor use; NeoPixels at full intensity are uncomfortably bright.",
+      color_mode_note:
+        design.colorMode === "rgb"
+          ? 'Color mode is "rgb": colors are arbitrary 24-bit values.'
+          : `Color mode is "${design.colorMode}": colors are constrained. Send the listed RGB values directly.`,
+      rendering_hint_micropython:
+        'Example MicroPython per page: `for p in page["pixels"]: np[p["index"]] = hex_to_rgb(p["color"]); np.write()`. ' +
+        "Clear unset LEDs first with `for i in range(NUM_LEDS): np[i] = (0, 0, 0)` before each page.",
+    },
+  };
+}
+
 export function buildExportJSON(design: Design) {
   return {
     version: 4,

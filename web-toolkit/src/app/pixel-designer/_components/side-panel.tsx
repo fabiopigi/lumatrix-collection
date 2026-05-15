@@ -30,10 +30,7 @@ interface SidePanelProps {
 
   jsonValue: string;
   onJsonChange: (v: string) => void;
-  onExport: () => void;
   onImport: () => void;
-  onCopy: () => void;
-  copyLabel: string;
   importError: string | null;
 }
 
@@ -191,23 +188,17 @@ export function SidePanel(props: SidePanelProps) {
         </div>
       </Section>
 
-      <Section title="Design JSON">
+      <Section title="Import JSON" hint="paste then Import">
         <textarea
           value={props.jsonValue}
           onChange={(e) => props.onJsonChange(e.target.value)}
           spellCheck={false}
-          placeholder="Click Export to fill, or paste JSON and click Import."
+          placeholder="Paste design JSON here and click Import. Use Export… in the header to save."
           className="w-full h-[120px] bg-[#0a0a0c] border border-edge text-foreground p-2 rounded font-mono text-[10.5px] leading-[1.4] resize-y outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
         />
         <div className="flex gap-1.5 mt-1.5">
-          <Btn primary onClick={props.onExport} className="flex-1">
-            Export
-          </Btn>
-          <Btn onClick={props.onImport} className="flex-1">
+          <Btn primary onClick={props.onImport} className="flex-1">
             Import
-          </Btn>
-          <Btn onClick={props.onCopy} className="flex-1">
-            {props.copyLabel}
           </Btn>
         </div>
         {props.importError && (
