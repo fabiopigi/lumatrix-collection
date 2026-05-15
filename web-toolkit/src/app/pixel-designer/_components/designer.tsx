@@ -509,22 +509,37 @@ export function Designer() {
 
   const addPage = useCallback(
     (copy: boolean) => {
-      setPages((prev) => {
-        const newPage: Page = {
-          label: `Page ${prev.length + 1}`,
-          pixels: copy
-            ? prev[currentPage].pixels.slice()
-            : makeEmptyPixels(config),
+      // New page inherits the full variant set from the page we're inserting
+      // after, so adding a page never silently drops variants the user is
+      // designing for. `copy` controls pixel content per variant; the variant
+      // shape (which presets exist) is always inherited.
+      setDesign((prev) => {
+        const sourcePage = prev.pages[currentPage];
+        if (!sourcePage) return prev;
+        const newVariants: Record<string, { pixels: (string | null)[] }> = {};
+        for (const presetId of Object.keys(sourcePage.variants)) {
+          const sv = sourcePage.variants[presetId];
+          const hw = prev.hardware[presetId];
+          if (!sv || !hw) continue;
+          newVariants[presetId] = {
+            pixels: copy
+              ? sv.pixels.slice()
+              : new Array(hw.width * hw.height).fill(null),
+          };
+        }
+        const newPage = {
+          label: `Page ${prev.pages.length + 1}`,
+          variants: newVariants,
         };
         const insertAt = currentPage + 1;
-        const next = prev.slice();
-        next.splice(insertAt, 0, newPage);
-        queueMicrotask(() => pushHistory(next, insertAt));
-        return next;
+        const nextPages = prev.pages.slice();
+        nextPages.splice(insertAt, 0, newPage);
+        queueMicrotask(() => pushHistory(undefined, insertAt));
+        return { ...prev, pages: nextPages };
       });
       setCurrentPage((cp) => cp + 1);
     },
-    [config, currentPage, pushHistory],
+    [setDesign, currentPage, pushHistory, setCurrentPage],
   );
 
   const deletePage = useCallback(
@@ -1097,6 +1112,13 @@ export function Designer() {
             pageLabel: p.label,
             reason: `already had ${targetHw.width}×${targetHw.height} variant`,
           });
+          continue;
+        }
+        if (init === "blank") {
+          newPixelsByPage.set(
+            i,
+            new Array(targetHw.width * targetHw.height).fill(null),
+          );
           continue;
         }
         const sourceVariant = p.variants[sourcePresetId];

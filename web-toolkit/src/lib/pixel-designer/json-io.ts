@@ -1,5 +1,6 @@
 import { computeFromLed, computeLedIndex } from "./led-index";
 import { activeConfig } from "./config";
+import { presetIdsInOrder } from "@/lib/hardware-presets";
 import type { Config, Design, Hardware } from "./types";
 
 function buildIndexFormulaPseudo(cfg: Config): string {
@@ -254,13 +255,17 @@ export function buildExportJSON(design: Design) {
     version: 4,
     colorMode: design.colorMode,
     hardware: Object.fromEntries(
-      Object.entries(design.hardware).map(([id, hw]) => [id, { ...hw }]),
+      presetIdsInOrder(Object.keys(design.hardware)).map((id) => [
+        id,
+        { ...design.hardware[id] },
+      ]),
     ),
     pages: design.pages.map((page) => ({
       label: page.label,
       ...pageMetaFragment(page),
       variants: Object.fromEntries(
-        Object.entries(page.variants).map(([presetId, v]) => {
+        presetIdsInOrder(Object.keys(page.variants)).map((presetId) => {
+          const v = page.variants[presetId];
           const hw = design.hardware[presetId];
           if (!hw) return [presetId, []];
           const cfg = hardwareToConfig(hw, design.colorMode);

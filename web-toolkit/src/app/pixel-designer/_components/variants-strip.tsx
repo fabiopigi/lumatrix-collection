@@ -1,6 +1,6 @@
 "use client";
 
-import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
 import type { Design } from "@/lib/pixel-designer/types";
 
 interface VariantsStripProps {
@@ -25,7 +25,7 @@ export function VariantsStrip({
 }: VariantsStripProps) {
   const page = design.pages[pageIdx];
   if (!page) return null;
-  const variantIds = Object.keys(page.variants);
+  const variantIds = presetIdsInOrder(Object.keys(page.variants));
 
   const sizeLabel = (id: string) => {
     const hw = design.hardware[id];

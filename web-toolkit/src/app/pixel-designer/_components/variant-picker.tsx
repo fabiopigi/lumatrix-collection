@@ -1,6 +1,6 @@
 "use client";
 
-import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
 import type { Design } from "@/lib/pixel-designer/types";
 
 interface VariantPickerProps {
@@ -19,7 +19,7 @@ export function VariantPicker({
   activePreset,
   onChange,
 }: VariantPickerProps) {
-  const presetIds = Object.keys(design.hardware);
+  const presetIds = presetIdsInOrder(Object.keys(design.hardware));
 
   // "Variant mode" = the design has more than one preset's hardware defined,
   // or any individual page has more than one variant. Either makes the picker

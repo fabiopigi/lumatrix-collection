@@ -12,7 +12,7 @@ import {
   type PngGridSection,
 } from "@/lib/pixel-designer/png-export";
 import type { Design, Mode } from "@/lib/pixel-designer/types";
-import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
+import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
 import { ModalShell } from "./modal-shell";
 
 interface ExportModalProps {
@@ -36,7 +36,10 @@ function ExportModalInner({
   mode,
   onClose,
 }: Omit<ExportModalProps, "open">) {
-  const presetIds = useMemo(() => Object.keys(design.hardware), [design]);
+  const presetIds = useMemo(
+    () => presetIdsInOrder(Object.keys(design.hardware)),
+    [design],
+  );
   const [presetForFlat, setPresetForFlat] = useState<string>(activePreset);
 
   const page = design.pages[activePage];
@@ -114,7 +117,7 @@ function ExportModalInner({
 
   const handlePngPageVariants = () => {
     if (!page) return;
-    const cols = Object.keys(page.variants);
+    const cols = presetIdsInOrder(Object.keys(page.variants));
     if (cols.length === 0) return;
     exportPngGrid({
       sections: [cols.map((id) => sectionFor(activePage, id))],

@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HARDWARE_PRESETS } from "@/lib/hardware-presets";
 import type { Design } from "@/lib/pixel-designer/types";
 import { fits } from "@/lib/pixel-designer/variants";
 import { ModalShell } from "./modal-shell";
 
-export type AddVariantInit = "scale" | "center";
+export type AddVariantInit = "scale" | "center" | "blank";
 
 export interface AddVariantResult {
   created: number;
@@ -94,13 +94,23 @@ function AddVariantModalInner({
   const sourceLabel = sourceHw
     ? `${sourceHw.width}×${sourceHw.height}`
     : sourcePreset;
-  const refusalReason =
+  const shrinkNote =
     sourceHw && target && !sourceFits
-      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Shrinking variants isn't supported — pick a target at least as big as the source, or design the smaller variant from scratch later.`
+      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Scale/Center aren't available — Start blank is the only option for this target.`
       : null;
 
+  // When the source doesn't fit, scale/center can't carry the source pixels
+  // across. We don't refuse outright any more — "blank" stays available and
+  // we auto-select it so the user can just click Add.
+  useEffect(() => {
+    if (!sourceFits && init !== "blank") {
+      setInit("blank");
+    }
+  }, [sourceFits, init]);
+
   const handleAdd = () => {
-    if (!target || !sourceFits) return;
+    if (!target) return;
+    if (init !== "blank" && !sourceFits) return;
     onAdd(target.id, init, applyToAll);
   };
 
@@ -162,44 +172,32 @@ function AddVariantModalInner({
             </select>
           </Section>
 
-          <Section title="Initialise from source">
-            <label className="flex items-start gap-2 cursor-pointer py-1">
-              <input
-                type="radio"
-                name="init"
-                checked={init === "scale"}
-                onChange={() => setInit("scale")}
-                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
-              />
-              <span className="text-xs leading-[1.4]">
-                <span className="text-foreground">Scale to size</span>
-                <span className="block text-[10.5px] text-[#777]">
-                  Nearest-neighbour integer upscale of the source, centred on
-                  the new canvas. Empty cells stay empty.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer py-1">
-              <input
-                type="radio"
-                name="init"
-                checked={init === "center"}
-                onChange={() => setInit("center")}
-                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
-              />
-              <span className="text-xs leading-[1.4]">
-                <span className="text-foreground">Center unscaled</span>
-                <span className="block text-[10.5px] text-[#777]">
-                  Paste the source pixels 1:1 in the centre of the new canvas;
-                  the surround starts blank.
-                </span>
-              </span>
-            </label>
+          <Section title="Initialise">
+            <InitOption
+              checked={init === "scale"}
+              disabled={!sourceFits}
+              onChange={() => setInit("scale")}
+              title="Scale to size"
+              hint="Nearest-neighbour integer upscale of the source, centred on the new canvas. Empty cells stay empty."
+            />
+            <InitOption
+              checked={init === "center"}
+              disabled={!sourceFits}
+              onChange={() => setInit("center")}
+              title="Center unscaled"
+              hint="Paste the source pixels 1:1 in the centre of the new canvas; the surround starts blank."
+            />
+            <InitOption
+              checked={init === "blank"}
+              onChange={() => setInit("blank")}
+              title="Start blank"
+              hint="Create the variant as an empty canvas — ignore the source. Useful when scaling down or when you want to redesign for the new size from scratch."
+            />
           </Section>
 
-          {refusalReason && (
-            <div className="mb-3 text-[11px] text-[#ff8888] bg-[#3a1818] border border-[#5a2a2a] rounded p-2 leading-[1.4]">
-              {refusalReason}
+          {shrinkNote && (
+            <div className="mb-3 text-[11px] text-[#d8a000] bg-[#2a2010] border border-[#3a3020] rounded p-2 leading-[1.4]">
+              {shrinkNote}
             </div>
           )}
 
@@ -236,9 +234,7 @@ function AddVariantModalInner({
             <button
               type="button"
               onClick={handleAdd}
-              disabled={!sourceFits}
-              title={refusalReason ?? undefined}
-              className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#4a90e2]"
+              className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
             >
               Add variant
             </button>
@@ -246,6 +242,39 @@ function AddVariantModalInner({
         </>
       )}
     </ModalShell>
+  );
+}
+
+function InitOption({
+  checked,
+  disabled,
+  onChange,
+  title,
+  hint,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-2 py-1 ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+    >
+      <input
+        type="radio"
+        name="init"
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className={`mt-0.5 accent-[#4a90e2] ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+      />
+      <span className="text-xs leading-[1.4]">
+        <span className="text-foreground">{title}</span>
+        <span className="block text-[10.5px] text-[#777]">{hint}</span>
+      </span>
+    </label>
   );
 }
 
