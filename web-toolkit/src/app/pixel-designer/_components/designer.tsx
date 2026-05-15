@@ -32,6 +32,7 @@ import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
   Config,
   Design,
+  DesignPage,
   FontKey,
   Hardware,
   Mode,
@@ -543,6 +544,31 @@ export function Designer() {
       return next;
     });
   }, []);
+
+  /** Patch a page's auto-play metadata. `undefined` clears the field. */
+  const setPageMeta = useCallback(
+    (
+      idx: number,
+      patch: { duration?: number | undefined; fadeInTime?: number | undefined },
+    ) => {
+      setDesign((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p, i) =>
+          i === idx
+            ? {
+                ...p,
+                ...("duration" in patch ? { duration: patch.duration } : {}),
+                ...("fadeInTime" in patch
+                  ? { fadeInTime: patch.fadeInTime }
+                  : {}),
+              }
+            : p,
+        ),
+      }));
+      queueMicrotask(() => pushHistory());
+    },
+    [setDesign, pushHistory],
+  );
 
   // ============ pointer handling ============
 
@@ -1281,6 +1307,10 @@ export function Designer() {
                       ✕
                     </button>
                   </div>
+                  <PageMetaRow
+                    page={design.pages[pi]}
+                    onChange={(patch) => setPageMeta(pi, patch)}
+                  />
                   <VariantsStrip
                     design={design}
                     pageIdx={pi}
@@ -1428,6 +1458,64 @@ export function Designer() {
 
 function pointInSel(p: Point, sel: Selection): boolean {
   return p.x >= sel.x && p.x < sel.x + sel.w && p.y >= sel.y && p.y < sel.y + sel.h;
+}
+
+/** Per-page auto-play metadata row. Empty input ↔ field unset (no value in
+ *  exported JSON). Page is undefined briefly during hydration. */
+function PageMetaRow({
+  page,
+  onChange,
+}: {
+  page: DesignPage | undefined;
+  onChange: (patch: {
+    duration?: number | undefined;
+    fadeInTime?: number | undefined;
+  }) => void;
+}) {
+  if (!page) return null;
+  const fmt = (n: number | undefined) =>
+    n === undefined ? "" : String(n);
+  const parse = (v: string): number | undefined => {
+    const trimmed = v.trim();
+    if (trimmed === "") return undefined;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0) return undefined;
+    return Math.round(n);
+  };
+  return (
+    <div className="flex items-center gap-2 px-1.5">
+      <span className="text-[9px] text-[#555] uppercase tracking-wider font-semibold">
+        Auto-play
+      </span>
+      <label className="flex items-center gap-1 text-[10px] text-[#777]">
+        <span>Duration</span>
+        <input
+          type="number"
+          min={0}
+          step={100}
+          value={fmt(page.duration)}
+          placeholder="—"
+          onChange={(e) => onChange({ duration: parse(e.target.value) })}
+          className="w-16 bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10.5px] outline-none focus:border-[#4a90e2] text-right"
+        />
+        <span>ms</span>
+      </label>
+      <span className="text-[#3a3a42]">·</span>
+      <label className="flex items-center gap-1 text-[10px] text-[#777]">
+        <span>Fade in</span>
+        <input
+          type="number"
+          min={0}
+          step={50}
+          value={fmt(page.fadeInTime)}
+          placeholder="—"
+          onChange={(e) => onChange({ fadeInTime: parse(e.target.value) })}
+          className="w-16 bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10.5px] outline-none focus:border-[#4a90e2] text-right"
+        />
+        <span>ms</span>
+      </label>
+    </div>
+  );
 }
 
 function HeaderBtn({

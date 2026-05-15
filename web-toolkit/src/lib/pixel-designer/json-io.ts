@@ -104,7 +104,8 @@ export function buildExportInstructions(design: Design) {
     schema:
       "Top level: { version, colorMode, hardware, pages, instructions }. " +
       "hardware: map of presetId → { presetId, width, height, origin, axis, serpentine, letterMask }. " +
-      "pages: ordered array of { label, variants }. " +
+      "pages: ordered array of { label, variants, duration?, fadeInTime? }. " +
+      "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing the design; omit when not auto-playing. " +
       "variants: map of presetId → array of { index, x, y, color } — only LIT cells are listed; absent cells are OFF (#000000). " +
       "Per-variant LED-chain wiring is described under instructions.variant_indexing[presetId].",
     pages_meaning:
@@ -179,7 +180,14 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
           }
         }
       }
-      return { label: page.label, pixels: lit };
+      return {
+        label: page.label,
+        ...(page.duration !== undefined ? { duration: page.duration } : {}),
+        ...(page.fadeInTime !== undefined
+          ? { fadeInTime: page.fadeInTime }
+          : {}),
+        pixels: lit,
+      };
     });
   return {
     version: 4,
@@ -203,7 +211,8 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
       schema:
         "Top level: { version, kind: 'preset-extract', preset, config, pages, instructions }. " +
         "config: { width, height, colorMode, origin, axis, serpentine, letterMask }. " +
-        "pages: ordered array of { label, pixels }. " +
+        "pages: ordered array of { label, pixels, duration?, fadeInTime? }. " +
+        "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing. " +
         "pixels: array of { index, x, y, color } — only LIT cells are listed.",
       pages_meaning:
         "Each page is one frame. Render sequentially in array order with a delay; single-page = static image.",
@@ -222,6 +231,18 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
   };
 }
 
+/** Spread-in fragment with optional page metadata (duration/fadeInTime in ms).
+ *  Skipping unset fields keeps the wire format clean — pages with no auto-
+ *  play hints emit `{ label, variants }` exactly as before. */
+function pageMetaFragment(page: { duration?: number; fadeInTime?: number }) {
+  return {
+    ...(page.duration !== undefined ? { duration: page.duration } : {}),
+    ...(page.fadeInTime !== undefined
+      ? { fadeInTime: page.fadeInTime }
+      : {}),
+  };
+}
+
 export function buildExportJSON(design: Design) {
   return {
     version: 4,
@@ -231,6 +252,7 @@ export function buildExportJSON(design: Design) {
     ),
     pages: design.pages.map((page) => ({
       label: page.label,
+      ...pageMetaFragment(page),
       variants: Object.fromEntries(
         Object.entries(page.variants).map(([presetId, v]) => {
           const hw = design.hardware[presetId];
@@ -362,7 +384,12 @@ export function parseImport(raw: string, current: Design): ParseResult {
 
   const pagesIn: unknown[] = Array.isArray(data.pages) ? data.pages : [];
   const pages = pagesIn.map((rawPage, i) => {
-    const p = rawPage as { label?: string; variants?: Record<string, unknown> };
+    const p = rawPage as {
+      label?: string;
+      duration?: unknown;
+      fadeInTime?: unknown;
+      variants?: Record<string, unknown>;
+    };
     const variants: Record<string, { pixels: (string | null)[] }> = {};
     for (const [presetId, rawList] of Object.entries(p.variants ?? {})) {
       const hw = hardware[presetId];
@@ -377,7 +404,20 @@ export function parseImport(raw: string, current: Design): ParseResult {
       }
       variants[presetId] = { pixels };
     }
-    return { label: p.label || `Page ${i + 1}`, variants };
+    const duration =
+      typeof p.duration === "number" && p.duration >= 0
+        ? p.duration
+        : undefined;
+    const fadeInTime =
+      typeof p.fadeInTime === "number" && p.fadeInTime >= 0
+        ? p.fadeInTime
+        : undefined;
+    return {
+      label: p.label || `Page ${i + 1}`,
+      ...(duration !== undefined ? { duration } : {}),
+      ...(fadeInTime !== undefined ? { fadeInTime } : {}),
+      variants,
+    };
   });
 
   if (pages.length === 0) {

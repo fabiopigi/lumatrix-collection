@@ -53,10 +53,16 @@ export interface Variant {
   pixels: (string | null)[];
 }
 
-/** A page in storage: a label plus a map of variants keyed by presetId. */
+/** A page in storage: a label plus a map of variants keyed by presetId.
+ *  Optional `duration` and `fadeInTime` are auto-play hints (both in ms);
+ *  consumers that don't auto-play designs can ignore them. */
 export interface DesignPage {
   label: string;
   variants: Record<string, Variant>;
+  /** How long this page is shown when auto-playing, in milliseconds. */
+  duration?: number;
+  /** How long to fade this page in when auto-playing, in milliseconds. */
+  fadeInTime?: number;
 }
 
 /** Whole-design source of truth. Persisted; what undo/redo snapshots. */
