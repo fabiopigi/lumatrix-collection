@@ -104,7 +104,8 @@ export function buildExportInstructions(design: Design) {
     schema:
       "Top level: { version, colorMode, hardware, pages, instructions }. " +
       "hardware: map of presetId → { presetId, width, height, origin, axis, serpentine, letterMask }. " +
-      "pages: ordered array of { label, variants, duration?, fadeInTime? }. " +
+      "pages: ordered array of { label, variants, title?, description?, duration?, fadeInTime? }. " +
+      "Optional `title` is a display string for the page; `description` is free-form notes. " +
       "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing the design; omit when not auto-playing. " +
       "variants: map of presetId → array of { index, x, y, color } — only LIT cells are listed; absent cells are OFF (#000000). " +
       "Per-variant LED-chain wiring is described under instructions.variant_indexing[presetId].",
@@ -182,10 +183,7 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
       }
       return {
         label: page.label,
-        ...(page.duration !== undefined ? { duration: page.duration } : {}),
-        ...(page.fadeInTime !== undefined
-          ? { fadeInTime: page.fadeInTime }
-          : {}),
+        ...pageMetaFragment(page),
         pixels: lit,
       };
     });
@@ -211,7 +209,8 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
       schema:
         "Top level: { version, kind: 'preset-extract', preset, config, pages, instructions }. " +
         "config: { width, height, colorMode, origin, axis, serpentine, letterMask }. " +
-        "pages: ordered array of { label, pixels, duration?, fadeInTime? }. " +
+        "pages: ordered array of { label, pixels, title?, description?, duration?, fadeInTime? }. " +
+        "Optional `title` is a display string; `description` is free-form notes. " +
         "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing. " +
         "pixels: array of { index, x, y, color } — only LIT cells are listed.",
       pages_meaning:
@@ -231,11 +230,18 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
   };
 }
 
-/** Spread-in fragment with optional page metadata (duration/fadeInTime in ms).
- *  Skipping unset fields keeps the wire format clean — pages with no auto-
- *  play hints emit `{ label, variants }` exactly as before. */
-function pageMetaFragment(page: { duration?: number; fadeInTime?: number }) {
+/** Spread-in fragment with optional page metadata. Skipping unset fields
+ *  keeps the wire format clean — pages with no metadata emit just
+ *  `{ label, variants }` (or `{ label, pixels }` in the preset-extract). */
+function pageMetaFragment(page: {
+  title?: string;
+  description?: string;
+  duration?: number;
+  fadeInTime?: number;
+}) {
   return {
+    ...(page.title ? { title: page.title } : {}),
+    ...(page.description ? { description: page.description } : {}),
     ...(page.duration !== undefined ? { duration: page.duration } : {}),
     ...(page.fadeInTime !== undefined
       ? { fadeInTime: page.fadeInTime }
@@ -386,6 +392,8 @@ export function parseImport(raw: string, current: Design): ParseResult {
   const pages = pagesIn.map((rawPage, i) => {
     const p = rawPage as {
       label?: string;
+      title?: unknown;
+      description?: unknown;
       duration?: unknown;
       fadeInTime?: unknown;
       variants?: Record<string, unknown>;
@@ -404,6 +412,14 @@ export function parseImport(raw: string, current: Design): ParseResult {
       }
       variants[presetId] = { pixels };
     }
+    const title =
+      typeof p.title === "string" && p.title.trim() !== ""
+        ? p.title
+        : undefined;
+    const description =
+      typeof p.description === "string" && p.description.trim() !== ""
+        ? p.description
+        : undefined;
     const duration =
       typeof p.duration === "number" && p.duration >= 0
         ? p.duration
@@ -414,6 +430,8 @@ export function parseImport(raw: string, current: Design): ParseResult {
         : undefined;
     return {
       label: p.label || `Page ${i + 1}`,
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
       ...(duration !== undefined ? { duration } : {}),
       ...(fadeInTime !== undefined ? { fadeInTime } : {}),
       variants,

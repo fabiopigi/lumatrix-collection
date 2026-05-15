@@ -54,11 +54,17 @@ export interface Variant {
 }
 
 /** A page in storage: a label plus a map of variants keyed by presetId.
- *  Optional `duration` and `fadeInTime` are auto-play hints (both in ms);
- *  consumers that don't auto-play designs can ignore them. */
+ *  Optional `title`/`description`/`duration`/`fadeInTime` are extra metadata
+ *  surfaced in the JSON export; consumers that don't care can ignore them. */
 export interface DesignPage {
   label: string;
   variants: Record<string, Variant>;
+  /** Display title shown on the page in the editor (and exposed in JSON for
+   *  downstream renderers that want it). Optional. */
+  title?: string;
+  /** Free-form description, JSON-only — never surfaced in the editor UI
+   *  outside the page-metadata modal. */
+  description?: string;
   /** How long this page is shown when auto-playing, in milliseconds. */
   duration?: number;
   /** How long to fade this page in when auto-playing, in milliseconds. */

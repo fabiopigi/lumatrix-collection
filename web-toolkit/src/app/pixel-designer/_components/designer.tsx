@@ -32,7 +32,6 @@ import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
   Config,
   Design,
-  DesignPage,
   FontKey,
   Hardware,
   Mode,
@@ -58,6 +57,10 @@ import {
 import { ConfigModal } from "./config-modal";
 import { DeletePageModal } from "./delete-page-modal";
 import { ExportModal } from "./export-modal";
+import {
+  PageMetaModal,
+  type PageMetaPatch,
+} from "./page-meta-modal";
 import { PixelGrid } from "./pixel-grid";
 import { SidePanel } from "./side-panel";
 import { Toolbar } from "./toolbar";
@@ -281,6 +284,7 @@ export function Designer() {
     useState<AddVariantResult | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
+  const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -562,18 +566,21 @@ export function Designer() {
     });
   }, []);
 
-  /** Patch a page's auto-play metadata. `undefined` clears the field. */
+  /** Patch a page's metadata (title/description/duration/fadeInTime).
+   *  `undefined` clears the field. Only keys present in the patch object
+   *  are touched — pass `{ duration: 3000 }` to set just that one. */
   const setPageMeta = useCallback(
-    (
-      idx: number,
-      patch: { duration?: number | undefined; fadeInTime?: number | undefined },
-    ) => {
+    (idx: number, patch: PageMetaPatch) => {
       setDesign((prev) => ({
         ...prev,
         pages: prev.pages.map((p, i) =>
           i === idx
             ? {
                 ...p,
+                ...("title" in patch ? { title: patch.title } : {}),
+                ...("description" in patch
+                  ? { description: patch.description }
+                  : {}),
                 ...("duration" in patch ? { duration: patch.duration } : {}),
                 ...("fadeInTime" in patch
                   ? { fadeInTime: patch.fadeInTime }
@@ -1316,6 +1323,14 @@ export function Designer() {
                     />
                     <button
                       type="button"
+                      onClick={() => setMetaModalFor(pi)}
+                      title="Page metadata"
+                      className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42]"
+                    >
+                      ⓘ
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setDeletePromptFor(pi)}
                       disabled={
                         pages.length <= 1 &&
@@ -1327,19 +1342,18 @@ export function Designer() {
                       ✕
                     </button>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <VariantsStrip
-                      design={design}
-                      pageIdx={pi}
-                      activePreset={activePreset}
-                      onSelectVariant={setActivePreset}
-                      onAddClicked={() => setAddVariantFor(pi)}
-                    />
-                    <PageMetaRow
-                      page={design.pages[pi]}
-                      onChange={(patch) => setPageMeta(pi, patch)}
-                    />
-                  </div>
+                  {design.pages[pi]?.title && (
+                    <div className="px-2 -mt-1 text-[11px] text-[#aaa] italic">
+                      {design.pages[pi].title}
+                    </div>
+                  )}
+                  <VariantsStrip
+                    design={design}
+                    pageIdx={pi}
+                    activePreset={activePreset}
+                    onSelectVariant={setActivePreset}
+                    onAddClicked={() => setAddVariantFor(pi)}
+                  />
                   {design.pages[pi]?.variants[activePreset] ? (
                     <div
                       onMouseDown={(e) => onMouseDown(e, pi)}
@@ -1474,6 +1488,15 @@ export function Designer() {
         mode={mode}
         onClose={() => setExportOpen(false)}
       />
+      <PageMetaModal
+        open={metaModalFor !== null}
+        pageIndex={metaModalFor ?? 0}
+        page={metaModalFor !== null ? design.pages[metaModalFor] : undefined}
+        onClose={() => setMetaModalFor(null)}
+        onSave={(patch) => {
+          if (metaModalFor !== null) setPageMeta(metaModalFor, patch);
+        }}
+      />
       <DeletePageModal
         open={deletePromptFor !== null}
         pageLabel={
@@ -1512,57 +1535,6 @@ export function Designer() {
 
 function pointInSel(p: Point, sel: Selection): boolean {
   return p.x >= sel.x && p.x < sel.x + sel.w && p.y >= sel.y && p.y < sel.y + sel.h;
-}
-
-/** Per-page auto-play metadata row. Empty input ↔ field unset (no value in
- *  exported JSON). Page is undefined briefly during hydration. */
-function PageMetaRow({
-  page,
-  onChange,
-}: {
-  page: DesignPage | undefined;
-  onChange: (patch: {
-    duration?: number | undefined;
-    fadeInTime?: number | undefined;
-  }) => void;
-}) {
-  if (!page) return null;
-  const fmt = (n: number | undefined) =>
-    n === undefined ? "" : String(n);
-  const parse = (v: string): number | undefined => {
-    const trimmed = v.trim();
-    if (trimmed === "") return undefined;
-    const n = Number(trimmed);
-    if (!Number.isFinite(n) || n < 0) return undefined;
-    return Math.round(n);
-  };
-  return (
-    <div className="flex items-center gap-1 px-1.5 shrink-0">
-      <input
-        type="number"
-        min={0}
-        step={100}
-        value={fmt(page.duration)}
-        placeholder="Duration"
-        title="Page duration when auto-playing (ms)"
-        onChange={(e) => onChange({ duration: parse(e.target.value) })}
-        className="w-[68px] bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10px] outline-none focus:border-[#4a90e2] text-right placeholder:text-[#555]"
-      />
-      <span className="text-[9.5px] text-[#666]">ms</span>
-      <span className="text-[#3a3a42] mx-1">·</span>
-      <input
-        type="number"
-        min={0}
-        step={50}
-        value={fmt(page.fadeInTime)}
-        placeholder="Fade in"
-        title="Fade-in time when auto-playing (ms)"
-        onChange={(e) => onChange({ fadeInTime: parse(e.target.value) })}
-        className="w-[68px] bg-[#0a0a0c] border border-[#2a2a30] text-foreground px-1.5 py-0.5 rounded text-[10px] outline-none focus:border-[#4a90e2] text-right placeholder:text-[#555]"
-      />
-      <span className="text-[9.5px] text-[#666]">ms</span>
-    </div>
-  );
 }
 
 function HeaderBtn({
