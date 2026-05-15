@@ -190,7 +190,7 @@ export async function run(
   PADDLE_LEN = Math.max(2, Math.floor(H / 4));
   PLAYER_COL = 0;
   CPU_COL = W - 1;
-  screens.init(screensNp ?? neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();

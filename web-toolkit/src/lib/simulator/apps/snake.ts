@@ -195,11 +195,10 @@ export async function run(
   JOY_RIGHT = joystick.right;
   W = display?.width ?? 8;
   H = display?.height ?? 8;
-  // screens.init keeps screens bound to the LUMATRIX 8×8 source buffer (the
-  // launcher's marquee NP); the simulator scales loading/game-over up to fit
-  // the actual display. screensNp falls back to `neopixel` only if the host
-  // didn't supply one (e.g., the app runs at 8×8 anyway).
-  screens.init(screensNp ?? neopixel, joystick);
+  // The launcher passes a W×H displayNp as screensNp so loading/game-over
+  // fills the whole display natively. screensNp falls back to `neopixel`
+  // only if the host didn't supply one.
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();

@@ -1,4 +1,4 @@
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { FONT_3X5, glyph } from "../fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
@@ -163,14 +163,19 @@ async function showWatch(): Promise<"exit" | "idle"> {
   }
 }
 
-export async function run(neopixel: NeoPixel, joystick: Joystick): Promise<void> {
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
   np = neopixel;
   JOY_UP = joystick.up;
   JOY_DOWN = joystick.down;
   JOY_LEFT = joystick.left;
   JOY_RIGHT = joystick.right;
   JOY_SLIDE = joystick.slide;
-  screens.init(neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const outcome = await showWatch();

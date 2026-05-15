@@ -688,7 +688,7 @@ export async function run(
   N = W * H;
   zBuffer = new Array(W).fill(MAX_DIST);
   frameBuffer = Array.from({ length: N }, () => [0, 0, 0]);
-  screens.init(screensNp ?? neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const finalScore = await playGame();

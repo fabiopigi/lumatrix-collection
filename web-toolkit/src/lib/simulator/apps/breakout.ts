@@ -1,4 +1,4 @@
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 
@@ -256,11 +256,16 @@ async function playOneGame(): Promise<number | null> {
   }
 }
 
-export async function run(neopixel: NeoPixel, joystick: Joystick): Promise<void> {
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
   np = neopixel;
   JOY_LEFT = joystick.left;
   JOY_RIGHT = joystick.right;
-  screens.init(neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();

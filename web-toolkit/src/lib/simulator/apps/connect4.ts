@@ -1,6 +1,6 @@
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 import * as screens from "../screens";
-import type { Joystick, NeoPixel, Pin, RGB } from "../types";
+import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 
 export const NAME = "Connect4";
 
@@ -247,12 +247,14 @@ async function playOneRound(): Promise<Player | 0 | null> {
 export async function run(
   neopixel: NeoPixel,
   joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
 ): Promise<void> {
   np = neopixel;
   JOY_LEFT = joystick.left;
   JOY_RIGHT = joystick.right;
   JOY_CENTER = joystick.center;
-  screens.init(neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const outcome = await playOneRound();

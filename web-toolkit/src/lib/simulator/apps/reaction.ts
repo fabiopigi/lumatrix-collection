@@ -316,7 +316,7 @@ export async function run(
     ARROW_OY = 0;
   }
 
-  screens.init(screensNp ?? neopixel, joystick);
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
     const score = await playOneGame();
