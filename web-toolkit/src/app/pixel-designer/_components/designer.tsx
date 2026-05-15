@@ -50,7 +50,11 @@ import {
   type VariantSource,
 } from "@/lib/pixel-designer/variants";
 import { AddPageModal } from "./add-page-modal";
-import { AddVariantModal, type AddVariantInit } from "./add-variant-modal";
+import {
+  AddVariantModal,
+  type AddVariantInit,
+  type AddVariantResult,
+} from "./add-variant-modal";
 import { ConfigModal } from "./config-modal";
 import { PixelGrid } from "./pixel-grid";
 import { SidePanel } from "./side-panel";
@@ -272,6 +276,8 @@ export function Designer() {
   const [addPageOpen, setAddPageOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [addVariantFor, setAddVariantFor] = useState<number | null>(null);
+  const [addVariantResult, setAddVariantResult] =
+    useState<AddVariantResult | null>(null);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -995,35 +1001,68 @@ export function Designer() {
   // ============ variants ============
 
   const handleAddVariant = useCallback(
-    (pageIdx: number, targetPresetId: string, init: AddVariantInit) => {
+    (
+      pageIdx: number,
+      targetPresetId: string,
+      init: AddVariantInit,
+      applyToAll: boolean,
+    ) => {
       const sourcePresetId = activePresetRef.current;
-      setDesign((prev) => {
-        const page = prev.pages[pageIdx];
-        const sourceHw = prev.hardware[sourcePresetId];
-        const sourceVariant = page?.variants[sourcePresetId];
-        if (!page || !sourceHw || !sourceVariant) return prev;
+      const baseDesign = designRef.current;
+      const sourceHw = baseDesign.hardware[sourcePresetId];
 
-        // Resolve target hardware. If the design already has this preset id
-        // wired up elsewhere (e.g. another page already added it), reuse that.
-        // Otherwise look up the canonical preset and seed wiring from the
-        // source so the user has sensible defaults to tweak.
-        const existingTargetHw = prev.hardware[targetPresetId];
-        const preset = HARDWARE_PRESETS.find((p) => p.id === targetPresetId);
-        const targetHw: Hardware | null =
-          existingTargetHw ??
-          (preset
-            ? {
-                presetId: preset.id,
-                width: preset.width,
-                height: preset.height,
-                origin: sourceHw.origin,
-                axis: sourceHw.axis,
-                serpentine: sourceHw.serpentine,
-                letterMask: "",
-              }
-            : null);
-        if (!targetHw) return prev;
+      // Resolve target hardware up-front (same logic for single-page and bulk).
+      const existingTargetHw = baseDesign.hardware[targetPresetId];
+      const preset = HARDWARE_PRESETS.find((p) => p.id === targetPresetId);
+      const targetHw: Hardware | null =
+        existingTargetHw ??
+        (preset && sourceHw
+          ? {
+              presetId: preset.id,
+              width: preset.width,
+              height: preset.height,
+              origin: sourceHw.origin,
+              axis: sourceHw.axis,
+              serpentine: sourceHw.serpentine,
+              letterMask: "",
+            }
+          : null);
+      if (!targetHw || !sourceHw) return;
 
+      // Pure pre-computation: figure out which pages succeed and which skip.
+      // Doing this outside setDesign keeps the updater free of side-effects
+      // (important for React strict-mode double-invocation).
+      const targetIndices = applyToAll
+        ? baseDesign.pages.map((_, i) => i)
+        : [pageIdx];
+      const newPixelsByPage = new Map<number, (string | null)[]>();
+      const skippedDetails: AddVariantResult["skippedDetails"] = [];
+      let skippedAlreadyHad = 0;
+      let skippedNoSource = 0;
+      let skippedTooBig = 0;
+
+      for (const i of targetIndices) {
+        const p = baseDesign.pages[i];
+        if (!p) continue;
+        if (p.variants[targetPresetId]) {
+          skippedAlreadyHad++;
+          skippedDetails.push({
+            pageIdx: i,
+            pageLabel: p.label,
+            reason: `already had ${targetHw.width}×${targetHw.height} variant`,
+          });
+          continue;
+        }
+        const sourceVariant = p.variants[sourcePresetId];
+        if (!sourceVariant) {
+          skippedNoSource++;
+          skippedDetails.push({
+            pageIdx: i,
+            pageLabel: p.label,
+            reason: `no ${sourceHw.width}×${sourceHw.height} source variant`,
+          });
+          continue;
+        }
         const src: VariantSource = {
           width: sourceHw.width,
           height: sourceHw.height,
@@ -1034,27 +1073,56 @@ export function Designer() {
           width: targetHw.width,
           height: targetHw.height,
         });
-        if (!newPixels) return prev;
+        if (!newPixels) {
+          skippedTooBig++;
+          skippedDetails.push({
+            pageIdx: i,
+            pageLabel: p.label,
+            reason: `source ${sourceHw.width}×${sourceHw.height} doesn't fit in ${targetHw.width}×${targetHw.height}`,
+          });
+          continue;
+        }
+        newPixelsByPage.set(i, newPixels);
+      }
 
-        return {
+      const created = newPixelsByPage.size;
+      if (created > 0) {
+        setDesign((prev) => ({
           ...prev,
           hardware: { ...prev.hardware, [targetPresetId]: targetHw },
           pages: prev.pages.map((p, i) =>
-            i === pageIdx
+            newPixelsByPage.has(i)
               ? {
                   ...p,
                   variants: {
                     ...p.variants,
-                    [targetPresetId]: { pixels: newPixels },
+                    [targetPresetId]: {
+                      pixels: newPixelsByPage.get(i)!,
+                    },
                   },
                 }
               : p,
           ),
-        };
-      });
-      setActivePreset(targetPresetId);
-      setAddVariantFor(null);
-      queueMicrotask(() => pushHistory());
+        }));
+        setActivePreset(targetPresetId);
+        queueMicrotask(() => pushHistory());
+      }
+
+      // Bulk apply always shows a summary so the user sees what happened.
+      // Single-page apply closes immediately if it worked, otherwise reports.
+      const anySkipped =
+        skippedAlreadyHad + skippedNoSource + skippedTooBig > 0;
+      if (applyToAll || (anySkipped && created === 0)) {
+        setAddVariantResult({
+          created,
+          skippedAlreadyHad,
+          skippedNoSource,
+          skippedTooBig,
+          skippedDetails,
+        });
+      } else {
+        setAddVariantFor(null);
+      }
     },
     [setDesign, setActivePreset, pushHistory],
   );
@@ -1360,10 +1428,14 @@ export function Designer() {
         design={design}
         pageIdx={addVariantFor ?? 0}
         sourcePreset={activePreset}
-        onClose={() => setAddVariantFor(null)}
-        onAdd={(targetId, init) => {
+        result={addVariantResult}
+        onClose={() => {
+          setAddVariantFor(null);
+          setAddVariantResult(null);
+        }}
+        onAdd={(targetId, init, applyToAll) => {
           if (addVariantFor !== null) {
-            handleAddVariant(addVariantFor, targetId, init);
+            handleAddVariant(addVariantFor, targetId, init, applyToAll);
           }
         }}
       />

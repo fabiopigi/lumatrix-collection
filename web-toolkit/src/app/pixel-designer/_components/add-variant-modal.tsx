@@ -8,13 +8,33 @@ import { ModalShell } from "./modal-shell";
 
 export type AddVariantInit = "scale" | "center";
 
+export interface AddVariantResult {
+  created: number;
+  skippedAlreadyHad: number;
+  skippedNoSource: number;
+  skippedTooBig: number;
+  skippedDetails: Array<{
+    pageIdx: number;
+    pageLabel: string;
+    reason: string;
+  }>;
+}
+
 interface AddVariantModalProps {
   open: boolean;
   design: Design;
   pageIdx: number;
   sourcePreset: string;
+  /** When set, the modal switches to a results view: the action just ran
+   *  with at least one page skipped, and we're showing the summary until
+   *  the user clicks Done. */
+  result: AddVariantResult | null;
   onClose: () => void;
-  onAdd: (targetPresetId: string, init: AddVariantInit) => void;
+  onAdd: (
+    targetPresetId: string,
+    init: AddVariantInit,
+    applyToAllPages: boolean,
+  ) => void;
 }
 
 export function AddVariantModal(props: AddVariantModalProps) {
@@ -26,6 +46,7 @@ function AddVariantModalInner({
   design,
   pageIdx,
   sourcePreset,
+  result,
   onClose,
   onAdd,
 }: Omit<AddVariantModalProps, "open">) {
@@ -59,6 +80,7 @@ function AddVariantModalInner({
 
   const [targetId, setTargetId] = useState<string>(eligible[0]?.id ?? "");
   const [init, setInit] = useState<AddVariantInit>("scale");
+  const [applyToAll, setApplyToAll] = useState(false);
 
   const target = eligible.find((p) => p.id === targetId);
   const sourceFits =
@@ -79,8 +101,19 @@ function AddVariantModalInner({
 
   const handleAdd = () => {
     if (!target || !sourceFits) return;
-    onAdd(target.id, init);
+    onAdd(target.id, init, applyToAll);
   };
+
+  // When the parent populated `result`, we've just finished a bulk apply with
+  // skipped pages. Show the summary instead of the form until the user
+  // dismisses it.
+  if (result) {
+    return (
+      <ModalShell onClose={onClose} className="w-[480px]">
+        <ResultView result={result} onDone={onClose} />
+      </ModalShell>
+    );
+  }
 
   return (
     <ModalShell onClose={onClose} className="w-[440px]">
@@ -170,6 +203,28 @@ function AddVariantModalInner({
             </div>
           )}
 
+          {design.pages.length > 1 && (
+            <label className="flex items-start gap-2 cursor-pointer py-1 mb-3">
+              <input
+                type="checkbox"
+                checked={applyToAll}
+                onChange={(e) => setApplyToAll(e.target.checked)}
+                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
+              />
+              <span className="text-xs leading-[1.4]">
+                <span className="text-foreground">
+                  Apply to all {design.pages.length} pages
+                </span>
+                <span className="block text-[10.5px] text-[#777]">
+                  Each page sources from its own{" "}
+                  <span className="font-mono">{sourceLabel}</span> variant.
+                  Pages without one — or whose source doesn&apos;t fit — are
+                  skipped and reported afterwards.
+                </span>
+              </span>
+            </label>
+          )}
+
           <div className="flex justify-end gap-1.5">
             <button
               type="button"
@@ -208,5 +263,59 @@ function Section({
       </div>
       {children}
     </div>
+  );
+}
+
+function ResultView({
+  result,
+  onDone,
+}: {
+  result: AddVariantResult;
+  onDone: () => void;
+}) {
+  const totalSkipped =
+    result.skippedAlreadyHad +
+    result.skippedNoSource +
+    result.skippedTooBig;
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="text-[15px] font-semibold text-foreground">
+            Bulk add complete
+          </div>
+          <div className="text-[11px] text-[#777] mt-0.5">
+            Created on {result.created} page
+            {result.created === 1 ? "" : "s"} · skipped {totalSkipped}
+          </div>
+        </div>
+      </div>
+
+      {result.skippedDetails.length > 0 && (
+        <div className="mb-3 bg-[#0a0a0c] border border-[#2a2a30] rounded max-h-[260px] overflow-y-auto">
+          {result.skippedDetails.map((d) => (
+            <div
+              key={d.pageIdx}
+              className="flex items-start gap-2 px-2.5 py-1.5 border-b border-[#1a1a1f] last:border-b-0 text-[11px]"
+            >
+              <span className="font-mono text-[#aaa] min-w-[90px]">
+                {d.pageLabel}
+              </span>
+              <span className="text-[#888] leading-[1.4]">{d.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onDone}
+          className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+        >
+          Done
+        </button>
+      </div>
+    </>
   );
 }
