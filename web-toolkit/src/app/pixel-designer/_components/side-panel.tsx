@@ -1,7 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { SYMBOLS } from "@/lib/pixel-designer/symbols";
 import type { FontKey, Mode } from "@/lib/pixel-designer/types";
+import { FontPreviewModal } from "./font-preview-modal";
+
+const FONT_OPTIONS: Array<{ value: FontKey; label: string }> = [
+  { value: "3x5", label: "3×5  ·  fixed-width" },
+  { value: "5x8", label: "5×8  ·  fixed-width" },
+  { value: "7x9", label: "7×9  ·  proportional (Jersey 10)" },
+];
 
 interface SidePanelProps {
   mode: Mode;
@@ -30,6 +38,8 @@ interface SidePanelProps {
 }
 
 export function SidePanel(props: SidePanelProps) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   const handleHexBlur = (v: string) => {
     let next = v.trim();
     if (!next.startsWith("#")) next = "#" + next;
@@ -118,27 +128,26 @@ export function SidePanel(props: SidePanelProps) {
       </Section>
 
       <Section title="Text" hint="type then click on grid">
-        <div className="flex items-center mb-1.5">
-          <div className="flex bg-[#0a0a0c] p-0.5 rounded-md border border-edge w-full">
-            <ToggleButton
-              on={props.font === "3x5"}
-              onClick={() => props.onFont("3x5")}
-            >
-              3×5
-            </ToggleButton>
-            <ToggleButton
-              on={props.font === "5x8"}
-              onClick={() => props.onFont("5x8")}
-            >
-              5×8
-            </ToggleButton>
-            <ToggleButton
-              on={props.font === "7x9"}
-              onClick={() => props.onFont("7x9")}
-            >
-              7×9
-            </ToggleButton>
-          </div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <select
+            value={props.font}
+            onChange={(e) => props.onFont(e.target.value as FontKey)}
+            className="flex-1 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] cursor-pointer"
+          >
+            {FONT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            title="Preview all glyphs"
+            className="px-2 py-1.5 rounded text-xs bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] cursor-pointer shrink-0"
+          >
+            Preview
+          </button>
         </div>
         <input
           type="text"
@@ -153,6 +162,14 @@ export function SidePanel(props: SidePanelProps) {
           stamp.
         </Tip>
       </Section>
+
+      {previewOpen && (
+        <FontPreviewModal
+          font={props.font}
+          color={props.color}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
 
       <Section title="Symbols" hint="click then click grid">
         <div className="flex flex-wrap gap-[5px]">
