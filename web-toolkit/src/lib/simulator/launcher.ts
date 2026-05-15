@@ -1,3 +1,18 @@
+/**
+ * Responsive launcher.
+ *
+ * Renders to a W×H buffer sized to the configured display, picking a font by
+ * height (3×5 / 5×8 / 7×9). The on-display launcher's marquee is the selected
+ * app's NAME in light blue, with a 1-px-per-app track along the bottom row(s).
+ * Layout follows shared/design/launcher-loading-gameover.json.
+ *
+ * Two NeoPixel buffers are owned here:
+ *  - displayNp (W×H): launcher's own rendering + screensNp for all apps.
+ *  - lumatrixNp (8×8 source): gameplay buffer for non-responsive apps. The
+ *    SimulatorGrid scales 64-LED buffers up, so legacy 8×8 apps still work.
+ * Responsive apps still get their own W×H gameplay buffer.
+ */
+
 import * as breakout from "./apps/breakout";
 import * as connect4 from "./apps/connect4";
 import * as dinojump from "./apps/dinojump";
@@ -9,14 +24,13 @@ import * as reaction from "./apps/reaction";
 import * as simonsays from "./apps/simonsays";
 import * as snake from "./apps/snake";
 import * as watch from "./apps/watch";
-import { FONT_3X5, glyph } from "./fonts";
+import { FONT_3X5, FONT_5X8, FONT_7X9 } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
 import * as screens from "./screens";
 import type { App, DisplayDims, Joystick, NeoPixel, RGB } from "./types";
 
-/** Factory the simulator host supplies — produces a NeoPixel of the given
- *  size with its flush callback already bound to the appropriate render path
- *  (scale-up for 64-LED LUMATRIX buffers, direct for full-display buffers). */
+type GlyphSet = Record<string, string[]>;
+
 export type NeoPixelFactory = (numLeds: number) => NeoPixel;
 
 export interface LauncherDeps {
@@ -25,8 +39,6 @@ export interface LauncherDeps {
   readonly createNeoPixel: NeoPixelFactory;
 }
 
-// Order matches python/main.py's APPS list so the on-display launcher's
-// bottom-track slot indices line up with the Pico build.
 const APPS: readonly App[] = [
   reaction,
   connect4,
@@ -41,15 +53,10 @@ const APPS: readonly App[] = [
   watch,
 ];
 
-/** Read-only view of the registered apps. The LumenSimulator's app launcher
- *  panel uses this to list every app on the left rail. */
 export function getApps(): readonly App[] {
   return APPS;
 }
 
-/** Set by the host UI (LumenSimulator app launcher) to make this launcher
- *  jump straight to a specific app on its next iteration. Combine with
- *  screens.forceExit() to interrupt whatever is currently running. */
 let _pendingAppIndex: number | null = null;
 
 export function setPendingApp(index: number | null): void {
@@ -62,8 +69,6 @@ function consumePending(): number | null {
   return i;
 }
 
-/** Listeners are notified whenever the launcher enters / leaves an app, so the
- *  host UI can sync its "active app" highlight with what's actually running. */
 type AppChangeListener = (idx: number | null) => void;
 const _appListeners = new Set<AppChangeListener>();
 
@@ -78,9 +83,15 @@ function notifyAppChange(idx: number | null): void {
   for (const l of _appListeners) l(idx);
 }
 
-const NUM_LEDS = 64;
 const BRIGHTNESS = 0.25;
-const MARQUEE_STEP_MS = 180;
+
+/** Marquee step time scales with display width — wider displays scroll faster
+ *  so the user doesn't wait too long for text to traverse. */
+function marqueeStepMs(): number {
+  if (_w <= 8) return 100;
+  if (_w <= 16) return 75;
+  return 50;
+}
 
 function hexDim(hex: string, scale = BRIGHTNESS): RGB {
   const h = hex.startsWith("#") ? hex.slice(1) : hex;
@@ -91,79 +102,141 @@ function hexDim(hex: string, scale = BRIGHTNESS): RGB {
   ];
 }
 
-const NAME_COLOR: RGB = hexDim("#008040");
-const TRACK_DIM: RGB = hexDim("#000080", 0.08);
+const NAME_COLOR: RGB = hexDim("#0080ff");
+const TRACK_DIM: RGB = hexDim("#000080");
 const TRACK_BRIGHT: RGB = hexDim("#0080ff");
 const LUMA_COLOR: RGB = [45, 45, 45];
 const TRIX_COLOR: RGB = hexDim("#0080ff");
 
 let np: NeoPixel;
 let joy: Joystick;
+let _w = 8;
+let _h = 8;
+
+function ledIndex(x: number, y: number): number {
+  return (_h - 1 - y) * _w + x;
+}
+
+function setPx(x: number, y: number, color: RGB): void {
+  if (x < 0 || x >= _w || y < 0 || y >= _h) return;
+  np[ledIndex(x, y)] = color;
+}
 
 function clear(): void {
-  for (let i = 0; i < NUM_LEDS; i++) np[i] = [0, 0, 0];
+  const total = _w * _h;
+  for (let i = 0; i < total; i++) np[i] = [0, 0, 0];
 }
 
-function pxVisual(x: number, y: number, color: RGB): void {
-  if (x >= 0 && x <= 7 && y >= 0 && y <= 7) {
-    const ledRow = 7 - y;
-    np[ledRow * 8 + x] = color;
+function glyphFor(font: GlyphSet, ch: string): string[] | undefined {
+  if (ch in font) return font[ch];
+  const u = ch.toUpperCase();
+  if (u in font) return font[u];
+  return font[" "];
+}
+
+function fontHeight(font: GlyphSet): number {
+  for (const ch of Object.keys(font)) {
+    const g = font[ch];
+    if (g && g.length) return g.length;
   }
+  return 0;
 }
 
-function textToBitmap(text: string, trailingGap = 8): string[] {
-  const rows: string[] = ["", "", "", "", ""];
+function chooseFont(): { font: GlyphSet; height: number } {
+  if (_h <= 8) return { font: FONT_3X5, height: fontHeight(FONT_3X5) };
+  if (_h <= 16) return { font: FONT_5X8, height: fontHeight(FONT_5X8) };
+  return { font: FONT_7X9, height: fontHeight(FONT_7X9) };
+}
+
+interface Bitmap {
+  rows: string[];
+  width: number;
+  height: number;
+}
+
+function textToBitmap(
+  text: string,
+  font: GlyphSet,
+  trailingGap: number,
+): Bitmap {
+  const fontH = fontHeight(font);
+  const rows: string[] = Array(fontH).fill("");
   for (const ch of text) {
-    const g = glyph(FONT_3X5, ch);
+    const g = glyphFor(font, ch);
     if (!g) continue;
-    for (let i = 0; i < 5; i++) rows[i] += g[i] + ".";
-  }
-  const pad = ".".repeat(trailingGap);
-  for (let i = 0; i < 5; i++) rows[i] += pad;
-  return rows;
-}
-
-function drawMarquee(
-  bitmap: string[],
-  offset: number,
-  color: RGB,
-  y0 = 0,
-): void {
-  const total = bitmap[0].length;
-  if (total <= 0) return;
-  for (let y = 0; y < 5; y++) {
-    const row = bitmap[y];
-    for (let x = 0; x < 8; x++) {
-      const src = (((offset + x) % total) + total) % total;
-      if (row[src] === "X") pxVisual(x, y0 + y, color);
+    const w = g[0]?.length ?? 0;
+    for (let i = 0; i < fontH; i++) {
+      const row = g[i] ?? ".".repeat(w);
+      rows[i] += row + ".";
     }
   }
+  const pad = ".".repeat(trailingGap);
+  for (let i = 0; i < fontH; i++) rows[i] += pad;
+  return { rows, width: rows[0]?.length ?? 0, height: fontH };
+}
+
+function drawBitmapWindow(
+  bitmap: Bitmap,
+  offset: number,
+  color: RGB,
+  x0: number,
+  y0: number,
+  windowW: number,
+  wrap: boolean,
+): void {
+  const total = bitmap.width;
+  if (total <= 0) return;
+  for (let y = 0; y < bitmap.height; y++) {
+    const row = bitmap.rows[y];
+    for (let x = 0; x < windowW; x++) {
+      let src: number;
+      if (wrap) {
+        src = (((offset + x) % total) + total) % total;
+      } else {
+        src = offset + x;
+        if (src < 0 || src >= total) continue;
+      }
+      if (row[src] === "X") setPx(x0 + x, y0 + y, color);
+    }
+  }
+}
+
+function trackTopY(totalApps: number): number {
+  const rows = Math.max(1, Math.ceil(totalApps / _w));
+  return _h - rows;
 }
 
 function drawTrack(currentIdx: number, totalApps: number): void {
+  const topY = trackTopY(totalApps);
   for (let i = 0; i < totalApps; i++) {
-    let x: number;
-    let y: number;
-    if (i < 8) {
-      x = i;
-      y = 6;
-    } else {
-      x = i - 8;
-      y = 7;
-    }
-    const color = i === currentIdx ? TRACK_BRIGHT : TRACK_DIM;
-    pxVisual(x, y, color);
+    const row = Math.floor(i / _w);
+    const col = i % _w;
+    setPx(col, topY + row, i === currentIdx ? TRACK_BRIGHT : TRACK_DIM);
   }
 }
 
+function marqueeY0(fontH: number, totalApps: number): number {
+  // Available rows above the track minus a 1-row visual gap.
+  const space = trackTopY(totalApps) - 1;
+  return Math.max(0, Math.floor((space - fontH) / 2));
+}
+
 function renderMenu(
-  bitmap: string[],
+  bitmap: Bitmap,
   offset: number,
   idx: number,
   total: number,
 ): void {
   clear();
-  drawMarquee(bitmap, offset, NAME_COLOR);
+  drawBitmapWindow(
+    bitmap,
+    offset,
+    NAME_COLOR,
+    0,
+    marqueeY0(bitmap.height, total),
+    _w,
+    true,
+  );
   drawTrack(idx, total);
   np.write();
 }
@@ -186,45 +259,57 @@ async function waitRelease(): Promise<void> {
 async function oneShotMarquee(
   text: string,
   color: RGB,
+  font: GlyphSet,
   stepMs = 55,
-  y0 = 1,
 ): Promise<void> {
-  const bitmap = textToBitmap(text, 0);
-  const width = bitmap[0].length;
-  for (let offset = -8; offset <= width; offset++) {
+  const bitmap = textToBitmap(text, font, 0);
+  const y0 = Math.max(0, Math.floor((_h - bitmap.height) / 2));
+  for (let offset = -_w; offset <= bitmap.width; offset++) {
     clear();
-    for (let y = 0; y < 5; y++) {
-      const row = bitmap[y];
-      for (let x = 0; x < 8; x++) {
-        const src = offset + x;
-        if (src >= 0 && src < width && row[src] === "X") {
-          pxVisual(x, y0 + y, color);
-        }
-      }
-    }
+    drawBitmapWindow(bitmap, offset, color, 0, y0, _w, false);
     np.write();
     await sleep_ms(stepMs);
   }
 }
 
 async function bootAnimation(): Promise<void> {
-  await oneShotMarquee("LUMA", LUMA_COLOR);
-  await oneShotMarquee("TRIX", TRIX_COLOR);
+  const { font } = chooseFont();
+  await oneShotMarquee("LUMA", LUMA_COLOR, font);
+  await oneShotMarquee("TRIX", TRIX_COLOR, font);
   clear();
   np.write();
   await sleep_ms(150);
 }
 
+/** Read-pause then ease-in: the marquee holds at offset 0 for 500 ms so the
+ *  name is readable, then linearly ramps speed from 0 to full over the next
+ *  500 ms, then continues at full marqueeStepMs() pace. */
+const MARQUEE_HOLD_MS = 500;
+const MARQUEE_ACCEL_MS = 500;
+
+/** Cumulative pixel offset at a given elapsed time (since the current name
+ *  was selected), given the display's full-speed step time. Integrating the
+ *  ramp speed v(t) = fullSpeed · t / ACCEL gives offset = t²/(2·ACCEL·step). */
+function marqueeOffsetAt(elapsedMs: number, stepMs: number): number {
+  if (elapsedMs < MARQUEE_HOLD_MS) return 0;
+  const tFromAccel = elapsedMs - MARQUEE_HOLD_MS;
+  const accelPx = MARQUEE_ACCEL_MS / (2 * stepMs);
+  if (tFromAccel < MARQUEE_ACCEL_MS) {
+    return Math.floor((tFromAccel * tFromAccel) / (2 * MARQUEE_ACCEL_MS * stepMs));
+  }
+  return Math.floor(accelPx) + Math.floor((tFromAccel - MARQUEE_ACCEL_MS) / stepMs);
+}
+
 async function menuSelect(): Promise<number> {
+  const { font } = chooseFont();
   let idx = 0;
-  let bitmap = textToBitmap(APPS[idx].NAME);
-  let total = bitmap[0].length;
-  let offset = Math.max(0, total - 8);
-  let lastStep = ticks_ms();
+  let bitmap = textToBitmap(APPS[idx].NAME, font, _w);
+  // Start at offset 0 so the first letter is at the left edge from frame one;
+  // scrolling then walks it leftward until the trailing gap wraps back around.
+  let offset = 0;
+  let nameStart = ticks_ms();
 
   while (true) {
-    // The host UI may have queued an app while we were idling here — bail so
-    // run() can pick it up via consumePending().
     if (_pendingAppIndex !== null) return idx;
 
     const press = readInput();
@@ -241,17 +326,13 @@ async function menuSelect(): Promise<number> {
       await waitRelease();
       const n = APPS.length;
       idx = (((idx + nav) % n) + n) % n;
-      bitmap = textToBitmap(APPS[idx].NAME);
-      total = bitmap[0].length;
-      offset = Math.max(0, total - 8);
-      lastStep = ticks_ms();
+      bitmap = textToBitmap(APPS[idx].NAME, font, _w);
+      offset = 0;
+      nameStart = ticks_ms();
     }
 
-    const now = ticks_ms();
-    if (ticks_diff(now, lastStep) >= MARQUEE_STEP_MS) {
-      offset = (offset + 1) % total;
-      lastStep = now;
-    }
+    const elapsed = ticks_diff(ticks_ms(), nameStart);
+    offset = marqueeOffsetAt(elapsed, marqueeStepMs()) % bitmap.width;
 
     renderMenu(bitmap, offset, idx, APPS.length);
     await sleep_ms(10);
@@ -261,9 +342,17 @@ async function menuSelect(): Promise<number> {
 export async function run(deps: LauncherDeps): Promise<void> {
   joy = deps.joy;
   const { display, createNeoPixel } = deps;
-  // The launcher's marquee + screens module are bound to the LUMATRIX 8×8
-  // source. Always use a 64-LED buffer for them.
-  np = createNeoPixel(NUM_LEDS);
+  _w = display.width;
+  _h = display.height;
+  // displayNp: launcher's W×H buffer, shared as screensNp with every app so
+  // loading / game-over fills the whole display at native resolution.
+  const displayNp = createNeoPixel(_w * _h);
+  np = displayNp;
+  // lumatrixNp: 8×8 source buffer for legacy non-responsive apps. The grid
+  // detects the 64-LED size and scales it up. Skipped when display is 8×8
+  // (we'd just allocate two equivalent buffers).
+  const lumatrixNp =
+    _w === 8 && _h === 8 ? displayNp : createNeoPixel(64);
 
   await bootAnimation();
   while (true) {
@@ -275,9 +364,8 @@ export async function run(deps: LauncherDeps): Promise<void> {
       i = pending;
       viaMenuUI = true;
     } else {
-      notifyAppChange(null); // entering on-display menu
+      notifyAppChange(null);
       const selected = await menuSelect();
-      // menuSelect may have been interrupted by setPendingApp — re-check.
       const pendingAfter = consumePending();
       if (pendingAfter !== null) {
         i = pendingAfter;
@@ -288,7 +376,6 @@ export async function run(deps: LauncherDeps): Promise<void> {
     }
 
     if (viaMenuUI) {
-      // User picked via the host menu — skip the on-display loading spinner.
       screens.skipNextLoading();
     }
 
@@ -296,26 +383,15 @@ export async function run(deps: LauncherDeps): Promise<void> {
     np.write();
     await sleep_ms(150);
 
-    // forceExit() was fired by the rail handler at the moment of the click.
-    // If an app was running, its check_exit() already consumed the flag.
-    // If nothing was running (user clicked the rail while on the menu), the
-    // flag is still set and would bite the brand-new app's first check_exit.
-    // Wipe it here, right before launching, so the new app starts clean.
     screens.clearExternalExit();
 
-    notifyAppChange(i); // entering app
+    notifyAppChange(i);
     const app = APPS[i];
-    // Responsive apps get a NeoPixel sized for the physical display and a
-    // copy of its dimensions. Non-responsive apps keep using the 8×8 source
-    // NeoPixel; the simulator scales their output up for the user.
-    // The launcher's own 64-LED NeoPixel doubles as the screensNp for every
-    // app — that way screens.init() always renders to the LUMATRIX 8×8
-    // source (and gets scaled up) instead of getting mis-indexed into a
-    // responsive app's W×H buffer.
-    const appNp = app.RESPONSIVE
-      ? createNeoPixel(display.width * display.height)
-      : np;
-    await app.run(appNp, joy, display, np);
+    const appNp = app.RESPONSIVE ? createNeoPixel(_w * _h) : lumatrixNp;
+    await app.run(appNp, joy, display, displayNp);
+    // After an app exits its gameplay buffer (8×8 or W×H) may still be on
+    // screen; the menu loop below clears + redraws to displayNp immediately.
+    np = displayNp;
     await waitRelease();
     await sleep_ms(200);
   }
