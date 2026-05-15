@@ -60,20 +60,20 @@ function DeletePageModalInner({
 
       <div className="flex flex-col gap-1.5 mb-3">
         <ActionRow
-          label={`Delete this variant (${activePresetLabel})`}
+          label={`Only this variant on this page (${activePresetLabel})`}
           hint={
             canDeleteVariant
-              ? "Keeps the page and its other variants. The active variant is removed for this page only."
-              : "This is the page's only variant — deleting it would leave the page unrenderable. Use “delete entire page” instead."
+              ? `Removes the ${activePresetLabel} variant from this page. Other pages keep their ${activePresetLabel} variants; this page keeps its other variants.`
+              : "This is the page's only variant — deleting it would leave the page unrenderable. Use “Only this page” instead."
           }
           disabled={!canDeleteVariant}
           onClick={onDeleteVariant}
         />
         <ActionRow
-          label="Delete the entire page"
+          label="Only this page"
           hint={
             canDeletePage
-              ? `Removes the page and all ${variantCount} variant${variantCount === 1 ? "" : "s"} on it.`
+              ? `Removes this page and all ${variantCount} variant${variantCount === 1 ? "" : "s"} on it. Other pages are untouched.`
               : "Can't delete the design's only page. Add another page first."
           }
           disabled={!canDeletePage}
