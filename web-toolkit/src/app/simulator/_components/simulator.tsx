@@ -26,6 +26,9 @@ export function Simulator() {
   const gridRef = useRef<SimGridHandle>(null);
   const [mode, setMode] = useState<DisplayMode>("pixel");
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // Bumping this re-runs the launcher useEffect, which aborts the current
+  // run and starts a fresh one (boot animation, menu, etc.).
+  const [resetKey, setResetKey] = useState(0);
   // Start with the default; hydrate from localStorage on mount to keep
   // server and first-client renders identical.
   const [display, setDisplay] = useState<DisplayConfig>(DEFAULT_DISPLAY);
@@ -59,6 +62,13 @@ export function Simulator() {
     setActiveIdx(null);
     launcher.setPendingApp(null);
     screens.forceExit();
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setActiveIdx(null);
+    launcher.setPendingApp(null);
+    screens.forceExit();
+    setResetKey((k) => k + 1);
   }, []);
 
   // Keep the highlighted app in sync with whatever the launcher is actually
@@ -95,11 +105,11 @@ export function Simulator() {
       controller.abort();
       setRuntimeSignal(null);
     };
-    // Restart the whole runtime when the physical display dimensions change.
-    // Responsive apps need NeoPixels of a different size; non-responsive apps
-    // need the grid to know the new geometry too. Easier than coordinating
-    // a hot-swap.
-  }, [joy, display.width, display.height]);
+    // Restart the whole runtime when the physical display dimensions change
+    // or when the user hits Reset. Responsive apps need NeoPixels of a
+    // different size; non-responsive apps need the grid to know the new
+    // geometry too. Easier than coordinating a hot-swap.
+  }, [joy, display.width, display.height, resetKey]);
 
   useEffect(() => {
     gridRef.current?.setMode(mode);
@@ -187,6 +197,13 @@ export function Simulator() {
           </div>
           <JoystickPad joy={joy} />
           <SlideSwitch slide={slide} />
+          <button
+            type="button"
+            onClick={handleReset}
+            className="px-4 py-2 bg-panel border border-edge rounded-lg text-[11px] uppercase tracking-[0.12em] text-muted font-semibold hover:text-accent hover:border-accent transition-colors cursor-pointer select-none"
+          >
+            Reset
+          </button>
         </div>
       </div>
 
