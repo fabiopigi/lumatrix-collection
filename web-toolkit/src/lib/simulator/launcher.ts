@@ -28,6 +28,7 @@ import { FONT_3X5, FONT_5X8, FONT_7X9 } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
 import * as screens from "./screens";
 import type { App, DisplayDims, Joystick, NeoPixel, RGB } from "./types";
+import bootDesignRaw from "../../../../shared/design/boot-animation.json";
 
 type GlyphSet = Record<string, string[]>;
 
@@ -105,8 +106,79 @@ function hexDim(hex: string, scale = BRIGHTNESS): RGB {
 const NAME_COLOR: RGB = hexDim("#0080ff");
 const TRACK_DIM: RGB = hexDim("#000080");
 const TRACK_BRIGHT: RGB = hexDim("#0080ff");
-const LUMA_COLOR: RGB = [45, 45, 45];
-const TRIX_COLOR: RGB = hexDim("#0080ff");
+
+// ─── Boot animation ────────────────────────────────────────────────────────
+
+interface BootDesignPixel {
+  index: number;
+  x: number;
+  y: number;
+  color: string;
+}
+interface BootDesign {
+  pages: Array<{ variants: Record<string, BootDesignPixel[]> }>;
+}
+const bootDesign = bootDesignRaw as unknown as BootDesign;
+
+const BOOT_WHITE_HEX = "#b8b8c0";
+const BOOT_BLUE_HEX = "#0080ff";
+const BOOT_WHITE_BASE: RGB = hexDim(BOOT_WHITE_HEX);
+const BOOT_BLUE_BASE: RGB = hexDim(BOOT_BLUE_HEX);
+
+const BOOT_FRAME_MS = 33; // ~30 fps — keeps the fades smooth
+const BOOT_TOTAL_MS = 3500;
+const BOOT_WHITE_FADE_IN_END = 1000;
+const BOOT_BLUE_FADE_IN_START = 500;
+const BOOT_BLUE_FADE_IN_END = 1500;
+const BOOT_FADE_OUT_START = 3000;
+const BOOT_FADE_OUT_END = 3500;
+const BOOT_FLICKER_AMOUNT = 0.05;
+/** Average ms between flicker re-rolls per pixel — slower than the frame
+ *  rate so the sparkle reads as "twinkle" rather than full-rate noise. Each
+ *  pixel re-rolls with probability BOOT_FRAME_MS / this value per frame. */
+const BOOT_FLICKER_STEP_MS = 150;
+
+type XY = readonly [number, number];
+
+function getBootPixels(): { white: readonly XY[]; blue: readonly XY[] } | null {
+  const key = `${_w}x${_h}`;
+  const variants = bootDesign.pages[0]?.variants;
+  const list = variants?.[key];
+  if (!list) return null;
+  const white: XY[] = [];
+  const blue: XY[] = [];
+  for (const p of list) {
+    const c = p.color.toLowerCase();
+    if (c === BOOT_WHITE_HEX) white.push([p.x, p.y]);
+    else if (c === BOOT_BLUE_HEX) blue.push([p.x, p.y]);
+  }
+  return { white, blue };
+}
+
+function fadeInAlpha(t: number, start: number, end: number): number {
+  if (t <= start) return 0;
+  if (t >= end) return 1;
+  return (t - start) / (end - start);
+}
+
+function fadeOutMultiplier(t: number): number {
+  if (t <= BOOT_FADE_OUT_START) return 1;
+  if (t >= BOOT_FADE_OUT_END) return 0;
+  return 1 - (t - BOOT_FADE_OUT_START) / (BOOT_FADE_OUT_END - BOOT_FADE_OUT_START);
+}
+
+function bootColor(base: RGB, k: number): RGB {
+  if (k <= 0) return [0, 0, 0];
+  return [
+    Math.min(255, Math.max(0, Math.round(base[0] * k))),
+    Math.min(255, Math.max(0, Math.round(base[1] * k))),
+    Math.min(255, Math.max(0, Math.round(base[2] * k))),
+  ];
+}
+
+function rollFlicker(): number {
+  return 1 + (Math.random() * 2 - 1) * BOOT_FLICKER_AMOUNT;
+}
 
 let np: NeoPixel;
 let joy: Joystick;
@@ -256,26 +328,58 @@ async function waitRelease(): Promise<void> {
   while (readInput() !== null) await sleep_ms(10);
 }
 
-async function oneShotMarquee(
-  text: string,
-  color: RGB,
-  font: GlyphSet,
-  stepMs = 55,
-): Promise<void> {
-  const bitmap = textToBitmap(text, font, 0);
-  const y0 = Math.max(0, Math.floor((_h - bitmap.height) / 2));
-  for (let offset = -_w; offset <= bitmap.width; offset++) {
-    clear();
-    drawBitmapWindow(bitmap, offset, color, 0, y0, _w, false);
-    np.write();
-    await sleep_ms(stepMs);
-  }
-}
-
+/** LumenLab boot animation — white + blue parts fade in independently,
+ *  with per-pixel ±5% flicker that re-rolls every ~150 ms (stochastic,
+ *  not every frame) for a slow "twinkle" rather than fast noise. Pixel
+ *  layout is defined per canonical display size in
+ *  shared/design/boot-animation.json; non-canonical sizes get a brief
+ *  blank pause instead of the animation. */
 async function bootAnimation(): Promise<void> {
-  const { font } = chooseFont();
-  await oneShotMarquee("LUMA", LUMA_COLOR, font);
-  await oneShotMarquee("TRIX", TRIX_COLOR, font);
+  const pixels = getBootPixels();
+  if (!pixels) {
+    clear();
+    np.write();
+    await sleep_ms(300);
+    return;
+  }
+
+  // Cached per-pixel flicker multipliers. Each pixel keeps its current value
+  // until a (per-frame, per-pixel) coin flip says to re-roll. With
+  // BOOT_FRAME_MS / BOOT_FLICKER_STEP_MS as the probability, the expected
+  // interval between re-rolls is BOOT_FLICKER_STEP_MS per pixel.
+  const whiteFlicker = pixels.white.map(() => rollFlicker());
+  const blueFlicker = pixels.blue.map(() => rollFlicker());
+  const rerollProb = BOOT_FRAME_MS / BOOT_FLICKER_STEP_MS;
+
+  const start = ticks_ms();
+  while (true) {
+    const t = ticks_diff(ticks_ms(), start);
+    if (t >= BOOT_TOTAL_MS) break;
+
+    const fadeOut = fadeOutMultiplier(t);
+    const aWhite = fadeInAlpha(t, 0, BOOT_WHITE_FADE_IN_END) * fadeOut;
+    const aBlue = fadeInAlpha(t, BOOT_BLUE_FADE_IN_START, BOOT_BLUE_FADE_IN_END) * fadeOut;
+
+    for (let i = 0; i < whiteFlicker.length; i++) {
+      if (Math.random() < rerollProb) whiteFlicker[i] = rollFlicker();
+    }
+    for (let i = 0; i < blueFlicker.length; i++) {
+      if (Math.random() < rerollProb) blueFlicker[i] = rollFlicker();
+    }
+
+    clear();
+    for (let i = 0; i < pixels.white.length; i++) {
+      const [x, y] = pixels.white[i];
+      setPx(x, y, bootColor(BOOT_WHITE_BASE, aWhite * whiteFlicker[i]));
+    }
+    for (let i = 0; i < pixels.blue.length; i++) {
+      const [x, y] = pixels.blue[i];
+      setPx(x, y, bootColor(BOOT_BLUE_BASE, aBlue * blueFlicker[i]));
+    }
+    np.write();
+    await sleep_ms(BOOT_FRAME_MS);
+  }
+
   clear();
   np.write();
   await sleep_ms(150);
