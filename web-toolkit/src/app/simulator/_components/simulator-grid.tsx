@@ -79,7 +79,7 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
       (buffer: Uint8ClampedArray) => {
         lastBufferRef.current = buffer;
         const direct = buffer.length === display.width * display.height * 3;
-        const isMask = modeRef.current === "mask" && isLumatrix(display) && !direct;
+        const isMask = modeRef.current === "mask" && isLumatrix(display);
 
         for (let py = 0; py < display.height; py++) {
           for (let px = 0; px < display.width; px++) {
@@ -90,7 +90,10 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
             let g = 0;
             let b = 0;
             let lit = false;
-            let src: { sx: number; sy: number } | null = null;
+            // Source-pixel mapping for mask overlay positioning. On 8×8 the
+            // direct path and scale-up path agree on sourceForCell, so this
+            // also drives the mask overlay when isLumatrix is true.
+            const src = sourceForCell(px, py);
 
             if (direct) {
               // Direct: each physical cell maps 1:1 to the buffer.
@@ -102,16 +105,13 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
               g = buffer[base + 1];
               b = buffer[base + 2];
               lit = r > 0 || g > 0 || b > 0;
-            } else {
+            } else if (src) {
               // Scale-up: physical cell → source 8×8 cell → LED index.
-              src = sourceForCell(px, py);
-              if (src) {
-                const base = sourceLedIndex(src.sx, src.sy) * 3;
-                r = buffer[base];
-                g = buffer[base + 1];
-                b = buffer[base + 2];
-                lit = r > 0 || g > 0 || b > 0;
-              }
+              const base = sourceLedIndex(src.sx, src.sy) * 3;
+              r = buffer[base];
+              g = buffer[base + 1];
+              b = buffer[base + 2];
+              lit = r > 0 || g > 0 || b > 0;
             }
 
             const color = `rgb(${boostByte(r)},${boostByte(g)},${boostByte(b)})`;
@@ -123,9 +123,9 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
 
             // Letter mask: only show a letter on the TOP-LEFT cell of each
             // scaled-up source block, so a 2×2 block at 16×16 doesn't show
-            // four copies of the same letter. Only relevant in scale-up mode.
+            // four copies of the same letter. On 8×8 scale=1 so every cell
+            // is its own block origin.
             const isBlockOrigin =
-              !direct &&
               src !== null &&
               (px - offset.x) % scale === 0 &&
               (py - offset.y) % scale === 0;
