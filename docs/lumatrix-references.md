@@ -11,10 +11,8 @@ These embed the GitHub slug or npm package name.
 | Reference | File / line | Use |
 |---|---|---|
 | `https://github.com/fabiopigi/lumatrix-collection.git` | `.git/config` (origin URL — not a tracked file) | Push/pull remote. Update with `git remote set-url origin <new>` after renaming. |
-| `"name": "lumatrix-simulator"` | `web/package.json:2` | npm package name for the legacy 8×8 simulator under `web/`. |
-| `"name": "lumatrix-simulator"` | `web/package-lock.json:2`, `:8` | Mirrors the package.json name. Regenerates on `npm install`. |
 
-`web-toolkit/package.json` does **not** carry a lumatrix-named identifier, so the Next.js toolkit is unaffected.
+`web-toolkit/package.json` does **not** carry a lumatrix-named identifier, so the Next.js toolkit is unaffected. The legacy `web/` and `web-apps/` folders (which used to host a separate `lumatrix-simulator` npm package and a pre-built `simulator.html`) have been removed.
 
 ## 2. localStorage keys — user-data persistence
 
@@ -35,7 +33,6 @@ Schema strings embedded in shared JSON files. Loaders may pin/version against th
 | `lumatrix-fonts-v1` | `shared/fonts.json:2` | Schema id for the shared pixel-font catalog (read by simulator, Python apps, designer). |
 | `lumatrix-hardware-presets-v1` | `shared/hardware-presets.json:2` | Schema id for the canonical hardware presets file (just added). |
 
-The web/ bundle copies `fonts.json` verbatim into `web-apps/simulator.html`, so its `lumatrix-fonts-v1` schema string appears in the build artifact too.
 
 ## 4. Internal code identifiers
 
@@ -58,8 +55,6 @@ These describe the LUMATRIX kit. Keep as-is unless you're rebranding the project
 
 | File / line | Use |
 |---|---|
-| `web/index.html:6` | `<title>LUMATRIX Simulator</title>` — browser tab title for legacy simulator. |
-| `web-apps/simulator.html:6` | Same title in the built bundle. Regenerates from `web/`. |
 | `web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:224` | Button label "Use LUMATRIX preset". |
 | `web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:242` | Button label "Reset to LUMATRIX defaults". |
 | `web-toolkit/src/app/simulator/_components/mode-toggle.tsx:32` | Tooltip explaining mask mode is the LUMATRIX 8×8 word-clock layout. |
@@ -72,7 +67,6 @@ These describe the LUMATRIX kit. Keep as-is unless you're rebranding the project
 | `python/apps/_screens.py:1` | Module docstring: "Shared lifecycle screens for LUMATRIX apps." |
 | `python/apps/_fonts.py:1` | Module docstring: "Common font definitions for LUMATRIX apps." |
 | `python/apps/dinojump.py:1` | "Chrome-dino-style side scroller for LUMATRIX." |
-| `web/src/letter-mask.ts:2` | Comment: "Physical letter overlay printed on the LUMATRIX matrix." |
 | `web-toolkit/src/lib/pixel-designer/png-export.ts:27` | Doc comment with `"8×8 (LumaTrix)"` as an example column label. |
 | `web-toolkit/src/lib/simulator/screens.ts:86,586` | Comments referring to the LUMATRIX 8×8 source and original arrow design. |
 | `web-toolkit/src/lib/simulator/types.ts:53,57,62,66` | Doc comments on the `App` interface describing the LUMATRIX 8×8 source buffer. |
@@ -106,18 +100,12 @@ These describe the LUMATRIX kit. Keep as-is unless you're rebranding the project
 |---|---|---|
 | `https://lumatrix.zhaw.ch` | `README.md:3,9` | Link to the actual ZHAW LUMATRIX kit. Independent of this repo. |
 
-## 7. Generated build artifact — regenerates from source
-
-| File | Use |
-|---|---|
-| `web-apps/simulator.html` | Built bundle of `web/`. Contains the `<title>` and an inlined copy of `shared/fonts.json` (so its `lumatrix-fonts-v1` schema string appears in the minified JS). Rebuilds with `cd web && npm run build` — don't hand-edit. |
-
 ## What a pure GitHub rename actually requires
 
 If you only want to change the GitHub slug (say `lumatrix-collection` → `<new>`):
 
 1. Rename on GitHub (Settings → General).
 2. `git remote set-url origin git@github.com:fabiopigi/<new>.git` here.
-3. Done — everything else is brand text tied to the ZHAW kit, not to the repo URL. The npm package name in `web/package.json` is `lumatrix-simulator`, which is a publish identifier; it doesn't have to match the repo slug unless you publish it.
+3. Done — everything else is brand text tied to the ZHAW kit, not to the repo URL.
 
 If you also want to drop the LUMATRIX naming from the codebase (rebrand), the affected surfaces in priority order are: localStorage keys (§2, migration cost), JSON schema strings (§3, contract bump), code identifiers (§4, mechanical), UI strings (§5 UI subsection, user-visible), then comments/docs (§5 remainder).

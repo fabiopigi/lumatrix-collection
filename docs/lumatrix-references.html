@@ -91,8 +91,6 @@ const DATA = [
     description: "These embed the GitHub slug or npm package name.",
     rows: [
       { id: "repo-origin",      ref: "https://github.com/fabiopigi/lumatrix-collection.git", file: ".git/config (origin URL — not a tracked file)", use: "Push/pull remote. Update with `git remote set-url origin <new>` after renaming." },
-      { id: "repo-web-pkg",     ref: '"name": "lumatrix-simulator"', file: "web/package.json:2", use: "npm package name for the legacy 8×8 simulator under web/." },
-      { id: "repo-web-lock",    ref: '"name": "lumatrix-simulator"', file: "web/package-lock.json:2, :8", use: "Mirrors the package.json name. Regenerates on npm install." },
     ],
   },
   {
@@ -132,8 +130,6 @@ const DATA = [
     title: "5a. Product/brand name in UI strings",
     description: "Visible to users. Keep as-is unless you're rebranding the project away from the ZHAW kit.",
     rows: [
-      { id: "ui-web-title",       ref: "<title>LUMATRIX Simulator</title>", file: "web/index.html:6",                                                    use: "Browser tab title for legacy simulator." },
-      { id: "ui-built-title",     ref: "<title>LUMATRIX Simulator</title>", file: "web-apps/simulator.html:6",                                           use: "Same title in the built bundle. Regenerates from web/." },
       { id: "ui-preset-btn",      ref: "\"Use LUMATRIX preset\"",           file: "web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:224", use: "Button label." },
       { id: "ui-reset-btn",       ref: "\"Reset to LUMATRIX defaults\"",    file: "web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:242", use: "Button label." },
       { id: "ui-mode-toggle",     ref: "Tooltip text",                      file: "web-toolkit/src/app/simulator/_components/mode-toggle.tsx:32",        use: "Tooltip explaining mask mode is the LUMATRIX 8×8 word-clock layout." },
@@ -148,7 +144,6 @@ const DATA = [
       { id: "comment-screens-py",    ref: "Module docstring",       file: "python/apps/_screens.py:1",                            use: "\"Shared lifecycle screens for LUMATRIX apps.\"" },
       { id: "comment-fonts-py",      ref: "Module docstring",       file: "python/apps/_fonts.py:1",                              use: "\"Common font definitions for LUMATRIX apps.\"" },
       { id: "comment-dinojump-py",   ref: "Module docstring",       file: "python/apps/dinojump.py:1",                            use: "\"Chrome-dino-style side scroller for LUMATRIX.\"" },
-      { id: "comment-letter-mask",   ref: "Comment",                file: "web/src/letter-mask.ts:2",                             use: "\"Physical letter overlay printed on the LUMATRIX matrix.\"" },
       { id: "comment-png-export",    ref: "JSDoc",                  file: "web-toolkit/src/lib/pixel-designer/png-export.ts:27",  use: "Doc comment with \"8×8 (LumaTrix)\" as an example column label." },
       { id: "comment-screens-ts",    ref: "Comments",               file: "web-toolkit/src/lib/simulator/screens.ts:86,586",      use: "References to the LUMATRIX 8×8 source and the original arrow design." },
       { id: "comment-types",         ref: "JSDoc",                  file: "web-toolkit/src/lib/simulator/types.ts:53,57,62,66",   use: "Doc comments on the App interface describing the LUMATRIX 8×8 source buffer." },
@@ -187,14 +182,6 @@ const DATA = [
     description: "Refers to the ZHAW kit's official website; independent of this repo.",
     rows: [
       { id: "ext-zhaw", ref: "https://lumatrix.zhaw.ch", file: "README.md:3,9", use: "Link to the ZHAW LUMATRIX kit." },
-    ],
-  },
-  {
-    id: "gen",
-    title: "7. Generated build artifact — regenerates from source",
-    description: "Don't hand-edit; rebuild instead.",
-    rows: [
-      { id: "gen-simhtml", ref: "Built simulator bundle", file: "web-apps/simulator.html", use: "Built from web/. Contains the <title> and an inlined copy of shared/fonts.json (so its lumatrix-fonts-v1 schema string appears in the minified JS). Rebuilds with `cd web && npm run build`." },
     ],
   },
 ];
