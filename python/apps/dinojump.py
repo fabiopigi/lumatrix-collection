@@ -139,12 +139,14 @@ def play_one_round():
         sleep_ms(FRAME_MS)
 
 
-def run(neopixel, joystick):
+def run(neopixel, joystick, display=None, screens_np=None):
     global np, JOY_UP, JOY_DOWN
     np = neopixel
     JOY_UP = joystick["up"]
     JOY_DOWN = joystick["down"]
-    screens.init(neopixel, joystick)
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return

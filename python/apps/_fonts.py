@@ -1,17 +1,19 @@
 """Common font definitions for LumenLab apps.
 
-Loaded from /fonts.json on the Pico filesystem at import time. Exposes two
+Loaded from /fonts.json on the Pico filesystem at import time. Exposes three
 dicts of {char: [rows of '.' / 'X']}:
 
   FONT_3X5 — 3 cols wide, 5 rows tall. Uppercase A-Z, digits, basic punctuation.
   FONT_5X8 — 5 cols wide, 8 rows tall (7 visible + blank baseline). Adds
              lowercase a-z and a few more punctuation glyphs.
+  FONT_7X9 — proportional pixel font (glyph data is 12 rows tall). Used by the
+             launcher on displays taller than 16 rows.
 
 If /fonts.json is missing or unreadable, a small embedded fallback covering
 just digits is used so apps/screens.py (game-over scores) keep working.
 
 Usage:
-    from _fonts import FONT_3X5, FONT_5X8, glyph
+    from _fonts import FONT_3X5, FONT_5X8, FONT_7X9, glyph
     g = glyph(FONT_3X5, ch)   # falls back ch -> ch.upper() -> ' '
 """
 
@@ -64,12 +66,16 @@ def _load():
         with open("/_fonts.json") as f:
             data = json.load(f)
         fonts = data["fonts"]
-        return _trim_font(fonts["3x5"]["glyphs"]), _trim_font(fonts["5x8"]["glyphs"])
+        return (
+            _trim_font(fonts["3x5"]["glyphs"]),
+            _trim_font(fonts["5x8"]["glyphs"]),
+            _trim_font(fonts["7x9"]["glyphs"]),
+        )
     except (OSError, ValueError, KeyError):
-        return _trim_font(_FALLBACK_3X5), {}
+        return _trim_font(_FALLBACK_3X5), {}, {}
 
 
-FONT_3X5, FONT_5X8 = _load()
+FONT_3X5, FONT_5X8, FONT_7X9 = _load()
 
 # Pixel gap inserted between glyphs when rendering text. All bundled fonts
 # are now proportional (no fully-empty leading/trailing columns); renderers
