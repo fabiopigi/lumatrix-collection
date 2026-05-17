@@ -1,4 +1,4 @@
-"""DinoJump — Chrome-dino-style side scroller for LUMATRIX."""
+"""DinoJump — Chrome-dino-style side scroller for LumenLab."""
 
 from machine import Pin
 from neopixel import NeoPixel

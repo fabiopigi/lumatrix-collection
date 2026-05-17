@@ -1,4 +1,4 @@
-"""Common font definitions for LUMATRIX apps.
+"""Common font definitions for LumenLab apps.
 
 Loaded from /fonts.json on the Pico filesystem at import time. Exposes two
 dicts of {char: [rows of '.' / 'X']}:

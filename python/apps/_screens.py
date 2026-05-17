@@ -1,4 +1,4 @@
-"""Shared lifecycle screens for LUMATRIX apps.
+"""Shared lifecycle screens for LumenLab apps.
 
 Call init() once at the start of run(), then loading_screen() / game_over_screen() /
 end_screen() / check_exit() / any_input() as needed. See README.md for the lifecycle

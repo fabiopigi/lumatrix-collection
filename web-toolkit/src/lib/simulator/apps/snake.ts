@@ -10,7 +10,7 @@ export const NAME = "Snake";
  * dimensions beyond W × H. A 16×16 display gives 256 cells of room; a 32×32
  * gives 1024. The win condition (length === total cells) scales naturally.
  *
- * The screens module is still bound to the LUMATRIX 8×8 source buffer — its
+ * The screens module is still bound to the 8×8 source buffer — its
  * loading-spinner / game-over UI keeps rendering at 8×8 and the simulator
  * scales that up. Only gameplay uses the W×H buffer directly.
  */

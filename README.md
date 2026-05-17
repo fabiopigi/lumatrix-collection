@@ -1,10 +1,10 @@
-# LUMATRIX collection
+# LumenLab collection
 
 MicroPython apps for the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) kit — a Raspberry Pi Pico driving an 8×8 NeoPixel matrix with a 5-way joystick and a slide switch.
 
 `python/main.py` boots into a launcher that lets you pick from the installed apps. Center-click launches; left/right cycles through the list; hold-center-1.5 s from anywhere inside an app brings you back.
 
-A browser-based **simulator** of the LUMATRIX hardware lives in `web-toolkit/` (Next.js). Run `cd web-toolkit && npm install && npm run dev` to start it locally, or visit the hosted version linked in the Pixel Designer section below.
+A browser-based **simulator** of the kit's hardware lives in `web-toolkit/` (Next.js). Run `cd web-toolkit && npm install && npm run dev` to start it locally, or visit the hosted version linked in the Pixel Designer section below.
 
 ![device](https://lumatrix.zhaw.ch)
 

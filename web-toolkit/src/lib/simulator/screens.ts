@@ -83,8 +83,8 @@ export function init(
 ): void {
   _np = neopixel;
   _joy = joystick;
-  // Default to 8×8 (LUMATRIX) when dims aren't supplied — keeps any caller
-  // that hasn't been updated working at native resolution.
+  // Default to 8×8 when dims aren't supplied — keeps any caller that hasn't
+  // been updated working at native resolution.
   _w = width ?? 8;
   _h = height ?? 8;
   _exitPressStart = null;
@@ -583,7 +583,7 @@ function makeArrow(bboxW: number, bboxH: number, shaftRows: number): ArrowDesign
   return { pixels, w: bboxW, h: bboxH };
 }
 
-/** 8×8 arrow — original LUMATRIX design, single-pixel diagonals. Bbox is in
+/** 8×8 arrow — original kit design, single-pixel diagonals. Bbox is in
  *  the (1..6, 3..7) region of the source 8×8 frame, expressed here in local
  *  bbox coords (0..5, 0..4) so it composes the same way as the larger ones. */
 const ARROW_8: ArrowDesign = {

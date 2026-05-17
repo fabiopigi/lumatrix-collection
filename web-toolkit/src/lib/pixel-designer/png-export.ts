@@ -24,7 +24,7 @@ export interface PngGridArgs {
   sections: Array<Array<PngGridSection | null>>;
   /** Row label rendered to the left of each row (e.g., "#1 Page 1"). */
   rowLabels?: string[];
-  /** Column label rendered above each column (e.g., "8×8 (LumaTrix)"). */
+  /** Column label rendered above each column (e.g., "8×8"). */
   columnLabels?: string[];
   mode: Mode;
   filename: string;

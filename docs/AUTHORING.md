@@ -1,4 +1,4 @@
-# Authoring an app for LUMATRIX
+# Authoring an app for LumenLab
 
 The full reference for adding a new app to this collection. If you only want the boilerplate, skip to [Templates](#templates).
 

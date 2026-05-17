@@ -1,6 +1,6 @@
 {
   "schema": "lumenlab-fonts-v1",
-  "description": "Pixel fonts for LUMATRIX and similar LED-matrix displays. Fixed-width fonts at small sizes (3x5, 5x8) and a proportional pixel font (7x9).",
+  "description": "Pixel fonts for LumenLab and similar LED-matrix displays. Fixed-width fonts at small sizes (3x5, 5x8) and a proportional pixel font (7x9).",
   "format": {
     "encoding": "Each glyph is an array of strings, one string per row, ordered top-to-bottom. Each character represents one pixel: 'X' = pixel ON, '.' = pixel OFF. Within a glyph, every row has the same length (the glyph's width). For fixed-width fonts (3x5, 5x8) all glyphs share the same width, given as the font's top-level `width`. Proportional fonts (7x9) set `proportional: true` and omit the top-level `width` — each glyph's width is determined by the length of its rows.",
     "indexing": "row 0 is the topmost row of the glyph; column 0 is the leftmost. To render a glyph at position (x0, y0), light pixel (x0 + col, y0 + row) for every 'X' encountered.",

@@ -4,6 +4,8 @@ Every place "lumatrix", "luma matrix", or "luma trix" appears in the tree (case-
 
 The product name itself ("LUMATRIX" / "LumaTrix") refers to the ZHAW kit at <https://lumatrix.zhaw.ch>. Renaming the GitHub repo is independent of rebranding the product — most references below are brand mentions that can stay if you keep using the LUMATRIX kit.
 
+**Progress (2026-05-17):** §2 localStorage keys, §3 JSON schemas, §5b comments/docstrings, §5c shared design JSON descriptions, and §5d documentation have been worked through per the "drop the brand where redundant, keep ZHAW kit references" rule. Outstanding: §1 repo identity (origin URL), §4 internal code identifiers (`LUMATRIX_MASK`, `isLumatrix`, `lumatrixNp`), §5a UI strings (button labels).
+
 ## 1. Repo identity — change if renaming
 
 These embed the GitHub slug or npm package name.

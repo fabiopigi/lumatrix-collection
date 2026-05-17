@@ -1,7 +1,7 @@
 /**
  * Physical display size for the LumenSimulator.
  *
- * Apps always write to a virtual 8×8 NeoPixel buffer (the LUMATRIX native
+ * Apps always write to a virtual 8×8 NeoPixel buffer (the native
  * resolution). The SimulatorGrid scales that 8×8 source onto the configured
  * physical display by an integer factor, centred when the aspect ratio
  * doesn't match. Larger displays = each source pixel becomes an s×s block.

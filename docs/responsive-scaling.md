@@ -1,12 +1,12 @@
 # Responsive scaling per app
 
-How each LumenSimulator app currently behaves when the display size leaves the LUMATRIX-native 8×8. The simulator's runtime supports three rendering strategies; each app sits in one of them today.
+How each LumenSimulator app currently behaves when the display size leaves the native 8×8. The simulator's runtime supports three rendering strategies; each app sits in one of them today.
 
 ## The three categories
 
 | Category | What it means | How the app code looks |
 |---|---|---|
-| **Pixel-matching upscale** | The app is unchanged — writes to the 8×8 LUMATRIX source buffer. The simulator scales that source up by the largest integer factor that fits the configured display and centres it. Non-square aspect ratios get black bars on the long sides. | `export const RESPONSIVE = false` (or omitted). Hardcoded `8`s throughout. |
+| **Pixel-matching upscale** | The app is unchanged — writes to the 8×8 source buffer. The simulator scales that source up by the largest integer factor that fits the configured display and centres it. Non-square aspect ratios get black bars on the long sides. | `export const RESPONSIVE = false` (or omitted). Hardcoded `8`s throughout. |
 | **UI upscaling** | The app opts in to the responsive path and renders to a `W × H` buffer that matches the actual display. UI elements either stay logical-size 1 cell (e.g. snake segments) or scale proportionally with the canvas (e.g. paddle length). The drawing **shapes** stay the same — what changes is *where* and *how big* they're drawn. | `RESPONSIVE = true`. Reads `display.width / display.height`, uses them in coordinate math and sprite sizing. |
 | **Drawing upscaling** | The app renders its visuals from real math (raycaster, ray-based sprite projection, gradients). Higher resolution = more rays / finer projection / smoother lighting. The output is qualitatively different at 32×32 than at 8×8, not just bigger. | `RESPONSIVE = true`. Drawing routines do per-display-pixel computation rather than mapping fixed shapes onto cells. |
 
@@ -52,7 +52,7 @@ The migration cost grows roughly with the gap you cross:
   2. Bind `W = display?.width ?? 8` and `H = display?.height ?? 8` inside `run()`.
   3. Replace every hardcoded `8` with `W` or `H`.
   4. Replace `np[row * 8 + col]` writes with `np[row * W + col]`.
-  5. Pass the launcher's `screensNp` (4th `run()` arg) to `screens.init()` so the loading / game-over screens keep rendering at the LUMATRIX 8×8 scale-up.
+  5. Pass the launcher's `screensNp` (4th `run()` arg) to `screens.init()` so the loading / game-over screens keep rendering at the 8×8 scale-up.
   6. Audit any hardcoded shape arrays — for Breakout that means rewriting the level layouts as functions of `(W, H)` instead of static `"########"` strings.
 - **UI upscaling → Drawing upscaling** is a much bigger lift and only makes sense for apps with real procedural drawing potential (raycasters, physics-driven visuals, particle systems). Most simple grid games don't benefit.
 

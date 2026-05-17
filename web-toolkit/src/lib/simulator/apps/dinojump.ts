@@ -1,4 +1,4 @@
-/** DinoJump — Chrome-dino-style side scroller for LUMATRIX. */
+/** DinoJump — Chrome-dino-style side scroller for LumenLab. */
 import type { DisplayDims, Joystick, NeoPixel, Pin, RGB } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";

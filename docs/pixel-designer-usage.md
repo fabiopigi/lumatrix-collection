@@ -1,10 +1,10 @@
-# LUMATRIX Pixel Designer — Usage Guide
+# Pixel Designer — Usage Guide
 
 A pixel-art designer for LED matrix displays, originally written for the ZHAW **LUMATRIX** 8×8 NeoPixel kit but configurable for any matrix size, color mode, and LED-chain layout.
 
 Lives in `web-toolkit/src/app/pixel-designer/` as **LumenDesigner**, a route in the LumenLab Next.js app. Run `cd web-toolkit && npm run dev` and visit [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer).
 
-![LUMATRIX Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
+![Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
 
 ---
 
