@@ -146,13 +146,15 @@ def play_one_game():
         frame += 1
 
 
-def run(neopixel, joystick):
+def run(neopixel, joystick, display=None, screens_np=None):
     global np, JOY_UP, JOY_DOWN, JOY_SLIDE
     np = neopixel
     JOY_UP = joystick["up"]
     JOY_DOWN = joystick["down"]
     JOY_SLIDE = joystick.get("slide")
-    screens.init(neopixel, joystick)
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return

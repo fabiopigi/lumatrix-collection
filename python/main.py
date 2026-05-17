@@ -24,11 +24,17 @@ from time import sleep_ms, ticks_ms, ticks_diff
 
 from _fonts import FONT_3X5, FONT_5X8, FONT_7X9, KERNING_GAP, glyph as font_glyph
 
+import reaction
+import connect4
 import pong
 import breakout
 import simonsays
-import connect4
 import dinojump
+import snake
+import flappy
+import invaders
+import doom
+import watch
 
 
 # ─── Hardware config ─────────────────────────────────────────────────────────
@@ -47,7 +53,19 @@ JOY = {
     "slide":  Pin(9, Pin.IN),
 }
 
-APPS = [pong, breakout, simonsays, connect4, dinojump]
+APPS = [
+    reaction,
+    connect4,
+    pong,
+    breakout,
+    simonsays,
+    dinojump,
+    snake,
+    flappy,
+    invaders,
+    doom,
+    watch,
+]
 
 
 # ─── Colors ──────────────────────────────────────────────────────────────────

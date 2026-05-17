@@ -16,48 +16,67 @@ An app is a single `.py` file in `python/apps/` that exposes two things to the r
 
 | Symbol | Purpose |
 |---|---|
-| `NAME` | Display name for the launcher menu (string, scrolled in the marquee). |
-| `run(neopixel, joystick)` | Entry point. The launcher calls this when the user selects your app. |
+| `NAME` | Display name for the launcher marquee (string). |
+| `run(neopixel, joystick, display=None, screens_np=None)` | Entry point. The launcher calls this when the user selects your app. |
 
 That's the entire contract. Anything else (game state, helpers, constants) is private to your module.
 
 When `run()` returns, control goes back to the launcher and the user can pick a different app.
 
+### The four `run()` arguments
+
+| Arg | What it is |
+|---|---|
+| `neopixel` | Your **gameplay buffer**. Default: a virtual 8×8 (64 LEDs) buffer the launcher mirrors onto the real display. You can ignore the rest of the args entirely and write a classic 8×8 app — `np[row * 8 + col] = (r, g, b)` and `np.write()` just work. |
+| `joystick` | A dict of six `Pin` objects: `up`, `down`, `left`, `right`, `center`, `slide`. All active-low. |
+| `display` | `{"width": W, "height": H}` — the actual physical display dimensions. Only meaningful if you opt into responsive mode (see below). Can be `None` when running standalone. |
+| `screens_np` | The full-display NeoPixel buffer (W×H). Pass this to `screens.init` so loading / game-over / end screens render at native resolution instead of the 8×8 scale-up. Can be `None` when running standalone. |
+
+### Responsive vs. classic apps
+
+Apps come in two flavours:
+
+- **Classic (default).** Don't set `RESPONSIVE`. Render to the 8×8 source buffer. The launcher integer-scales + centres your output onto whatever physical display is configured. Zero responsive code, costs nothing.
+- **Responsive (opt-in).** Set `RESPONSIVE = True` at module top. The launcher gives you a W×H gameplay buffer, you read `display["width"]` / `display["height"]` in your render code. Required if you want UI elements (paddles, levels, walls) to scale or reshape with the actual hardware.
+
+You can write a great app without ever caring about responsive mode. Use it when "more screen = more game" is meaningful (Snake's grid, Pong's paddle, Doom's raycaster).
+
 ---
 
-## Where to start: web simulator first?
+## Where to start: simulator first?
 
 **Before writing any code, ask the user this question:**
 
-> **"Do you want to build this app for the web simulator first, then port it to the Pico — or go straight to MicroPython?"**
+> **"Do you want to build this app in the web simulator first, then port it to the Pico — or go straight to MicroPython?"**
 
-There's almost always a good reason to start in the web simulator:
+There's almost always a good reason to start in the simulator:
 
-- **Faster iteration.** No flashing, no Thonny disconnect dance. Save the file, the build watcher rebuilds, refresh the browser, see the result. Cycle time is a few seconds vs ~30 s on hardware.
+- **Faster iteration.** No flashing, no Thonny disconnect dance. Save the file, the dev server hot-reloads, see the result. Cycle time is seconds vs ~30 s on hardware.
 - **Real debugging.** Browser DevTools, breakpoints, console logs, time travel — none of which exist on a Pico.
 - **No "is the hardware to blame?" ambiguity.** When something breaks in the sim, it's your code. On the Pico it might be a wiring quirk, a brightness issue, a serial-port lock, or a soft brick.
-- **The port is mostly mechanical.** The TypeScript simulator under `web/src/` is a direct API mirror of the MicroPython codebase: same `np[i] = [r, g, b]` writes, same `pin.value() === 0` active-low, same `screens` and `fonts` modules. Once the sim works, translating to Python is rote — see [Porting from TypeScript to MicroPython](#porting-from-typescript-to-micropython).
+- **The port is mostly mechanical.** The TypeScript simulator under `web-toolkit/src/lib/simulator/` is a direct API mirror of the MicroPython codebase: same `np[i] = [r, g, b]` writes, same `pin.value() === 0` active-low, same `screens` and `fonts` modules. Once the sim works, translating to Python is rote — see [Porting from TypeScript to MicroPython](#porting-from-typescript-to-micropython).
 - **The user can test without a Pico.** They can open the sim in any browser, click the on-screen joystick or use keyboard, and tell you what feels off.
 
-Reasons to skip the sim and go straight to Python:
+Reasons to skip the simulator and go straight to Python:
 
 - The app depends on something the simulator doesn't model (specific timing artifacts on the WS2812 strip, the slide switch in a way the sim doesn't simulate yet, USB serial input).
 - You're prototyping a one-off animation and don't care about cross-platform parity.
 - The user explicitly says they want hardware-only.
 
-**The default recommendation is web-first.** If unsure, ask the user — don't decide silently. The workflow then becomes:
+**The default recommendation is simulator-first.** If unsure, ask the user — don't decide silently. The workflow then becomes:
 
 ```
 1. Ask:   "Web simulator first, or straight to MicroPython?"
-2. Build: web/src/apps/<name>.ts + wire into web/src/launcher.ts
-3. Test:  user runs `npm run watch` in web/ and opens index.html
+2. Build: web-toolkit/src/lib/simulator/apps/<name>.ts
+          and wire into web-toolkit/src/lib/simulator/launcher.ts
+3. Test:  cd web-toolkit && npm run dev, open the LumenSimulator page.
 4. Iterate based on user feedback in the browser.
 5. Port:  copy the .ts into python/apps/<name>.py with the mechanical
           translation (await → blocking, [] → (), dict-access conventions).
 6. Test:  user flashes to the Pico, confirms it behaves the same.
 ```
 
-If the user picks "straight to MicroPython", skip ahead to [Step-by-step: creating a new app](#step-by-step-creating-a-new-app) and ignore the web/ paths.
+If the user picks "straight to MicroPython", skip ahead to [Step-by-step](#step-by-step-creating-a-new-app) and ignore the simulator paths.
 
 ---
 
@@ -71,25 +90,25 @@ launcher → loading_screen → your app → game_over_screen | end_screen → l
                                 └────────── restart ─────────────┘
 ```
 
-1. **Loading screen** (mandatory, comes from `screens.loading_screen()`):
-   - A 2×2 cyan spinner in the centre of the matrix.
-   - Waits for the user to commit. Any joystick press = start. Hold center 1.5 s = exit back to launcher without running your app.
+1. **Loading screen** (`screens.loading_screen()`): a rotating clockwise spinner — a 2×2 ring on 8×8 displays, an 8-pixel diamond on ≤ 16, a 16-pixel circle on larger panels. Waits for the user to commit. Any joystick press = start. Hold center 1.5 s = exit back to launcher without running your app.
 
 2. **Your app** runs.
    - For games: play one round, return its score.
    - For passive apps (no win/lose): run until either the user holds center to exit, or the app detects 10 s of inactivity and bails to the end screen.
 
 3. **End-of-session screen** (one of two):
-   - `screens.game_over_screen(score)` — for games. Two red flashes, then a red halftone bar at the top + the score rendered in amber. ≤2 digit scores are static; ≥3 digit scores marquee.
-   - `screens.end_screen()` — for passive apps. Green halftone bar at the top + an amber left-pointing arrow. No score.
+   - `screens.game_over_screen(score)` — for games. Scrolling red/orange checker banner top + bottom, score centred in size-appropriate font (3×5, 5×8, or 7×9 by height). Scores that don't fit the display width marquee horizontally. Tall displays (h ≥ 24) get a small "SCORE" label above.
+   - `screens.end_screen()` — for passive apps. Scrolling blue/green checker banner + a filled amber left-pointing arrow.
    - Both screens accept the same inputs: **tap any direction** = restart your app, **hold center 1.5 s** = back to launcher.
 
 Your `run()` function is responsible for wiring these three pieces together. The standard shape is:
 
 ```python
-def run(neopixel, joystick):
-    # ... bind your own hardware refs ...
-    screens.init(neopixel, joystick)
+def run(neopixel, joystick, display=None, screens_np=None):
+    # ... bind your own module-globals from the args ...
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return
@@ -102,6 +121,8 @@ def run(neopixel, joystick):
 
 For passive apps, replace `game_over_screen(score)` with `end_screen()` and drop the score concept.
 
+The `screens.init` line is verbose because it has to cope with the standalone case (`display=None`, `screens_np=None`), but every app uses it verbatim — copy-paste from the templates.
+
 ---
 
 ## Repo layout
@@ -112,37 +133,35 @@ LumaMatrix/
 │   ├── main.py              ← launcher, gets flashed as main.py on the Pico
 │   └── apps/
 │       ├── _screens.py      ← shared lifecycle screens (loading/game-over/end)
-│       ├── _fonts.py        ← loads fonts.json, exposes FONT_3X5 / FONT_5X8
+│       ├── _fonts.py        ← loads fonts.json, exposes FONT_3X5 / FONT_5X8 / FONT_7X9
 │       ├── reaction.py      ← one of the games
 │       ├── flappy.py
 │       ├── ...
 │       └── <your_app>.py    ← your new app goes here
-├── web/                     ← browser simulator (TypeScript)
-│   ├── index.html           ← the simulator UI
-│   ├── compile.mjs          ← esbuild bundler
-│   ├── package.json         ← `npm install && npm run watch`
+├── web-toolkit/             ← Next.js app: LumenSimulator + LumenDesigner
+│   ├── package.json         ← `npm install && npm run dev`
 │   └── src/
-│       ├── main.ts          ← simulator entry point (mounts UI, boots launcher)
-│       ├── launcher.ts      ← port of main.py
-│       ├── screens.ts       ← port of _screens.py
-│       ├── fonts.ts         ← port of _fonts.py
-│       ├── letter-mask.ts   ← LUMATRIX word-clock mask helper
-│       ├── runtime/
-│       │   └── time.ts      ← ticks_ms / ticks_diff / sleep_ms
-│       ├── hardware/
-│       │   ├── neopixel.ts  ← NeoPixel buffer + flush callback
-│       │   ├── joystick.ts  ← Joystick with active-low pin.value()
-│       │   └── slide.ts     ← slide switch
-│       ├── ui/              ← grid renderer, mode toggle, on-screen joystick
-│       └── apps/
-│           ├── reaction.ts  ← port of reaction.py
-│           ├── connect4.ts
-│           ├── ...
-│           └── <your_app>.ts  ← your new app (web-first path)
+│       ├── app/             ← Next.js routes (/, /simulator, /pixel-designer)
+│       └── lib/
+│           ├── simulator/
+│           │   ├── launcher.ts          ← port of main.py
+│           │   ├── screens.ts           ← port of _screens.py
+│           │   ├── fonts.ts             ← port of _fonts.py
+│           │   ├── runtime/time.ts      ← ticks_ms / ticks_diff / sleep_ms
+│           │   ├── hardware/            ← NeoPixel, joystick, slide
+│           │   └── apps/
+│           │       ├── reaction.ts      ← port of reaction.py
+│           │       ├── ...
+│           │       └── <your_app>.ts    ← your new app (sim-first path)
+│           └── pixel-designer/
 ├── shared/
-│   └── fonts.json           ← font definitions (copy to Pico's filesystem root; also imported by the sim at build time)
+│   ├── fonts.json              ← font definitions (copy to / on the Pico; also imported by the simulator at build time)
+│   ├── hardware-presets.json   ← canonical display sizes (8×8, 16×16, 32×8, 8×32, 32×32)
+│   └── design/
+│       └── boot-animation.json ← launcher boot animation (copy to / on the Pico)
 └── docs/
     ├── AUTHORING.md         ← this file
+    ├── responsive-scaling.md
     └── apps/
         ├── reaction.md      ← per-app docs
         ├── flappy.md
@@ -150,13 +169,27 @@ LumaMatrix/
         └── <your_app>.md    ← your app's docs go here
 ```
 
-The two trees mirror each other. Every `python/apps/foo.py` ideally has a `web/src/apps/foo.ts` sibling, with both registered in their respective launcher (`python/main.py` and `web/src/launcher.ts`). Apps that only exist on one side are an in-progress state — not a permanent split.
+The Python and simulator trees mirror each other. Every `python/apps/foo.py` ideally has a `web-toolkit/src/lib/simulator/apps/foo.ts` sibling, with both registered in their respective launcher (`python/main.py` and `web-toolkit/src/lib/simulator/launcher.ts`). Apps that only exist on one side are an in-progress state — not a permanent split.
 
 Two things to keep in mind:
 
 - On the Pico, `/apps` is on `sys.path` via the launcher's `sys.path.append("/apps")` at the top of `python/main.py`. That's why your app can `import _screens` directly without a package prefix.
-- The launcher and `python/apps/_screens.py` both run from the same `np` and `joystick` references; nothing is duplicated. Your app gets its own bindings via `run()`'s parameters.
 - The leading underscore on `_screens.py` and `_fonts.py` is a convention: it marks these as **internal shared modules**, visually separating them from the actual apps in the same folder. They behave like any other Python module. Most apps alias on import (`import _screens as screens`) so the in-code calls stay readable.
+
+### Files to copy to the Pico
+
+After editing in this repo, the deploy is:
+
+| Source | Pico path |
+|---|---|
+| `python/main.py` | `/main.py` |
+| `python/apps/_fonts.py` | `/apps/_fonts.py` |
+| `python/apps/_screens.py` | `/apps/_screens.py` |
+| `python/apps/<each_app>.py` | `/apps/<each_app>.py` |
+| `shared/fonts.json` | `/fonts.json` |
+| `shared/design/boot-animation.json` | `/boot-animation.json` |
+
+The two JSONs are optional — the launcher falls back gracefully if they're missing (digit-only fallback font, blank 300 ms boot pause). But you want both for a proper experience.
 
 ---
 
@@ -168,44 +201,52 @@ The single source of truth for entry, exit, and end-of-session UI. Every app imp
 
 | Symbol | What it does |
 |---|---|
-| `init(np, joystick)` | Bind hardware refs. **Call once at the top of `run()`.** Required before any other screens function. |
-| `loading_screen()` | Spinner, waits for press. Returns `"start"` or `"exit"`. |
-| `game_over_screen(score)` | Red flash → halftone + score. Returns `"restart"` or `"exit"`. |
-| `end_screen()` | Green halftone + arrow. Returns `"restart"` or `"exit"`. |
-| `show_digit_briefly(digit, color, hold_ms)` | Render a single digit, hold for `hold_ms`. Returns `"exit"` (if user bailed) or `None`. Useful for level/life indicators during gameplay. |
+| `init(neopixel, joystick, w=None, h=None)` | Bind hardware refs and dimensions. **Call once at the top of `run()`.** Required before any other screens function. `w` / `h` default to 8 when omitted. |
+| `loading_screen()` | Responsive clockwise ring spinner — waits for press. Returns `"start"` or `"exit"`. |
+| `game_over_screen(score)` | Scrolling red/orange checker banner + score (static if it fits, marquee if it doesn't). Returns `"restart"` or `"exit"`. |
+| `end_screen()` | Scrolling blue/green checker banner + filled amber arrow. Returns `"restart"` or `"exit"`. |
+| `show_digit_briefly(digit, color, hold_ms)` | Render a number centred on the full display, hold for `hold_ms`. Returns `"exit"` (if user bailed) or `None`. Useful for level / lives indicators during gameplay. |
 | `check_exit()` | Non-blocking hold-center detector. Returns `True` once when the user has held center for 1.5 s. **Poll this every frame inside your game loop.** |
 | `any_input()` | True if any of up/down/left/right is currently held. Excludes center. Use for inactivity tracking in passive apps. |
+
+All screens are W×H responsive — they read the dimensions you passed to `init` and lay themselves out accordingly. You don't write any responsive code for screens; pass the dims through.
 
 ### `python/apps/_fonts.py`
 
 | Symbol | What it is |
 |---|---|
-| `FONT_3X5` | Dict `{char: [5 rows]}`. Uppercase A–Z, digits, basic punctuation. Used by `_screens.py` for scores, by `main.py` for the launcher marquee. |
-| `FONT_5X8` | Dict `{char: [8 rows]}`. Adds lowercase a–z and more punctuation. The 8th row is a blank baseline (line spacing). |
+| `FONT_3X5` | Dict `{char: [5 rows]}`. Uppercase A–Z, digits, basic punctuation. Used by `_screens.py` for scores on small displays, by the launcher marquee at h ≤ 8. |
+| `FONT_5X8` | Dict `{char: [8 rows]}`. Adds lowercase a–z and more punctuation. Used at 8 < h ≤ 16. |
+| `FONT_7X9` | Proportional pixel font (glyph data is 12 rows tall). Used at h > 16. |
+| `KERNING_GAP` | Pixels inserted between glyphs by renderers. Default 1. |
 | `glyph(font, ch)` | Look up a glyph with fallback chain: exact → uppercase → `' '`. Returns `None` if even `' '` is missing. |
 
-Both fonts are loaded from `/fonts.json` at module import. If that file is missing, `FONT_3X5` falls back to a digit-only embedded subset and `FONT_5X8` becomes empty.
+All three fonts are loaded from `/fonts.json` at module import. If that file is missing, `FONT_3X5` falls back to a digit-only embedded subset and the others become empty — enough for `screens.game_over_screen` to keep working but not enough for the launcher marquee to show app names.
 
 ---
 
 ## Coordinate system
 
-The matrix has two coordinate systems and you need both:
+Two coordinate systems exist and you need both, but most apps live in just one.
 
 | System | Origin | Y-axis | Used for |
 |---|---|---|---|
-| **LED coords** | `(col=0, row=0)` = bottom-left | row increases upward (row 0 = bottom strip, row 7 = top) | Indexing `np[]` directly: `np[row * 8 + col]` |
-| **Visual coords** | `(x=0, y=0)` = top-left | y increases downward (y=0 = top, y=7 = bottom) | The design tool, the _screens.py rendering, anything you draw "by eye". |
+| **LED coords** | `(col=0, row=0)` = bottom-left | row increases upward (row 0 = bottom strip, row 7 = top on 8×8) | Indexing `np[]` directly: `np[row * W + col]` |
+| **Visual coords** | `(x=0, y=0)` = top-left | y increases downward (y=0 = top, y=H-1 = bottom) | The design tool, the `_screens.py` rendering, anything you draw "by eye". |
 
-Conversion: `led_row = 7 - visual_y`.
+Conversion: `led_row = (H - 1) - visual_y`.
 
-LED chain index: `index = row * 8 + col`. So index 0 is bottom-left, index 63 is top-right.
+LED chain index: `index = row * W + col`. So index 0 is bottom-left, index `W*H - 1` is top-right.
 
-Most apps in this repo work in LED coords because that's what the hardware sees directly. The launcher and `_screens.py` work in visual coords because their layouts came from a design tool that uses top-left origin. Pick one per app and stick with it — the helper functions you write will be cleaner.
+For **classic 8×8 apps**: W = H = 8 always. Use `row * 8 + col`. Most apps in this repo work in LED coords because that's what the hardware sees directly.
 
-A common pattern in apps:
+For **responsive apps**: bind `W` and `H` from `display` inside `run()` and use them everywhere. `np` is sized `W*H`; `row * W + col` is the index.
+
+A common pattern in classic 8×8 apps:
 
 ```python
+NUM_LEDS = 64
+
 def clear():
     for i in range(NUM_LEDS):
         np[i] = (0, 0, 0)
@@ -216,7 +257,7 @@ def px(col, row, color):
         np[row * 8 + col] = color
 ```
 
-If your design tool produces visual-coord layouts, the equivalent helper is:
+The visual-coords version:
 
 ```python
 def px_visual(x, y, color):
@@ -225,31 +266,37 @@ def px_visual(x, y, color):
         np[(7 - y) * 8 + x] = color
 ```
 
+Pick one per app and stick with it — the helper functions you write will be cleaner.
+
 ---
 
 ## Using Pixel Designer designs
 
-The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** is the browser tool used to design the launcher backgrounds, game-over halftones, and end-screen arrow in this repo. It exports JSON files where each page is one screen/frame and only the lit pixels are listed. Cells you didn't paint are off.
+The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is the browser tool used to design the launcher boot animation, game-over backgrounds, and end-screen arrow in this repo. It exports JSON files where each page is one screen/frame and only the lit pixels are listed. Cells you didn't paint are off.
 
 A typical export looks like this:
 
 ```json
 {
-  "version": 3,
-  "config": {
-    "width": 8, "height": 8,
-    "origin": "bottom-left",
-    "axis": "row", "serpentine": false
+  "version": 4,
+  "colorMode": "rgb",
+  "hardware": {
+    "8x8":   { "presetId": "8x8",   "width": 8,  "height": 8  },
+    "16x16": { "presetId": "16x16", "width": 16, "height": 16 },
+    "32x32": { "presetId": "32x32", "width": 32, "height": 32 }
   },
   "pages": [
     {
       "label": "Page 1",
-      "pixels": [
-        { "index": 56, "x": 0, "y": 0, "color": "#ff0000" },
-        { "index": 58, "x": 2, "y": 0, "color": "#ff0000" }
-      ]
-    },
-    { "label": "Page 2", "pixels": [ ... ] }
+      "variants": {
+        "8x8": [
+          { "index": 56, "x": 0, "y": 0, "color": "#ff0000" },
+          { "index": 58, "x": 2, "y": 0, "color": "#ff0000" }
+        ],
+        "16x16": [ ... ],
+        "32x32": [ ... ]
+      }
+    }
   ]
 }
 ```
@@ -258,8 +305,8 @@ Each pixel object carries:
 
 | Field | What it is |
 |---|---|
-| `index` | LED chain position 0..63. **Use this directly** as `np[index] = (r, g, b)`. |
-| `x`, `y` | Visual coordinates (`x` = col 0..7 left→right, `y` = row 0..7 top→bottom). Redundant with `index` but handy for math. |
+| `index` | LED chain position for that variant's display size. **Use this directly** as `np[index] = (r, g, b)`. |
+| `x`, `y` | Visual coordinates (`x` = col left→right, `y` = row top→bottom). Redundant with `index` but handy for math. |
 | `color` | CSS hex string `"#RRGGBB"`. Full 8-bit per channel — needs dimming for the matrix. |
 
 ### Two ways to embed a design
@@ -272,7 +319,6 @@ PAGES_HEX = (
     {  # Page 1
         56: "#ff0000", 58: "#ff0000", 60: "#ff0000", 62: "#ff0000",
         49: "#ff0000", 51: "#ff0000", 53: "#ff0000", 55: "#ff0000",
-        # ... more pixels ...
     },
     {  # Page 2
         # ...
@@ -282,23 +328,22 @@ PAGES_HEX = (
 
 Copy-paste the JSON's `pixels` arrays and collapse each one into the `{index: hex}` form. It's compact and lives next to the code that uses it.
 
-**Option B — keep the JSON file on the Pico and load it at runtime.** Best for larger or more frequently-edited designs.
+**Option B — keep the JSON file on the Pico and load it at runtime.** Best for larger or multi-variant designs (e.g. one design with 8×8 / 16×16 / 32×32 variants).
 
 ```python
 import json
 
-def load_pages(path):
+def load_variant(path, key):
+    """Load the pages of one display variant. Returns a list of {index: hex}."""
     with open(path) as f:
         data = json.load(f)
     pages = []
     for page in data["pages"]:
-        d = {}
-        for p in page["pixels"]:
-            d[p["index"]] = p["color"]
-        pages.append(d)
+        pixels = page.get("variants", {}).get(key, [])
+        pages.append({p["index"]: p["color"] for p in pixels})
     return pages
 
-PAGES_HEX = load_pages("/designs/my_design.json")
+PAGES_HEX = load_variant("/designs/my_design.json", "8x8")
 ```
 
 Drop the JSON file alongside `main.py` on the Pico (e.g. `/designs/my_design.json`) and load it once at app startup.
@@ -364,10 +409,9 @@ LEDs that appear in only one page fade naturally to or from black.
 
 ### Tips and pitfalls
 
-- **Always dim.** The JSON colors are full-intensity (e.g. `#ffffff` = `(255, 255, 255)`); pushing those straight to the strip is painful at close range. Stick with `BRIGHTNESS ≈ 0.20–0.30` unless you have a specific reason.
-- **Use `index`, not `(x, y)`.** Both fields are exported, but `index` is the LED chain position you can write to `np[]` directly. The `(x, y)` coords are convenient for understanding the design but require a `7 - y` conversion to get the LED row.
-- **Don't trust the JSON's `width`/`height` config beyond 8×8.** This codebase assumes 8×8. If you design something larger in the tool, the export will still work but won't fit the matrix.
-- **The `instructions` field is free LLM context.** Every export includes a schema description and rendering hint at the bottom. If you're vibe-coding integration, paste that section into your prompt.
+- **Always dim.** The JSON colors are full-intensity; pushing those straight to the strip is painful at close range. Stick with `BRIGHTNESS ≈ 0.20–0.30` unless you have a specific reason.
+- **Use `index`, not `(x, y)`.** Both fields are exported, but `index` is the LED chain position you can write to `np[]` directly. The `(x, y)` coords are convenient for understanding the design but require a `(H-1) - y` conversion to get the LED row.
+- **Pick the right variant.** Pixel Designer designs carry one variant per canonical display size. If your app is classic (8×8), use the `"8x8"` variant. Responsive apps that want to look good at multiple sizes can switch variant by display.
 - **For animation, prefer Option A (embedded).** Iterating designs you have to re-flash the JSON is slower than re-flashing one `.py` file.
 
 ---
@@ -433,7 +477,7 @@ Use for "tap to jump" style controls where you don't want the action to repeat w
 
 Walk through the whole process from blank file to running in the launcher.
 
-> **Branching note:** if the user picked the web-first workflow ([Where to start](#where-to-start-web-simulator-first)), do [Authoring for the web simulator](#authoring-for-the-web-simulator) first, get the app feature-complete and signed off in the browser, then come back here for the port to Python. The two paths converge at step 6 (registering in the launcher).
+> **Branching note:** if the user picked the simulator-first workflow ([Where to start](#where-to-start-simulator-first)), do [Authoring in the web simulator](#authoring-in-the-web-simulator) first, get the app feature-complete and signed off in the browser, then come back here for the port to Python. The two paths converge at step 6 (registering in the launcher).
 
 ### 1. Create `python/apps/<name>.py`
 
@@ -445,7 +489,7 @@ touch python/apps/coolgame.py
 
 ### 2. Standard header
 
-Every app starts the same way:
+Every classic 8×8 app starts the same way:
 
 ```python
 from machine import Pin
@@ -462,6 +506,17 @@ JOY_UP = None
 ```
 
 The `np = None` / `JOY_* = None` pattern is important: **never construct `NeoPixel(...)` or `Pin(...)` at module top level.** That would allocate hardware on `import`, which happens when the launcher first boots. You'd end up with two NeoPixel objects pointing at the same physical strip. Always bind them inside `run()`.
+
+For a **responsive app**, also declare:
+
+```python
+RESPONSIVE = True
+
+W = 8
+H = 8
+```
+
+The launcher reads `RESPONSIVE` once at boot; the `W`/`H` globals get bound inside `run()` from `display["width"]` / `display["height"]`.
 
 ### 3. Write your gameplay
 
@@ -486,11 +541,13 @@ Returning `None` for the "exit" case keeps the `run()` flow clean — see the bo
 ### 4. Wire up `run()`
 
 ```python
-def run(neopixel, joystick):
+def run(neopixel, joystick, display=None, screens_np=None):
     global np, JOY_UP        # whichever module globals you used
     np = neopixel
     JOY_UP = joystick["up"]
-    screens.init(neopixel, joystick)
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return
@@ -521,7 +578,7 @@ if __name__ == "__main__":
     run(_np, _joy)
 ```
 
-Calling `run()` once (not in a `while True:`) means hold-center 1.5 s actually exits the script back to the Thonny REPL during dev. That's deliberate.
+Calling `run()` with only the first two args means `display` and `screens_np` default to `None`, and `screens.init` falls back to 8×8 — fine for dev on the actual kit. Hold-center 1.5 s exits the script back to the Thonny REPL during dev. That's deliberate.
 
 ### 6. Register in the launcher
 
@@ -533,11 +590,23 @@ import coolgame                              # ← add this
 
 # ...
 
-APPS = [reaction, letters, flappy, pong, invaders, doom, breakout, snake, coolgame]
-#                                                                              ← add here
+APPS = [
+    reaction,
+    connect4,
+    pong,
+    breakout,
+    simonsays,
+    dinojump,
+    snake,
+    flappy,
+    invaders,
+    doom,
+    watch,
+    coolgame,                                # ← add here
+]
 ```
 
-The position in `APPS` determines the app's slot in the launcher's bottom track (and which number the user sees). Adding to the end is the safe default.
+The position in `APPS` determines the app's slot in the launcher's bottom track (and which number the user sees). The simulator's `APPS` order in `web-toolkit/src/lib/simulator/launcher.ts` is the canonical order — keep both lists in sync. Adding to the end is the safe default.
 
 ### 7. Write your docs
 
@@ -554,7 +623,7 @@ Copy `<name>.py` to `/apps/` on the Pico's filesystem, alongside the others. The
 Scoring isn't free: it has to work with the screens, and it has to make the player feel something. Two anchor points define a good scoring curve:
 
 - **~10 points should be reachable in any session.** Even a casual or unlucky run should land here. This is the "you played" baseline. Below ~10 feels punishing.
-- **99 points is the soft ceiling.** Above 99 the game-over screen has to marquee the score instead of showing it statically. The static display (red halftone + 2 digits) is the canonical look — keep your scoring inside it.
+- **99 points is the soft ceiling.** Scores that fit the display width get the static layout; anything taller marquees horizontally. The static display reads better and is the canonical look — keep your scoring inside it.
 
 These two points together imply a roughly **10–60 point session range**, with skilled play occasionally reaching 80–99 and very rarely exceeding 99 (where the marquee kicks in as a "you've gone deep" reward, not a normal outcome).
 
@@ -590,23 +659,6 @@ For player resources:
 - **Lives are a length lever, not a score lever.** Breakout has 3 lives; that bounds the session even when the player is mostly competent.
 - **Don't give the player too many bullets/jumps/lives at once.** Each one extends the game and multiplies the score.
 
-### Per-app score audit
-
-How the existing apps line up against the 10–99 target:
-
-| App | Per-action | Difficulty ramp | Typical | Expert | Comment |
-|---|---|---|---|---|---|
-| ArrowReaction | 1–8 (bar remaining) | duration shrinks 60 ms/hit, floor 600 ms | 20–50 | 60–99 | Per-action is variable (1–8), so totals climb fast. Fine. |
-| Flappy | +1 per wall | none — fixed wall speed | 10–25 | 50+ | **Could exceed 99.** Add wall-speed ramp if you want a tighter ceiling. |
-| Pong | +1 per hit | ×1.15 every 10 hits, capped | 8–30 | 60+ | Ramp eventually overwhelms the player. |
-| SpaceInvaders | +1 per alien | 5 discrete levels at score 8, 20, 35, 55 | 15–35 | 70+ | Ramp working. |
-| Breakout | +1 per brick | 5 levels, faster ball each | 20–60 | 80+ | Bricks are finite per level, but levels loop. |
-| Snake | +1 per food | move interval shrinks every 5 foods | 10–25 | 40–60 | Capped at 61 (grid full). |
-| Doom | n/a | n/a | — | — | Passive (no score). |
-| LetterDisplay | n/a | n/a | — | — | Passive (no score). |
-
-If a new app routinely produces 100+ scores during normal play, tighten the difficulty ramp before changing the per-action value.
-
 ---
 
 ## Per-app documentation
@@ -629,6 +681,10 @@ Every app **must** have a doc at `docs/apps/<name>.md`. Use this template:
 ## Mechanics
 
 (Internal model: what's moving, what spawns when, what kills the player.)
+
+## Responsive scaling
+
+(How the app behaves on non-8×8 displays. Pixel-matching upscale, UI upscaling, or drawing upscaling — see `docs/responsive-scaling.md` for the categories.)
 
 ## Tunables
 
@@ -659,14 +715,14 @@ The existing apps in `docs/apps/` are filled-in examples; copy the closest one a
 ### Do
 
 - ✅ **Construct hardware inside `run()`**, never at module top level. Use `np = None` / `JOY_* = None` and bind them inside `run()` and the `__main__` block.
-- ✅ **Always call `screens.init(np, joystick)` once at the start of `run()`** before any other screens function.
+- ✅ **Always call `screens.init(...)` once at the start of `run()`** before any other screens function. Pass through `screens_np` and `display` from `run`'s args.
 - ✅ **Poll `screens.check_exit()` every frame** inside your game loop. Without it, the user can't bail mid-game.
 - ✅ **Return `None` from your `play_one_round()` when exit is triggered**, so the outer `run()` can clean up.
 - ✅ **Use the shared `screens` and `fonts` modules** for anything that touches lifecycle UI or text. Don't roll your own.
 - ✅ **Match the existing visual conventions** — moderate brightness (rgb values ~30–60 of 255), per-game accent colors, dim background hues. Full `#ffffff` (255 white) at close range is painful.
 - ✅ **Test in standalone mode** (`Run` in Thonny) before integrating into the launcher. Standalone gives you a clean Ctrl-C escape if something hangs.
 - ✅ **Write your `docs/apps/<name>.md`** before considering the app done. If you can't describe the scoring in plain English, it probably needs another pass.
-- ✅ **Add your app to `APPS = [...]` in `python/main.py`** to make the launcher see it.
+- ✅ **Add your app to `APPS = [...]` in `python/main.py`** to make the launcher see it — and update the simulator's `APPS` list to match.
 
 ### Don't
 
@@ -674,29 +730,29 @@ The existing apps in `docs/apps/` are filled-in examples; copy the closest one a
 - ❌ **Don't put `while True: run(_np, _joy)` in your `__main__` block.** Use a single `run(_np, _joy)`. Hold-center then returns to REPL during dev (which is what you want in Thonny). The internal restart loop inside `run()` already handles "user wants to play again".
 - ❌ **Don't reimplement game-over UI inside your app.** No private flash sequences, no private score marquees. Use `screens.game_over_screen(score)`.
 - ❌ **Don't read `sys.stdin` from a game loop unless you handle Ctrl-C explicitly.** The serial byte 0x03 gets eaten by `sys.stdin.read(1)` instead of triggering `KeyboardInterrupt`, which means Thonny can't break you out. See `python/apps/letters.py` for how to handle this.
-- ❌ **Don't block in `sleep_ms()` for longer than ~50 ms at a time** if you're between input checks. The user expects sub-100ms response to direction presses; a single `sleep_ms(500)` makes the joystick feel laggy.
+- ❌ **Don't block in `sleep_ms()` for longer than ~50 ms at a time** if you're between input checks. The user expects sub-100 ms response to direction presses; a single `sleep_ms(500)` makes the joystick feel laggy.
 - ❌ **Don't run unbounded `while True:` loops without `sleep_ms()`.** Even if you have nothing to do, sleep at least 10 ms per iteration so Ctrl-C and `check_exit()` get a chance to fire.
 - ❌ **Don't hardcode the fonts.** Import from `_fonts.py`. There is one font module for the whole project.
-- ❌ **Don't design a scoring system that routinely produces 100+ scores.** It's not wrong, but it forces the marquee path on every game and waste's the static design's expressive range. Re-read [Scoring methodology](#scoring-methodology).
-- ❌ **Don't skip the loading screen.** Even for an app where it feels redundant, that 2×2 spinner is the user's "did I just launch the right thing?" confirmation. Always start with `screens.loading_screen()`.
+- ❌ **Don't design a scoring system that routinely produces 100+ scores.** It's not wrong, but it forces the marquee path on every game and wastes the static design's expressive range. Re-read [Scoring methodology](#scoring-methodology).
+- ❌ **Don't skip the loading screen.** Even for an app where it feels redundant, that spinner is the user's "did I just launch the right thing?" confirmation. Always start with `screens.loading_screen()`.
 
 ---
 
-## Authoring for the web simulator
+## Authoring in the web simulator
 
-The web simulator under `web/` is a TypeScript reimplementation of the launcher and shared modules, designed so that an app written against the simulator's API ports to MicroPython with mostly mechanical edits.
+The web simulator under `web-toolkit/` is a TypeScript reimplementation of the launcher and shared modules, designed so that an app written against the simulator's API ports to MicroPython with mostly mechanical edits.
 
 ### Dev loop
 
 ```bash
-cd web
+cd web-toolkit
 npm install          # one-time
-npm run watch        # rebuilds dist/ on every save
+npm run dev          # Next.js dev server on http://localhost:3000
 ```
 
-Open `web/index.html` in any modern browser (file:// is fine — no server required). You'll see the LUMATRIX matrix on the left and a virtual joystick + slide switch on the right. Keyboard works too: arrow keys = D-pad, space = center, S = slide.
+Open [http://localhost:3000/simulator](http://localhost:3000/simulator). You'll see a virtual LED matrix and a virtual joystick + slide switch. Keyboard works too: arrow keys = D-pad, space = center, S = slide. The display size is configurable in-page so you can preview your app at 8×8, 16×16, 32×32, etc.
 
-The watcher rebuilds in a few hundred ms. Refresh the browser after each save.
+The dev server hot-reloads on save.
 
 ### What's mirrored from MicroPython
 
@@ -715,12 +771,12 @@ The watcher rebuilds in a few hundred ms. Refresh the browser after each save.
 ### Standard shape of a TS app
 
 ```ts
-import type { NeoPixel, RGB } from "../hardware/neopixel";
-import type { Joystick } from "../hardware/joystick";
+import type { NeoPixel, RGB, Joystick, DisplayDims } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 
 export const NAME = "MyGame";
+// Omit RESPONSIVE (or set it false) for classic 8×8 apps.
 
 const NUM_LEDS = 64;
 const FRAME_MS = 50;
@@ -750,11 +806,16 @@ async function playOneRound(np: NeoPixel, joy: Joystick): Promise<RoundResult> {
   }
 }
 
-export async function run(np: NeoPixel, joy: Joystick): Promise<void> {
-  screens.init(np, joy);
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
-    const result = await playOneRound(np, joy);
+    const result = await playOneRound(neopixel, joystick);
     if (result.kind === "exit") return;
     if ((await screens.game_over_screen(result.score)) === "exit") return;
   }
@@ -765,11 +826,11 @@ Notes:
 
 - `NAME` and `run` are the same contract as Python. The launcher (TS or PY) only cares about those two symbols.
 - The `RoundResult` discriminated union is the TS-friendly form of "return `None` for exit, score otherwise". It compiles away — at runtime it's just `{ kind: "exit" }` or `{ kind: "score", score: 42 }`.
-- `np` and `joy` are passed as arguments here (rather than stashed in module-level `let np`). Both styles work; argument-passing is more idiomatic in TS and avoids the import-time hardware allocation problem entirely. When you port to Python, the module-level `np = None` / bind-in-`run()` pattern is the equivalent.
+- `screens.init(screensNp ?? neopixel, ...)` is the same pattern as Python — pass the launcher's W×H buffer if it gave you one, otherwise fall back to the gameplay buffer.
 
 ### Registering in the simulator launcher
 
-Edit `web/src/launcher.ts`. There are two spots, just like in `python/main.py`:
+Edit `web-toolkit/src/lib/simulator/launcher.ts`. There are two spots, just like in `python/main.py`:
 
 ```ts
 // ... existing imports ...
@@ -777,11 +838,11 @@ import * as mygame from "./apps/mygame";              // ← add this
 
 // ...
 
-const APPS: readonly App[] = [reaction, connect4, mygame];
-//                                                  ↑ add here
+const APPS: readonly App[] = [reaction, connect4, /* ... */ mygame];
+//                                                          ↑ add here
 ```
 
-The order in `APPS` defines the launcher slot index, matching the Pico exactly.
+The order in `APPS` defines the launcher slot index — keep it in sync with `python/main.py`.
 
 ### Per-app docs
 
@@ -791,7 +852,7 @@ Per-app documentation lives in `docs/apps/<name>.md` regardless of which platfor
 
 ## Porting from TypeScript to MicroPython
 
-Once the user has tested the web version and is happy, port it. The translation is mostly mechanical. Work top-to-bottom through the file.
+Once the user has tested the simulator version and is happy, port it. The translation is mostly mechanical. Work top-to-bottom through the file.
 
 ### Translation table
 
@@ -799,18 +860,19 @@ Once the user has tested the web version and is happy, port it. The translation 
 |---|---|---|
 | `import * as screens from "../screens";` | `import _screens as screens` | |
 | `import { sleep_ms, ticks_ms, ticks_diff } from "../runtime/time";` | `from time import sleep_ms, ticks_ms, ticks_diff` | |
-| `import type { NeoPixel, RGB } from "../hardware/neopixel";` | Delete. MicroPython has no static types. | |
+| `import type { NeoPixel, RGB, ... } from "../types";` | Delete. MicroPython has no static types. | |
 | `export const NAME = "MyGame";` | `NAME = "MyGame"` | |
-| `export async function run(np, joy) { ... }` | `def run(np, joy):` | Drop `async` and `export`. |
+| `export const RESPONSIVE = true;` | `RESPONSIVE = True` | Only if your app is responsive. |
+| `export async function run(np, joy, display?, screensNp?) { ... }` | `def run(np, joy, display=None, screens_np=None):` | Drop `async`, `export`, type annotations; rename `screensNp` → `screens_np`. |
 | `await sleep_ms(50);` | `sleep_ms(50)` | Drop `await` everywhere. |
 | `await screens.loading_screen()` | `screens.loading_screen()` | |
 | `await screens.game_over_screen(score)` | `screens.game_over_screen(score)` | |
+| `screens.init(screensNp ?? np, joy, display?.width, display?.height);` | `screens.init(screens_np if screens_np is not None else np, joy, display["width"] if display else None, display["height"] if display else None)` | Verbose but uniform — copy from a template. |
 | `np[i] = [r, g, b];` | `np[i] = (r, g, b)` | Arrays → tuples. |
-| `joy.up.value() === 0` | `joystick["up"].value() == 0` | Property → dict key. **Also**: the launcher passes a dict in Python and an object in TS; keep both consistent. |
+| `joy.up.value() === 0` | `joystick["up"].value() == 0` | Property → dict key. |
 | `function play_one_round(np, joy) { ... }` | `def play_one_round():` and use module globals | Python apps in this repo stash `np` / joy pins in module globals bound during `run()`. |
 | `{ kind: "exit" } / { kind: "score", score }` discriminated union | `return None` for exit, `return score` for score | Then check `if score is None:` in `run()`. |
 | `const FOO: readonly RGB[] = [[0, 25, 60]]` | `FOO = ((0, 25, 60),)` | Tuples of tuples; drop annotations. |
-| `const FOO: Readonly<Record<string, RGB>> = { up: [...] }` | `FOO = {"up": (...)}` | Dict literal; drop annotation. |
 | `Math.floor(x)` | `int(x)` (truncates toward 0; for negatives use `math.floor`) | |
 | `Math.random()` | `random.random()` (import `random`) | |
 | `Array.from({ length: n }, () => 0)` | `[0] * n` | |
@@ -846,7 +908,7 @@ If anything diverges between sim and hardware, the sim is usually right — it's
 
 ## Templates
 
-### Game app (with score)
+### Game app (Python, classic 8×8)
 
 ```python
 from machine import Pin
@@ -862,7 +924,6 @@ np = None
 # Add any joystick pins your game reads:
 # JOY_UP = None
 # JOY_LEFT = None
-# ...
 
 # Tunables
 FRAME_MS = 50
@@ -894,13 +955,15 @@ def play_one_round():
         sleep_ms(FRAME_MS)
 
 
-def run(neopixel, joystick):
+def run(neopixel, joystick, display=None, screens_np=None):
     global np
     np = neopixel
     # bind your joystick pins:
     # global JOY_UP
     # JOY_UP = joystick["up"]
-    screens.init(neopixel, joystick)
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return
@@ -927,8 +990,7 @@ if __name__ == "__main__":
 ### Game app (TypeScript, web simulator)
 
 ```ts
-import type { NeoPixel, RGB } from "../hardware/neopixel";
-import type { Joystick } from "../hardware/joystick";
+import type { NeoPixel, RGB, Joystick, DisplayDims } from "../types";
 import * as screens from "../screens";
 import { sleep_ms, ticks_diff, ticks_ms } from "../runtime/time";
 
@@ -962,11 +1024,16 @@ async function playOneRound(np: NeoPixel, joy: Joystick): Promise<RoundResult> {
   }
 }
 
-export async function run(np: NeoPixel, joy: Joystick): Promise<void> {
-  screens.init(np, joy);
+export async function run(
+  neopixel: NeoPixel,
+  joystick: Joystick,
+  display?: DisplayDims,
+  screensNp?: NeoPixel,
+): Promise<void> {
+  screens.init(screensNp ?? neopixel, joystick, display?.width, display?.height);
   while (true) {
     if ((await screens.loading_screen()) === "exit") return;
-    const result = await playOneRound(np, joy);
+    const result = await playOneRound(neopixel, joystick);
     if (result.kind === "exit") return;
     if ((await screens.game_over_screen(result.score)) === "exit") return;
   }
@@ -975,7 +1042,7 @@ export async function run(np: NeoPixel, joy: Joystick): Promise<void> {
 
 After this is feature-complete and the user has signed off in the browser, port it to `python/apps/<name>.py` using the [translation table](#translation-table).
 
-### Passive app (no score, ends on inactivity)
+### Passive app (Python, no score, ends on inactivity)
 
 ```python
 from machine import Pin
@@ -1010,10 +1077,12 @@ def show_animation():
         sleep_ms(FRAME_MS)
 
 
-def run(neopixel, joystick):
+def run(neopixel, joystick, display=None, screens_np=None):
     global np
     np = neopixel
-    screens.init(neopixel, joystick)
+    screens.init(screens_np if screens_np is not None else neopixel, joystick,
+                 display["width"] if display else None,
+                 display["height"] if display else None)
     while True:
         if screens.loading_screen() == "exit":
             return
@@ -1059,6 +1128,8 @@ if ch in ("\x03", "\x04"):   # Ctrl-C, Ctrl-D
 
 **Standalone runs the app twice.** Caused by `while True: run(_np, _joy)` in `__main__`. The internal restart loop inside `run()` already handles "user wants to play again". The outer `while True:` only kicks in when the user holds center to exit, which immediately re-enters loading — feels broken. Use a single `run(_np, _joy)`.
 
+**Launcher shows blank app names.** The fallback in `_fonts.py` only covers digits 0–9 — if `/fonts.json` is missing on the Pico, scores render but app names render as empty space. Always deploy `shared/fonts.json` to `/fonts.json` on the Pico.
+
 ---
 
 ## Hardware reference
@@ -1067,7 +1138,7 @@ For when you need it. From the LUMATRIX cheat sheet:
 
 | Component | GPIO | Notes |
 |---|---|---|
-| NeoPixel data | 19 | 64 LEDs, ws2812-compatible |
+| NeoPixel data | 19 | 64 LEDs on the stock 8×8 board, ws2812-compatible |
 | Joystick up | 3 | active-low |
 | Joystick down | 6 | active-low |
 | Joystick left | 7 | active-low |
@@ -1076,6 +1147,8 @@ For when you need it. From the LUMATRIX cheat sheet:
 | Slide switch | 9 | toggle, 0 or 1 |
 
 The launcher constructs all of these in `python/main.py` and passes them as a dict to your `run()`. Don't repeat the constructors in your app file — let the launcher own them.
+
+If you're using a larger display, set `DISPLAY_WIDTH` and `DISPLAY_HEIGHT` at the top of `python/main.py` (and `LED_PIN` if you've rewired). The launcher and screens become responsive automatically; classic apps still get an 8×8 buffer and the launcher upscales their output onto the larger panel.
 
 ---
 

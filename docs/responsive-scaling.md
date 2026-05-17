@@ -1,6 +1,6 @@
 # Responsive scaling per app
 
-How each LumenSimulator app currently behaves when the display size leaves the native 8×8. The simulator's runtime supports three rendering strategies; each app sits in one of them today.
+How each LumenSimulator app currently behaves when the display size leaves the native 8×8. The simulator's runtime supports three rendering strategies; each app sits in one of them today. The source of truth for app code lives under `web-toolkit/src/lib/simulator/apps/`.
 
 ## The three categories
 
