@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LUMATRIX references — rename checklist</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+      color: #1a1a1a;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+    h2 { font-size: 1.15rem; margin: 2rem 0 0.4rem; padding-top: 0.5rem; border-top: 2px solid #eaeaea; }
+    h3 { font-size: 1rem; margin: 1.25rem 0 0.4rem; color: #555; }
+    p { margin: 0.4rem 0 0.8rem; color: #444; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.88rem; margin-bottom: 0.5rem; }
+    th, td { border-bottom: 1px solid #eee; padding: 0.5rem 0.5rem; vertical-align: top; text-align: left; }
+    th { background: #f8f8f8; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+    th.cb, td.cb { width: 56px; text-align: center; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, Menlo, monospace; font-size: 0.85em; background: #f4f4f4; padding: 0.05em 0.3em; border-radius: 3px; word-break: break-word; }
+    tr.todo-active { background: #fff8d6; }
+    tr.is-done { background: #e8f5e9; }
+    tr.is-done td.ref, tr.is-done td.file, tr.is-done td.use { text-decoration: line-through; color: #888; }
+    input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #1a73e8; }
+    .controls { margin: 1.25rem 0 0.5rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .controls button { padding: 0.35rem 0.8rem; cursor: pointer; font-size: 0.85rem; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+    .controls button:hover { background: #f4f4f4; }
+    .stats { color: #666; font-size: 0.85rem; }
+    #output {
+      width: 100%;
+      min-height: 240px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, Menlo, monospace;
+      font-size: 0.82rem;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    #copy { margin-top: 0.5rem; }
+    .empty { color: #888; font-style: italic; }
+    .sticky-footer { position: sticky; bottom: 0; background: #fff; padding-top: 0.5rem; padding-bottom: 0.75rem; border-top: 1px solid #eee; margin-top: 2rem; z-index: 10; box-shadow: 0 -8px 12px -8px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body>
+  <h1>LUMATRIX references — rename checklist</h1>
+  <p>
+    Every place "lumatrix", "luma matrix", or "luma trix" appears in the tree.
+    Use the <strong>TODO</strong> column to flag references you want to change, and the
+    <strong>DONE</strong> column once they're updated. State persists in this browser via
+    <code>localStorage</code>. The text box at the bottom collects every row that's TODO but
+    not yet DONE — copy it into an LLM (or your notes) to act on the remaining items.
+  </p>
+  <p>
+    The product name "LUMATRIX" / "LumaTrix" refers to the ZHAW kit at
+    <a href="https://lumatrix.zhaw.ch" target="_blank" rel="noopener">lumatrix.zhaw.ch</a>;
+    renaming the GitHub repo is independent of rebranding the project.
+  </p>
+
+  <div class="controls">
+    <button id="markAllTodo" type="button">Mark all TODO</button>
+    <button id="clearTodo" type="button">Clear TODO</button>
+    <button id="clearDone" type="button">Clear DONE</button>
+    <button id="resetAll" type="button">Reset all state</button>
+    <span class="stats" id="stats"></span>
+  </div>
+
+  <div id="sections"></div>
+
+  <div class="sticky-footer">
+    <h2 style="border-top: none; margin-top: 0;">Outstanding TODOs</h2>
+    <p>Rows checked as TODO but not DONE, grouped by section. Copy/paste into an LLM.</p>
+    <textarea id="output" readonly></textarea>
+    <div><button id="copy" type="button">Copy to clipboard</button> <span class="stats" id="copyStatus"></span></div>
+  </div>
+
+<script>
+"use strict";
+
+const STORAGE_KEY = "lumatrix-rename-checklist-v1";
+
+const DATA = [
+  {
+    id: "repo",
+    title: "1. Repo identity — change if renaming",
+    description: "These embed the GitHub slug or npm package name.",
+    rows: [
+      { id: "repo-origin",      ref: "https://github.com/fabiopigi/lumatrix-collection.git", file: ".git/config (origin URL — not a tracked file)", use: "Push/pull remote. Update with `git remote set-url origin <new>` after renaming." },
+      { id: "repo-web-pkg",     ref: '"name": "lumatrix-simulator"', file: "web/package.json:2", use: "npm package name for the legacy 8×8 simulator under web/." },
+      { id: "repo-web-lock",    ref: '"name": "lumatrix-simulator"', file: "web/package-lock.json:2, :8", use: "Mirrors the package.json name. Regenerates on npm install." },
+    ],
+  },
+  {
+    id: "storage",
+    title: "2. localStorage keys — user-data persistence",
+    description: "Changing these breaks existing browser sessions (designs / display configs revert to defaults).",
+    rows: [
+      { id: "ls-designer",      ref: "lumatrix-pixel-designer-design",      file: "web-toolkit/src/lib/pixel-designer/config.ts:51",      use: "Stores the user's current pixel-designer design across reloads." },
+      { id: "ls-sim-display",   ref: "lumatrix-simulator-display",          file: "web-toolkit/src/lib/simulator/display-config.ts:33",  use: "Stores the user's selected display preset (8×8 / 16×16 / …)." },
+      { id: "ls-doc-stale",     ref: "lumatrix-pixel-designer-config",      file: "docs/pixel-designer-usage.md:287",                    use: "Doc-only reference — actual code uses ‘…-design’. Either the doc is stale or a second key was planned. Worth fixing while you're here." },
+    ],
+  },
+  {
+    id: "schema",
+    title: "3. JSON schema identifiers — cross-tool contract",
+    description: "Schema strings embedded in shared JSON files. Loaders may pin/version against these.",
+    rows: [
+      { id: "schema-fonts",     ref: "lumatrix-fonts-v1",                   file: "shared/fonts.json:2",                                 use: "Schema id for the shared pixel-font catalog (read by simulator, Python apps, designer)." },
+      { id: "schema-presets",   ref: "lumatrix-hardware-presets-v1",        file: "shared/hardware-presets.json:2",                      use: "Schema id for the canonical hardware presets file (just added)." },
+    ],
+  },
+  {
+    id: "code",
+    title: "4. Internal code identifiers",
+    description: "Variable, function, and constant names. Pure refactor if you rename them — no external contract.",
+    rows: [
+      { id: "code-mask-config",   ref: "LUMATRIX_MASK",     file: "web-toolkit/src/lib/pixel-designer/config.ts:3,22",                                use: "Default 8×8 word-clock letter mask." },
+      { id: "code-mask-modal",    ref: "LUMATRIX_MASK",     file: "web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:4,221",            use: "Imported + used by the \"Use LUMATRIX preset\" button." },
+      { id: "code-isLuma-config", ref: "isLumatrix(cfg)",   file: "web-toolkit/src/lib/simulator/display-config.ts:98",                               use: "Predicate: is the configured display the native 8×8?" },
+      { id: "code-isLuma-grid",   ref: "isLumatrix",        file: "web-toolkit/src/app/simulator/_components/simulator-grid.tsx:15,82",               use: "Drives mask-mode rendering." },
+      { id: "code-isLuma-sim",    ref: "isLumatrix",        file: "web-toolkit/src/app/simulator/_components/simulator.tsx:7,50",                     use: "Gates mask-mode availability." },
+      { id: "code-lumatrixNp",    ref: "lumatrixNp",        file: "web-toolkit/src/lib/simulator/launcher.ts:458,494 (and comments at :11, :455)",    use: "The legacy 64-LED source buffer used for non-responsive apps." },
+    ],
+  },
+  {
+    id: "ui",
+    title: "5a. Product/brand name in UI strings",
+    description: "Visible to users. Keep as-is unless you're rebranding the project away from the ZHAW kit.",
+    rows: [
+      { id: "ui-web-title",       ref: "<title>LUMATRIX Simulator</title>", file: "web/index.html:6",                                                    use: "Browser tab title for legacy simulator." },
+      { id: "ui-built-title",     ref: "<title>LUMATRIX Simulator</title>", file: "web-apps/simulator.html:6",                                           use: "Same title in the built bundle. Regenerates from web/." },
+      { id: "ui-preset-btn",      ref: "\"Use LUMATRIX preset\"",           file: "web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:224", use: "Button label." },
+      { id: "ui-reset-btn",       ref: "\"Reset to LUMATRIX defaults\"",    file: "web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:242", use: "Button label." },
+      { id: "ui-mode-toggle",     ref: "Tooltip text",                      file: "web-toolkit/src/app/simulator/_components/mode-toggle.tsx:32",        use: "Tooltip explaining mask mode is the LUMATRIX 8×8 word-clock layout." },
+      { id: "ui-preset-label",    ref: "\"8×8 (LumaTrix)\"",                file: "shared/hardware-presets.json:5",                                       use: "Preset label shown in dropdowns." },
+    ],
+  },
+  {
+    id: "comment",
+    title: "5b. Brand name in comments & docstrings",
+    description: "Internal comments. Mechanical to update if you rebrand.",
+    rows: [
+      { id: "comment-screens-py",    ref: "Module docstring",       file: "python/apps/_screens.py:1",                            use: "\"Shared lifecycle screens for LUMATRIX apps.\"" },
+      { id: "comment-fonts-py",      ref: "Module docstring",       file: "python/apps/_fonts.py:1",                              use: "\"Common font definitions for LUMATRIX apps.\"" },
+      { id: "comment-dinojump-py",   ref: "Module docstring",       file: "python/apps/dinojump.py:1",                            use: "\"Chrome-dino-style side scroller for LUMATRIX.\"" },
+      { id: "comment-letter-mask",   ref: "Comment",                file: "web/src/letter-mask.ts:2",                             use: "\"Physical letter overlay printed on the LUMATRIX matrix.\"" },
+      { id: "comment-png-export",    ref: "JSDoc",                  file: "web-toolkit/src/lib/pixel-designer/png-export.ts:27",  use: "Doc comment with \"8×8 (LumaTrix)\" as an example column label." },
+      { id: "comment-screens-ts",    ref: "Comments",               file: "web-toolkit/src/lib/simulator/screens.ts:86,586",      use: "References to the LUMATRIX 8×8 source and the original arrow design." },
+      { id: "comment-types",         ref: "JSDoc",                  file: "web-toolkit/src/lib/simulator/types.ts:53,57,62,66",   use: "Doc comments on the App interface describing the LUMATRIX 8×8 source buffer." },
+      { id: "comment-display-cfg",   ref: "Module comment",         file: "web-toolkit/src/lib/simulator/display-config.ts:4",    use: "Module-level comment on the LUMATRIX native buffer." },
+      { id: "comment-launcher",      ref: "Comments",               file: "web-toolkit/src/lib/simulator/launcher.ts:11,335,455", use: "References to the LUMATRIX source buffer / boot-animation flow." },
+      { id: "comment-snake",         ref: "Comment",                file: "web-toolkit/src/lib/simulator/apps/snake.ts:13",       use: "Notes screens is bound to the LUMATRIX 8×8 source." },
+      { id: "comment-dinojump-ts",   ref: "Module docstring",       file: "web-toolkit/src/lib/simulator/apps/dinojump.ts:1",     use: "Mirrors the Python docstring." },
+    ],
+  },
+  {
+    id: "design",
+    title: "5c. Brand name in shared design JSON descriptions",
+    description: "Description fields inside the shared/ JSON specs.",
+    rows: [
+      { id: "design-boot",        ref: "description field",   file: "shared/design/boot-animation.json:36",   use: "Animation description references the previous \"LUMA TRIX\" marquee." },
+      { id: "design-fonts-desc",  ref: "description field",   file: "shared/fonts.json:3",                    use: "\"Pixel fonts for LUMATRIX and similar LED-matrix displays.\"" },
+      { id: "design-presets-desc",ref: "description field",   file: "shared/hardware-presets.json:3",         use: "Description references the LUMATRIX-aware tooling." },
+    ],
+  },
+  {
+    id: "doc",
+    title: "5d. Brand name in documentation",
+    description: "Markdown docs in the repo.",
+    rows: [
+      { id: "doc-readme",          ref: "Project title + body",      file: "README.md:1,3,7,26,76,77,146",                                              use: "Project title, kit description, simulator pointer, deployment notes, letter-mask note, licensing note." },
+      { id: "doc-toolkit-readme",  ref: "Tagline",                   file: "web-toolkit/README.md:3",                                                   use: "\"a Next.js app for the LUMATRIX kit\"." },
+      { id: "doc-authoring",       ref: "Body",                      file: "docs/AUTHORING.md:1,129,697,1066",                                          use: "Title, repo tree comment, screenshot caption, cheat-sheet pointer." },
+      { id: "doc-designer-usage",  ref: "Body",                      file: "docs/pixel-designer-usage.md:1,3,7,215,217,240,248,255,280,287,486",       use: "Designer guide title, intro, screenshot alts, LUMATRIX-preset references, hardware-row in the indexing table." },
+      { id: "doc-responsive",      ref: "Body",                      file: "docs/responsive-scaling.md:3,9,55",                                         use: "Describes how apps behave outside the LUMATRIX-native 8×8." },
+      { id: "doc-letters",         ref: "Body",                      file: "docs/apps/letters.md:16,58,60",                                             use: "Explains the LUMATRIX word-clock mask binding." },
+    ],
+  },
+  {
+    id: "ext",
+    title: "6. External URL — do not change",
+    description: "Refers to the ZHAW kit's official website; independent of this repo.",
+    rows: [
+      { id: "ext-zhaw", ref: "https://lumatrix.zhaw.ch", file: "README.md:3,9", use: "Link to the ZHAW LUMATRIX kit." },
+    ],
+  },
+  {
+    id: "gen",
+    title: "7. Generated build artifact — regenerates from source",
+    description: "Don't hand-edit; rebuild instead.",
+    rows: [
+      { id: "gen-simhtml", ref: "Built simulator bundle", file: "web-apps/simulator.html", use: "Built from web/. Contains the <title> and an inlined copy of shared/fonts.json (so its lumatrix-fonts-v1 schema string appears in the minified JS). Rebuilds with `cd web && npm run build`." },
+    ],
+  },
+];
+
+// ---------- state ----------
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* ignore */
+  }
+}
+
+const state = loadState();
+
+function getRow(rowId) {
+  return state[rowId] || { todo: false, done: false };
+}
+
+function setRow(rowId, patch) {
+  state[rowId] = { ...getRow(rowId), ...patch };
+  saveState(state);
+}
+
+// ---------- rendering ----------
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") node.className = v;
+      else if (k === "dataset") Object.assign(node.dataset, v);
+      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v);
+    }
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    if (typeof c === "string") node.appendChild(document.createTextNode(c));
+    else node.appendChild(c);
+  }
+  return node;
+}
+
+function renderSections() {
+  const container = document.getElementById("sections");
+  container.replaceChildren();
+  for (const section of DATA) {
+    container.appendChild(el("h2", null, section.title));
+    if (section.description) container.appendChild(el("p", null, section.description));
+    const table = el("table");
+    const thead = el("thead", null,
+      el("tr", null,
+        el("th", { class: "cb" }, "TODO"),
+        el("th", { class: "cb" }, "DONE"),
+        el("th", null, "Reference"),
+        el("th", null, "File · line"),
+        el("th", null, "Use"),
+      )
+    );
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const row of section.rows) {
+      const tr = el("tr", { dataset: { rowId: row.id } });
+      const s = getRow(row.id);
+      const todoBox = el("input", { type: "checkbox" });
+      todoBox.checked = !!s.todo;
+      const doneBox = el("input", { type: "checkbox" });
+      doneBox.checked = !!s.done;
+      todoBox.addEventListener("change", () => {
+        setRow(row.id, { todo: todoBox.checked });
+        applyRowClass(tr, row.id);
+        refresh();
+      });
+      doneBox.addEventListener("change", () => {
+        setRow(row.id, { done: doneBox.checked });
+        applyRowClass(tr, row.id);
+        refresh();
+      });
+      tr.appendChild(el("td", { class: "cb" }, todoBox));
+      tr.appendChild(el("td", { class: "cb" }, doneBox));
+      tr.appendChild(el("td", { class: "ref" }, el("code", null, row.ref)));
+      tr.appendChild(el("td", { class: "file" }, el("code", null, row.file)));
+      tr.appendChild(el("td", { class: "use" }, row.use));
+      applyRowClass(tr, row.id);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+}
+
+function applyRowClass(tr, rowId) {
+  const s = getRow(rowId);
+  tr.classList.toggle("is-done", !!s.done);
+  tr.classList.toggle("todo-active", !!s.todo && !s.done);
+}
+
+// ---------- output ----------
+
+function outstanding() {
+  const out = [];
+  for (const section of DATA) {
+    const items = section.rows.filter((r) => {
+      const s = getRow(r.id);
+      return s.todo && !s.done;
+    });
+    if (items.length === 0) continue;
+    out.push({ section, items });
+  }
+  return out;
+}
+
+function buildOutputText() {
+  const groups = outstanding();
+  if (groups.length === 0) return "";
+  const lines = [];
+  lines.push("# Outstanding TODOs — LUMATRIX references audit");
+  lines.push("");
+  for (const { section, items } of groups) {
+    lines.push("## " + section.title);
+    for (const r of items) {
+      lines.push("- " + r.file + " — " + r.ref + " — " + r.use);
+    }
+    lines.push("");
+  }
+  return lines.join("\n").trimEnd() + "\n";
+}
+
+function refresh() {
+  const groups = outstanding();
+  const total = DATA.reduce((n, s) => n + s.rows.length, 0);
+  let todoCount = 0;
+  let doneCount = 0;
+  for (const section of DATA) {
+    for (const r of section.rows) {
+      const s = getRow(r.id);
+      if (s.todo) todoCount++;
+      if (s.done) doneCount++;
+    }
+  }
+  const remaining = groups.reduce((n, g) => n + g.items.length, 0);
+  document.getElementById("stats").textContent =
+    total + " total · " + todoCount + " TODO · " + doneCount + " DONE · " + remaining + " outstanding";
+  const output = document.getElementById("output");
+  const text = buildOutputText();
+  output.value = text || "(nothing pending — check some TODO boxes above)";
+  output.placeholder = "Nothing pending";
+}
+
+// ---------- controls ----------
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderSections();
+  refresh();
+
+  document.getElementById("markAllTodo").addEventListener("click", () => {
+    for (const section of DATA) for (const r of section.rows) setRow(r.id, { todo: true });
+    renderSections();
+    refresh();
+  });
+  document.getElementById("clearTodo").addEventListener("click", () => {
+    for (const section of DATA) for (const r of section.rows) setRow(r.id, { todo: false });
+    renderSections();
+    refresh();
+  });
+  document.getElementById("clearDone").addEventListener("click", () => {
+    for (const section of DATA) for (const r of section.rows) setRow(r.id, { done: false });
+    renderSections();
+    refresh();
+  });
+  document.getElementById("resetAll").addEventListener("click", () => {
+    if (!confirm("Reset all TODO/DONE state?")) return;
+    for (const k of Object.keys(state)) delete state[k];
+    saveState(state);
+    renderSections();
+    refresh();
+  });
+  document.getElementById("copy").addEventListener("click", async () => {
+    const status = document.getElementById("copyStatus");
+    const text = buildOutputText();
+    if (!text) { status.textContent = "nothing to copy"; setTimeout(() => status.textContent = "", 2000); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = "copied!";
+    } catch {
+      // fallback: select the textarea
+      const ta = document.getElementById("output");
+      ta.removeAttribute("readonly");
+      ta.select();
+      try { document.execCommand("copy"); status.textContent = "copied!"; }
+      catch { status.textContent = "press ⌘C to copy"; }
+      ta.setAttribute("readonly", "");
+    }
+    setTimeout(() => status.textContent = "", 2000);
+  });
+});
+</script>
+</body>
+</html>

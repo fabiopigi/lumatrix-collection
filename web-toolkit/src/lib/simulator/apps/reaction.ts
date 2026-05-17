@@ -134,6 +134,44 @@ const ARROWS_16: ArrowSet = {
   ],
 };
 
+// 32×32 native — built procedurally so the head reads as a smooth triangle
+// rather than a 4×-scaled-up 8×8 with chunky 4-pixel steps. 12-row triangular
+// head (apex 2 px → base 24 px wide), 8-wide × 14-deep stem, 5-row gap above
+// the bar. The up arrow is built explicitly; down mirrors it vertically and
+// right/left are 90° rotations + horizontal mirror.
+const ARROWS_32: ArrowSet = (() => {
+  const HEAD_DEPTH = 12;
+  const STEM_LEN = 14;
+  const STEM_WIDTH = 8;
+  const SIZE = 32;
+  const up: Array<readonly [number, number]> = [];
+  for (let i = 0; i < HEAD_DEPTH; i++) {
+    const r = SIZE - 1 - i;
+    const half = i + 1;
+    const cMin = SIZE / 2 - half;
+    const cMax = SIZE / 2 - 1 + half;
+    for (let c = cMin; c <= cMax; c++) up.push([c, r]);
+  }
+  const stemTop = SIZE - 1 - HEAD_DEPTH;
+  const stemBot = stemTop - STEM_LEN + 1;
+  const stemColMin = (SIZE - STEM_WIDTH) / 2;
+  for (let r = stemBot; r <= stemTop; r++) {
+    for (let c = stemColMin; c < stemColMin + STEM_WIDTH; c++) up.push([c, r]);
+  }
+  // Down: mirror vertically about the bar; row 0 stays empty (bar lives there).
+  const down: Array<readonly [number, number]> = up.map(
+    ([c, r]) => [c, SIZE - r] as const,
+  );
+  // Right: rotate up 90° CW around the centre, then left mirrors right.
+  const right: Array<readonly [number, number]> = up.map(
+    ([c, r]) => [r, SIZE - 1 - c] as const,
+  );
+  const left: Array<readonly [number, number]> = right.map(
+    ([c, r]) => [SIZE - 1 - c, r] as const,
+  );
+  return { up, down, left, right };
+})();
+
 let ARROWS: ArrowSet = ARROWS_8;
 
 let np: NeoPixel;
@@ -301,6 +339,12 @@ export async function run(
   if (W === 16 && H === 16) {
     // Native 16×16 shapes — no scaling, no offset.
     ARROWS = ARROWS_16;
+    ARROW_SCALE = 1;
+    ARROW_OX = 0;
+    ARROW_OY = 0;
+  } else if (W === 32 && H === 32) {
+    // Native 32×32 shapes — smooth triangle, no scaling.
+    ARROWS = ARROWS_32;
     ARROW_SCALE = 1;
     ARROW_OX = 0;
     ARROW_OY = 0;
