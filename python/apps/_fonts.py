@@ -63,7 +63,7 @@ def _trim_font(font):
 
 def _load():
     try:
-        with open("/_fonts.json") as f:
+        with open("/fonts.json") as f:
             data = json.load(f)
         fonts = data["fonts"]
         return (
