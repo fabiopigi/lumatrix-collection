@@ -98,9 +98,9 @@ const DATA = [
     title: "2. localStorage keys — user-data persistence",
     description: "Changing these breaks existing browser sessions (designs / display configs revert to defaults).",
     rows: [
-      { id: "ls-designer",      ref: "lumatrix-pixel-designer-design",      file: "web-toolkit/src/lib/pixel-designer/config.ts:51",      use: "Stores the user's current pixel-designer design across reloads." },
-      { id: "ls-sim-display",   ref: "lumatrix-simulator-display",          file: "web-toolkit/src/lib/simulator/display-config.ts:33",  use: "Stores the user's selected display preset (8×8 / 16×16 / …)." },
-      { id: "ls-doc-stale",     ref: "lumatrix-pixel-designer-config",      file: "docs/pixel-designer-usage.md:287",                    use: "Doc-only reference — actual code uses ‘…-design’. Either the doc is stale or a second key was planned. Worth fixing while you're here." },
+      { id: "ls-designer",      ref: "lumatrix-pixel-designer-design",      file: "web-toolkit/src/lib/pixel-designer/config.ts:51",      use: "Stores the user's current pixel-designer design across reloads.", defaultDone: true },
+      { id: "ls-sim-display",   ref: "lumatrix-simulator-display",          file: "web-toolkit/src/lib/simulator/display-config.ts:33",  use: "Stores the user's selected display preset (8×8 / 16×16 / …).", defaultDone: true },
+      { id: "ls-doc-stale",     ref: "lumatrix-pixel-designer-config",      file: "docs/pixel-designer-usage.md:287",                    use: "Doc-only reference — actual code uses ‘…-design’. Either the doc is stale or a second key was planned. Worth fixing while you're here.", defaultDone: true },
     ],
   },
   {
@@ -108,8 +108,8 @@ const DATA = [
     title: "3. JSON schema identifiers — cross-tool contract",
     description: "Schema strings embedded in shared JSON files. Loaders may pin/version against these.",
     rows: [
-      { id: "schema-fonts",     ref: "lumatrix-fonts-v1",                   file: "shared/fonts.json:2",                                 use: "Schema id for the shared pixel-font catalog (read by simulator, Python apps, designer)." },
-      { id: "schema-presets",   ref: "lumatrix-hardware-presets-v1",        file: "shared/hardware-presets.json:2",                      use: "Schema id for the canonical hardware presets file (just added)." },
+      { id: "schema-fonts",     ref: "lumatrix-fonts-v1",                   file: "shared/fonts.json:2",                                 use: "Schema id for the shared pixel-font catalog (read by simulator, Python apps, designer).", defaultDone: true },
+      { id: "schema-presets",   ref: "lumatrix-hardware-presets-v1",        file: "shared/hardware-presets.json:2",                      use: "Schema id for the canonical hardware presets file (just added).", defaultDone: true },
     ],
   },
   {
@@ -158,7 +158,7 @@ const DATA = [
     title: "5c. Brand name in shared design JSON descriptions",
     description: "Description fields inside the shared/ JSON specs.",
     rows: [
-      { id: "design-boot",        ref: "description field",   file: "shared/design/boot-animation.json:36",   use: "Animation description references the previous \"LUMA TRIX\" marquee." },
+      { id: "design-boot",        ref: "description field",   file: "shared/design/boot-animation.json:36",   use: "Animation description references the previous \"LUMA TRIX\" marquee.", defaultDone: true },
       { id: "design-fonts-desc",  ref: "description field",   file: "shared/fonts.json:3",                    use: "\"Pixel fonts for LUMATRIX and similar LED-matrix displays.\"" },
       { id: "design-presets-desc",ref: "description field",   file: "shared/hardware-presets.json:3",         use: "Description references the LUMATRIX-aware tooling." },
     ],
@@ -208,8 +208,19 @@ function saveState(state) {
 
 const state = loadState();
 
+// Build row → hardcoded defaults map from DATA (rows can set defaultTodo /
+// defaultDone). These apply only when localStorage has no entry for the row;
+// once a user toggles anything on the row, their state wins.
+const rowDefaults = new Map();
+for (const section of DATA) {
+  for (const r of section.rows) {
+    rowDefaults.set(r.id, { todo: !!r.defaultTodo, done: !!r.defaultDone });
+  }
+}
+
 function getRow(rowId) {
-  return state[rowId] || { todo: false, done: false };
+  if (state[rowId]) return state[rowId];
+  return rowDefaults.get(rowId) || { todo: false, done: false };
 }
 
 function setRow(rowId, patch) {
