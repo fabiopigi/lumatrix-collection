@@ -48,7 +48,7 @@ export const DEFAULT_DESIGN: Design = {
   ],
 };
 
-export const STORAGE_KEY = "lumatrix-pixel-designer-design";
+export const STORAGE_KEY = "lumenlab-pixel-designer-design";
 
 export function loadDesign(): Design {
   if (typeof window === "undefined") return cloneDesign(DEFAULT_DESIGN);

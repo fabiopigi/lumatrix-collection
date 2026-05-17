@@ -284,7 +284,7 @@ The **Index preview** grid below shows the resulting LED index in every cell, wi
 
 ### Persistence
 
-Configuration is saved to `localStorage` under `lumatrix-pixel-designer-config`. It persists across browser sessions on the same machine. **Cancel** discards changes; **Reset to LUMATRIX defaults** repopulates the form with defaults but does not apply them until you click **Save**.
+Configuration is saved to `localStorage` under `lumenlab-pixel-designer-design`. It persists across browser sessions on the same machine. **Cancel** discards changes; **Reset to LUMATRIX defaults** repopulates the form with defaults but does not apply them until you click **Save**.
 
 ---
 

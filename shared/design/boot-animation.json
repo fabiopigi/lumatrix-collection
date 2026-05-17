@@ -33,7 +33,7 @@
   "pages": [
     {
       "label": "Boot Animation",
-      "description": "Boot Animation:\n* replaces the current marquee that says \"LUMA TRIX\"\n* theres a white part and a blue part\n* white part starts fading in at t=0ms with a duration of 1s\n* blue part starts fading in at t=500ms with a duration of 1s\n* during the animations both parts' individual pixels flicker with a illuminance variance of between +/- 5% its intended color value\n* this flickering is random to give a \"sparkling\" effect\n* at t=3000ms both parts fade to black with a duration of 500ms",
+      "description": "Boot Animation:\n* white \"Lumen\" wordmark + blue \"Lab\" suffix\n* white part starts fading in at t=0ms with a duration of 1s\n* blue part starts fading in at t=500ms with a duration of 1s\n* during the animations both parts' individual pixels flicker with a illuminance variance of between +/- 5% its intended color value\n* this flickering is random to give a \"sparkling\" effect\n* at t=3000ms both parts fade to black with a duration of 500ms",
       "variants": {
         "8x8": [
           {"index": 49, "x": 1, "y": 1, "color": "#b8b8c0"},

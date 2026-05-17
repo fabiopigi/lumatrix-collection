@@ -30,7 +30,7 @@ export const DEFAULT_DISPLAY: DisplayConfig = { width: 8, height: 8 };
 export type DisplayPreset = HardwarePreset;
 export const DISPLAY_PRESETS = HARDWARE_PRESETS;
 
-const STORAGE_KEY = "lumatrix-simulator-display";
+const STORAGE_KEY = "lumenlab-simulator-display";
 const MIN_DIM = 8;
 const MAX_DIM = 64;
 

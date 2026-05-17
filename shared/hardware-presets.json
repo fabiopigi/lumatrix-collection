@@ -1,5 +1,5 @@
 {
-  "schema": "lumatrix-hardware-presets-v1",
+  "schema": "lumenlab-hardware-presets-v1",
   "description": "Canonical LED-matrix display sizes shared by the LumenSimulator and LumenDesigner. Both surfaces present the same list so a design made in one fits naturally onto a display configured in the other. Each preset has a stable id (used in design JSON variant keys), a human-readable label for UI, and a pixel width × height.",
   "presets": [
     { "id": "8x8",   "label": "8×8 (LumaTrix)",   "width": 8,  "height": 8  },
