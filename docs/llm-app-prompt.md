@@ -36,9 +36,10 @@ For each app you produce:
 
 1. **`python/apps/<name>.py`** — MicroPython, runs on the Pico.
 2. **`web-toolkit/src/lib/simulator/apps/<name>.ts`** — TypeScript, runs in the browser simulator. Optional but recommended; skip only if the user explicitly opts out.
-3. **Integration patch** — the exact lines the user needs to add to `python/main.py` and `web-toolkit/src/lib/simulator/launcher.ts`. Show them as before/after diffs or "add this line here" instructions.
+3. **`docs/apps/<name>.md`** — per-app documentation in the project's standard format (see [App documentation](#app-documentation) below). Required for every app — the project's other apps each have one and yours must match.
+4. **Integration patch** — the exact lines the user needs to add to `python/main.py` and `web-toolkit/src/lib/simulator/launcher.ts`. Show them as before/after diffs or "add this line here" instructions.
 
-Use lowercase, no separators for `<name>` (e.g. `catchgame`, `pixelclock`). The two files must use the same name.
+Use lowercase, no separators for `<name>` (e.g. `catchgame`, `pixelclock`). All three filenames must match.
 
 Before generating, ask clarifying questions if the user's description is missing:
 - **Controls** — which directions/buttons do what, and whether each is tap-once or hold-to-repeat.
@@ -461,6 +462,147 @@ export async function run(
 | `for (const x of xs)` | `for x in xs:` |
 | `// comment` | `# comment` |
 
+## App documentation
+
+Every app in this project has a doc at `docs/apps/<name>.md`. Yours must follow the same shape so it sits naturally alongside the existing ones.
+
+### Required sections (in this order)
+
+```markdown
+# AppName
+
+> One-sentence tagline. Describe what the app does, no marketing speak.
+
+## How to play
+
+Plain-English description of the gameplay loop or behavior. Then an inputs
+table:
+
+| Input | Action |
+|---|---|
+| Up / Down / Left / Right | … |
+| Tap center | … |
+| Hold center 1.5 s | Exit to launcher |
+
+(Include only the inputs the app actually uses. **Always** list "Hold center 1.5 s = Exit to launcher" — it's universal.)
+
+## Scoring         ← games only; rename to "Behavior" for passive apps
+
+- **+N per <event>.** What earns points and how much.
+
+A score-range table calibrating against the project's 10–99 target:
+
+| Score | Means |
+|---|---|
+| **10** | Casual / unlucky run |
+| **30** | Solid sustained play |
+| **60+** | Skilled run |
+| **99** | Soft ceiling — scores above marquee instead of showing statically |
+
+For **passive apps**, replace the section with:
+
+## Behavior
+
+How long it runs, what triggers idle exit (typically 10 s no input), whether
+animations loop, etc.
+
+## Mechanics
+
+The internal model. What's moving, what spawns when, what ends the round.
+Use subsections (### Movement, ### Speed-up, etc.) if the app has distinct
+mechanical systems. Reference constant names so the reader can find them in
+the source.
+
+## Tunables
+
+| Constant | Default | Effect |
+|---|---|---|
+| `FRAME_MS` | 50 | Frame rate cap (20 fps). |
+| `…` | … | … |
+
+(List every module-level tunable a future tweaker would want to find. If there's only one constant worth mentioning, you may skip the table and inline it in Mechanics.)
+
+## Implementation notes
+
+Subtle things in the code, edge cases handled, gotchas. Why a particular
+trick was needed. One short paragraph per note; bullet list is fine.
+
+## Responsive scaling
+
+**Feasibility: <Excellent | Good | Limited | Not applicable> — <one-line verdict>.**
+
+One short paragraph on whether and how the app benefits from running on a larger display (16×16, 32×32). Reference the three categories from `docs/responsive-scaling.md` if relevant: pixel-matching upscale, UI upscaling, drawing upscaling. End with a "Things to think about" sentence covering any tunables that would need adjusting on a bigger display.
+```
+
+### Tone rules
+
+- **Match the voice of the existing docs.** Read `docs/apps/snake.md`, `docs/apps/connect4.md`, `docs/apps/reaction.md` if you can — clear, factual, no superlatives.
+- **Cross-reference constant names** from your source (e.g. `START_INTERVAL`, `SPEEDUP_EVERY`) so a future maintainer can grep.
+- **Don't pad.** A 50-line doc that says what's needed beats a 150-line one that doesn't.
+- **No emoji** in the doc unless the user explicitly asks.
+- The tagline (the `>` blockquote under the title) should be a single sentence ≤ ~120 characters. It's what shows up in app index lists.
+
+### Worked example (Snake)
+
+For reference, here's roughly what `docs/apps/snake.md` looks like (abridged):
+
+```markdown
+# Snake
+
+> Classic snake. Eat the food, grow, don't crash into yourself. Edges wrap.
+
+## How to play
+
+The snake starts 3 segments long, stationary, in the middle of the matrix. Press a direction to start moving. Eat the red food pixel to grow by 1 and score +1. Crashing into your own body ends the game. Edges wrap.
+
+| Input | Action |
+|---|---|
+| Up / Down / Left / Right | Set direction |
+| Hold center 1.5 s | Exit to launcher |
+
+## Scoring
+
+- **+1 per food eaten.** No bonuses.
+
+| Score | Means |
+|---|---|
+| **5** | Comfortable run |
+| **15** | Solid sustained play |
+| **30+** | Snake is long and fast |
+| **61** | Hard cap — fills the entire 64-cell grid. Win flash. |
+
+## Mechanics
+
+### Movement
+- Snake is a list of `(col, row)` cells, head last.
+- Each move tick: `new_head = ((head_col + dx) % 8, (head_row + dy) % 8)`.
+- New head on food → grow + spawn new food. On own body → game over.
+
+### Speed-up
+- `START_INTERVAL = 6` frames per move (300 ms at 50 fps).
+- Every `SPEEDUP_EVERY = 5` foods: interval decreases by 1, floor `MIN_INTERVAL = 2`.
+
+## Tunables
+
+| Constant | Default | Effect |
+|---|---|---|
+| `FRAME_MS` | 50 | Frame rate. |
+| `START_INTERVAL` | 6 | Initial frames per snake move. |
+| `MIN_INTERVAL` | 2 | Floor for the move interval (max speed). |
+| `SPEEDUP_EVERY` | 5 | Foods between speedups. |
+
+## Implementation notes
+
+- Stored as both a list (ordered iteration) and a set (O(1) collision lookup), kept in sync.
+- 180° reversal is rejected at input time, not at apply time — prevents the classic double-tap bug.
+
+## Responsive scaling
+
+**Feasibility: Excellent — directly extends gameplay.**
+
+More cells = a longer game, harder late-game routing. The grid wrap already uses modular arithmetic, so a different size works without changes. Win condition (length = grid_size) scales automatically. Things to think about: `START_INTERVAL` may need raising on a 16×16 grid so the early game doesn't fly.
+```
+
 ## Integration patches you must provide
 
 After generating the two source files, hand the user **exactly** these two edits.
@@ -504,7 +646,7 @@ The user copies these files to the Pico's filesystem root (via Thonny or `mpremo
 | `python/apps/<name>.py` | `/apps/<name>.py` |
 | `python/main.py` | `/main.py` |
 
-The other shared files (`_screens.py`, `_fonts.py`, `fonts.json`, …) are already on the Pico from the project setup.
+The other shared files (`_screens.py`, `_fonts.py`, `fonts.json`, …) are already on the Pico from the project setup. The `.ts` and `.md` files **stay in the repo** — the simulator builds the `.ts` into its bundle; the `.md` is documentation.
 
 ## Rules — do these
 
@@ -548,6 +690,8 @@ Before sending the code to the user, verify:
 5. The `.ts` file uses `await` for every `sleep_ms`, `loading_screen`, `game_over_screen`, and `end_screen` call.
 6. Pixel Designer colors are scaled by `BRIGHTNESS` (≈ 0.25) wherever they're written to the strip.
 7. The integration patch tells the user exactly which lines to add to `python/main.py` and `web-toolkit/src/lib/simulator/launcher.ts`.
-8. The two filenames (`<name>.py` and `<name>.ts`) match each other and match the launcher registration.
+8. The three filenames (`<name>.py`, `<name>.ts`, `<name>.md`) match each other and match the launcher registration.
+9. The `.md` file follows the standard section order (Title + tagline → How to play → Scoring/Behavior → Mechanics → Tunables → Implementation notes → Responsive scaling) and uses tables for inputs, score ranges, and tunables.
+10. The doc's tagline (`>` blockquote) is a single sentence ≤ ~120 characters.
 
 Now read the user's design JSON and description, ask any necessary clarifying questions, and produce the files.
