@@ -101,6 +101,10 @@ The `instructions` field embedded in every export includes the LED-index formula
 
 `docs/AUTHORING.md` has the **[full Python integration guide](docs/AUTHORING.md#using-pixel-designer-designs)**, including both runtime-load and embedded-dict patterns, plus brightness scaling and helper functions.
 
+## Writing a new app without coding (LLM workflow)
+
+If you don't write code: design your screens visually in [Pixel Designer](https://pigagnelli.ch/pixel-designer/), then hand **[docs/llm-app-prompt.md](docs/llm-app-prompt.md)** to ChatGPT (or any LLM) together with the JSON export and a plain-English description of what the app should do. The LLM returns the `.py` file (for the Pico) and the `.ts` file (for the browser simulator), plus the two lines you need to add to register the app. The prompt file is fully self-contained — you don't need to share any other part of this repo.
+
 ## Writing a new app
 
 The full guide is in **[docs/AUTHORING.md](docs/AUTHORING.md)**. It covers:
