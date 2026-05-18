@@ -24,6 +24,8 @@ import * as reaction from "./apps/reaction";
 import * as simonsays from "./apps/simonsays";
 import * as snake from "./apps/snake";
 import * as watch from "./apps/watch";
+import * as tictactoe from "./apps/tictactoe";
+
 import { FONT_3X5, FONT_5X8, FONT_7X9 } from "./fonts";
 import { sleep_ms, ticks_diff, ticks_ms } from "./runtime/time";
 import * as screens from "./screens";
@@ -52,6 +54,7 @@ const APPS: readonly App[] = [
   invaders,
   doom,
   watch,
+  tictactoe
 ];
 
 export function getApps(): readonly App[] {

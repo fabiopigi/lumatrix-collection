@@ -31,7 +31,7 @@ from _fonts import FONT_3X5, FONT_5X8, FONT_7X9, KERNING_GAP, glyph as font_glyp
 #   DISPLAY_WIDTH, DISPLAY_HEIGHT, LED_PIN, APPS_ENABLED (tuple of app ids).
 _DEFAULT_ORDER = (
     "reaction", "connect4", "pong", "breakout", "simonsays", "dinojump",
-    "snake", "flappy", "invaders", "doom", "watch",
+    "snake", "flappy", "invaders", "doom", "watch", "tictactoe"
 )
 DISPLAY_WIDTH = 8
 DISPLAY_HEIGHT = 8
