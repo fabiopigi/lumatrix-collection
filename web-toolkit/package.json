@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "bundle:pico": "node scripts/build-pico-bundle.mjs",
+    "dev": "npm run bundle:pico && next dev",
+    "build": "npm run bundle:pico && next build",
     "start": "next start",
     "lint": "eslint"
   },

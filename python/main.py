@@ -24,25 +24,27 @@ from time import sleep_ms, ticks_ms, ticks_diff
 
 from _fonts import FONT_3X5, FONT_5X8, FONT_7X9, KERNING_GAP, glyph as font_glyph
 
-import reaction
-import connect4
-import pong
-import breakout
-import simonsays
-import dinojump
-import snake
-import flappy
-import invaders
-import doom
-import watch
 
-
-# ─── Hardware config ─────────────────────────────────────────────────────────
-# Change these to match the physical panel. The launcher adapts; non-responsive
-# 8×8 apps stay 8×8 and get mirrored center-scaled.
+# ─── Hardware + app config ───────────────────────────────────────────────────
+# Defaults are 8×8 LumaTrix with all canonical apps in simulator order. If a
+# /config.py exists (written by LumenFlash on flash), it overrides any of:
+#   DISPLAY_WIDTH, DISPLAY_HEIGHT, LED_PIN, APPS_ENABLED (tuple of app ids).
+_DEFAULT_ORDER = (
+    "reaction", "connect4", "pong", "breakout", "simonsays", "dinojump",
+    "snake", "flappy", "invaders", "doom", "watch",
+)
 DISPLAY_WIDTH = 8
 DISPLAY_HEIGHT = 8
 LED_PIN = 19
+_ENABLED = _DEFAULT_ORDER
+try:
+    import config as _cfg
+    DISPLAY_WIDTH = getattr(_cfg, "DISPLAY_WIDTH", DISPLAY_WIDTH)
+    DISPLAY_HEIGHT = getattr(_cfg, "DISPLAY_HEIGHT", DISPLAY_HEIGHT)
+    LED_PIN = getattr(_cfg, "LED_PIN", LED_PIN)
+    _ENABLED = getattr(_cfg, "APPS_ENABLED", _DEFAULT_ORDER) or _DEFAULT_ORDER
+except ImportError:
+    pass
 
 JOY = {
     "up":     Pin(3, Pin.IN),
@@ -53,19 +55,13 @@ JOY = {
     "slide":  Pin(9, Pin.IN),
 }
 
-APPS = [
-    reaction,
-    connect4,
-    pong,
-    breakout,
-    simonsays,
-    dinojump,
-    snake,
-    flappy,
-    invaders,
-    doom,
-    watch,
-]
+# Import each enabled app individually so a missing module doesn't crash boot.
+APPS = []
+for _name in _ENABLED:
+    try:
+        APPS.append(__import__(_name))
+    except ImportError:
+        pass
 
 
 # ─── Colors ──────────────────────────────────────────────────────────────────

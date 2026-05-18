@@ -200,3 +200,67 @@ body {
   font-size: calc(var(--sim-cell, 48px) * 0.42);
   color: #18181d;
 }
+
+/* ============================================================
+   LumenFlash — success celebration
+   ============================================================ */
+
+.lf-confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 40;
+}
+
+.lf-confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: var(--lf-w, 8px);
+  height: var(--lf-h, 14px);
+  background: var(--lf-color, #6cf);
+  border-radius: 1px;
+  opacity: 0;
+  transform: translate3d(0, 0, 0) rotate(var(--lf-rot-start, 0deg));
+  animation: lf-confetti-fall var(--lf-duration, 2.4s)
+    cubic-bezier(0.16, 0.84, 0.44, 1) var(--lf-delay, 0s) forwards;
+}
+
+@keyframes lf-confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(var(--lf-x-start, 0px), 0, 0)
+      rotate(var(--lf-rot-start, 0deg));
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--lf-x-end, 0px), 100vh, 0)
+      rotate(var(--lf-rot-end, 360deg));
+  }
+}
+
+.lf-success-title {
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  background: linear-gradient(135deg, #6cf, #80ffc0 60%, #ffc66c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lf-success-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes lf-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

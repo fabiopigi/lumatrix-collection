@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/pixel-designer", label: "LumenDesigner" },
   { href: "/simulator", label: "LumenSimulator" },
+  { href: "/flash", label: "LumenFlash" },
   { href: "/apps", label: "Apps" },
   { href: "/docs", label: "Docs" },
 ];
@@ -17,6 +18,7 @@ function titleSuffixForPath(pathname: string | null): string {
   if (!pathname) return "Lab";
   if (pathname.startsWith("/pixel-designer")) return "Designer";
   if (pathname.startsWith("/simulator")) return "Simulator";
+  if (pathname.startsWith("/flash")) return "Flash";
   return "Lab";
 }
 

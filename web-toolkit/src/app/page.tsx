@@ -22,6 +22,11 @@ export default function Home() {
           name="Simulator"
           summary="Boot the launcher and run apps in your browser with a virtual joystick and slide switch."
         />
+        <Tool
+          href="/flash"
+          name="Flash"
+          summary="Pick hardware and apps, plug your Pico into USB, and install everything from the browser."
+        />
       </div>
     </div>
   );
