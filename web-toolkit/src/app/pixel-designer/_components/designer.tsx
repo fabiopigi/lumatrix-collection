@@ -1611,7 +1611,7 @@ export function Designer() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] min-h-[480px]">
+    <div className="flex flex-col h-full min-h-[480px]">
       {headerSlot && createPortal(headerActions, headerSlot)}
 
       <div className="flex flex-1 min-h-0">

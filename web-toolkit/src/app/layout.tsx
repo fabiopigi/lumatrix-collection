@@ -26,11 +26,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
-        className={`${bitcount.variable} min-h-full flex flex-col bg-background text-foreground`}
+        className={`${bitcount.variable} h-dvh flex flex-col bg-background text-foreground`}
       >
         <HeaderActionsSlotProvider>
           <SiteHeader />
-          <main className="flex-1 w-full">{children}</main>
+          {/* min-h-0 lets main shrink inside the flex column so its own
+              overflow takes effect instead of pushing the footer off-screen.
+              Tool pages that want to fill the viewport (designer, simulator)
+              use h-full inside; long pages (LumenCreate) scroll within main. */}
+          <main className="flex-1 w-full min-h-0 overflow-y-auto">
+            {children}
+          </main>
           <SiteFooter />
         </HeaderActionsSlotProvider>
       </body>
