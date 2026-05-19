@@ -14,6 +14,7 @@ import { createSlide } from "@/lib/simulator/hardware/slide";
 import * as launcher from "@/lib/simulator/launcher";
 import { setRuntimeSignal } from "@/lib/simulator/runtime/time";
 import * as screens from "@/lib/simulator/screens";
+import { buildScreenshotJSON } from "@/lib/simulator/screenshot";
 import type { App, DisplayMode, JoyButton } from "@/lib/simulator/types";
 import { installUserAppRuntime } from "@/lib/simulator/user-app-runtime";
 import {
@@ -126,6 +127,25 @@ export function Simulator() {
     screens.forceExit();
     setResetKey((k) => k + 1);
   }, []);
+
+  // "Copied" feedback for the screen-export button. Stored as a timestamp so
+  // repeated clicks re-trigger the timeout cleanly.
+  const [screenCopied, setScreenCopied] = useState(false);
+  const handleCopyScreen = useCallback(async () => {
+    const snap = gridRef.current?.getSnapshot();
+    if (!snap) return;
+    const label =
+      activeIdx !== null && apps[activeIdx]
+        ? `${apps[activeIdx].NAME} screenshot`
+        : "Simulator screenshot";
+    try {
+      await navigator.clipboard.writeText(buildScreenshotJSON(snap, label));
+      setScreenCopied(true);
+      window.setTimeout(() => setScreenCopied(false), 1500);
+    } catch (err) {
+      console.error("copy screen failed:", err);
+    }
+  }, [activeIdx, apps]);
 
   // Keep the highlighted app in sync with whatever the launcher is actually
   // running — covers hardware exits (center hold) and natural app endings.
@@ -255,11 +275,43 @@ export function Simulator() {
 
         <div className="flex flex-col items-center gap-4">
           <SimulatorGrid ref={gridRef} display={display} />
-          <ModeToggle
-            mode={mode}
-            onChange={setMode}
-            maskAvailable={maskAvailable}
-          />
+          <div className="flex items-center gap-2">
+            <ModeToggle
+              mode={mode}
+              onChange={setMode}
+              maskAvailable={maskAvailable}
+            />
+            <button
+              type="button"
+              onClick={handleCopyScreen}
+              aria-label="Copy screen as JSON"
+              title={
+                screenCopied
+                  ? "Copied!"
+                  : "Copy the current screen as designer-importable JSON"
+              }
+              className={`w-9 h-9 inline-flex items-center justify-center border rounded-md transition-colors cursor-pointer bg-[#0a0a0c] ${
+                screenCopied
+                  ? "border-accent text-accent"
+                  : "border-edge text-muted hover:text-white hover:border-[#3a3a42]"
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width={18}
+                height={18}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pointerEvents="none"
+              >
+                <path d="M4 8.5h3.5L9 6h6l1.5 2.5H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z" />
+                <circle cx="12" cy="13.5" r="3.5" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-4 w-48 shrink-0">

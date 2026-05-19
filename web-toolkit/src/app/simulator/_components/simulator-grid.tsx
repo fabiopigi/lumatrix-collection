@@ -19,9 +19,21 @@ import {
 import { letterAt } from "@/lib/simulator/letter-mask";
 import type { DisplayMode } from "@/lib/simulator/types";
 
+export interface SimGridSnapshot {
+  width: number;
+  height: number;
+  /** Visual top-down, left-to-right grid of length width*height. `null` for
+   *  unlit cells, `#rrggbb` for lit cells. Colors have the same brightness
+   *  boost applied as the on-screen render, so a designer-imported screenshot
+   *  matches what was on the simulator (the designer renders hex directly,
+   *  with no boost of its own). */
+  pixels: (string | null)[];
+}
+
 export interface SimGridHandle {
   render(buffer: Uint8ClampedArray): void;
   setMode(mode: DisplayMode): void;
+  getSnapshot(): SimGridSnapshot;
 }
 
 interface SimulatorGridProps {
@@ -36,6 +48,11 @@ function sourceLedIndex(sx: number, sy: number): number {
 function boostByte(b: number): number {
   const boosted = Math.round(b * 3.2);
   return boosted > 255 ? 255 : boosted;
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const h = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
 }
 
 export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
@@ -177,7 +194,54 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
       [render],
     );
 
-    useImperativeHandle(ref, () => ({ render, setMode }), [render, setMode]);
+    /** Snapshot the currently-rendered frame as a visual pixel grid (for the
+     *  "Copy screen as JSON" affordance). Runs the same buffer→cell mapping as
+     *  render() but emits raw hex strings rather than touching DOM. */
+    const getSnapshot = useCallback((): SimGridSnapshot => {
+      const W = display.width;
+      const H = display.height;
+      const pixels: (string | null)[] = new Array(W * H).fill(null);
+      const buffer = lastBufferRef.current;
+      if (!buffer) return { width: W, height: H, pixels };
+      const direct = buffer.length === W * H * 3;
+      for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          if (direct) {
+            const ledRow = H - 1 - py;
+            const base = (ledRow * W + px) * 3;
+            r = buffer[base];
+            g = buffer[base + 1];
+            b = buffer[base + 2];
+          } else {
+            const src = sourceForCell(px, py);
+            if (!src) continue;
+            const base = sourceLedIndex(src.sx, src.sy) * 3;
+            r = buffer[base];
+            g = buffer[base + 1];
+            b = buffer[base + 2];
+          }
+          if (r === 0 && g === 0 && b === 0) continue;
+          pixels[py * W + px] = rgbToHex(
+            boostByte(r),
+            boostByte(g),
+            boostByte(b),
+          );
+        }
+      }
+      return { width: W, height: H, pixels };
+      // sourceForCell already recomposes when display dimensions change
+      // (its deps are offset/scale, both derived from display), so listing
+      // display.width/height here would be redundant.
+    }, [display, sourceForCell]);
+
+    useImperativeHandle(
+      ref,
+      () => ({ render, setMode, getSnapshot }),
+      [render, setMode, getSnapshot],
+    );
 
     // Build the cell DOM. We use the size in deps via display to force a
     // rebuild whenever the physical dimensions change.
