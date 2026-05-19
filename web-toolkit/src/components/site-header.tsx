@@ -6,13 +6,11 @@ import { useEffect, useState } from "react";
 import { useRegisterHeaderActionsSlot } from "@/components/header-actions-slot";
 
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
+  { href: "/", label: "LumenLab" },
   { href: "/create", label: "LumenCreate" },
   { href: "/pixel-designer", label: "LumenDesigner" },
   { href: "/simulator", label: "LumenSimulator" },
   { href: "/flash", label: "LumenFlash" },
-  { href: "/apps", label: "Apps" },
-  { href: "/docs", label: "Docs" },
 ];
 
 function titleSuffixForPath(pathname: string | null): string {
