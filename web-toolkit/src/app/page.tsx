@@ -13,9 +13,9 @@ export default function Home() {
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         <Tool
-          href="/create"
-          name="Create"
-          summary="Build your own LumenLab app without writing code — describe it, let an AI write it, test it in the browser."
+          href="/simulator"
+          name="Simulator"
+          summary="Boot the launcher and run apps in your browser with a virtual joystick and slide switch."
         />
         <Tool
           href="/pixel-designer"
@@ -23,9 +23,9 @@ export default function Home() {
           summary="Paint pixels, draw shapes, stamp symbols and text, export to JSON or PNG."
         />
         <Tool
-          href="/simulator"
-          name="Simulator"
-          summary="Boot the launcher and run apps in your browser with a virtual joystick and slide switch."
+          href="/create"
+          name="Create"
+          summary="Build your own LumenLab app without writing code — describe it, let an AI write it, test it in the browser."
         />
         <Tool
           href="/flash"
