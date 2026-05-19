@@ -82,10 +82,19 @@ export function cloneDesign(d: Design): Design {
     ),
     pages: d.pages.map((p) => ({
       label: p.label,
+      ...(p.title !== undefined ? { title: p.title } : {}),
+      ...(p.description !== undefined ? { description: p.description } : {}),
+      ...(p.duration !== undefined ? { duration: p.duration } : {}),
+      ...(p.fadeInTime !== undefined ? { fadeInTime: p.fadeInTime } : {}),
       variants: Object.fromEntries(
         Object.entries(p.variants).map(([k, v]) => [
           k,
-          { pixels: v.pixels.slice() },
+          {
+            pixels: v.pixels.slice(),
+            ...(v.annotations
+              ? { annotations: v.annotations.map((a) => ({ ...a })) }
+              : {}),
+          },
         ]),
       ),
     })),

@@ -48,9 +48,22 @@ export interface Hardware {
   letterMask: string;
 }
 
+/** A free-form labelled rectangle attached to a variant. Coordinates are in
+ *  the variant's own pixel grid (so the same logical annotation in a 16×16
+ *  variant lands at different coordinates than in an 8×8 variant). */
+export interface Annotation {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+}
+
 /** One variant of one page — the pixel data for that page on that hardware. */
 export interface Variant {
   pixels: (string | null)[];
+  annotations?: Annotation[];
 }
 
 /** A page in storage: a label plus a map of variants keyed by presetId.

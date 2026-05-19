@@ -2,7 +2,13 @@
 
 import { forwardRef } from "react";
 import { CELL_GAP, getCellLetter } from "@/lib/pixel-designer/config";
-import type { Config, Mode, Preview, Selection } from "@/lib/pixel-designer/types";
+import type {
+  Annotation,
+  Config,
+  Mode,
+  Preview,
+  Selection,
+} from "@/lib/pixel-designer/types";
 
 interface PixelGridProps {
   config: Config;
@@ -12,11 +18,23 @@ interface PixelGridProps {
   preview: Preview | null;
   selection: Selection | null;
   isActive: boolean;
+  annotations?: Annotation[];
+  showAnnotations?: boolean;
 }
 
 export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
   function PixelGrid(
-    { config, pixels, mode, cellSize, preview, selection, isActive },
+    {
+      config,
+      pixels,
+      mode,
+      cellSize,
+      preview,
+      selection,
+      isActive,
+      annotations,
+      showAnnotations,
+    },
     ref,
   ) {
     const isMask = mode === "mask";
@@ -129,6 +147,28 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
       );
     }
 
+    const annoElements: React.ReactNode[] = [];
+    if (isActive && showAnnotations && annotations) {
+      for (const a of annotations) {
+        annoElements.push(
+          <div
+            key={a.id}
+            className="pd-anno-rect"
+            style={{
+              left: a.x * step - 2,
+              top: a.y * step - 2,
+              width: a.w * step - CELL_GAP + 4,
+              height: a.h * step - CELL_GAP + 4,
+            }}
+          >
+            <div className="pd-anno-label" title={a.text}>
+              {a.text}
+            </div>
+          </div>,
+        );
+      }
+    }
+
     return (
       <div
         className="relative bg-[#1a1a1f] p-[14px] rounded-[10px]"
@@ -136,6 +176,7 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
       >
         <div ref={ref} className="pd-grid" style={wrapStyle}>
           {cells}
+          {annoElements}
           {selectionRect}
         </div>
       </div>
