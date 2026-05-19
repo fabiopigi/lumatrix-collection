@@ -1,7 +1,7 @@
 import { computeFromLed, computeLedIndex } from "./led-index";
 import { activeConfig } from "./config";
 import { presetIdsInOrder } from "@/lib/hardware-presets";
-import type { Config, Design, Hardware } from "./types";
+import type { Annotation, Config, Design, Hardware } from "./types";
 
 function buildIndexFormulaPseudo(cfg: Config): string {
   const W = cfg.width;
@@ -105,10 +105,11 @@ export function buildExportInstructions(design: Design) {
     schema:
       "Top level: { version, colorMode, hardware, pages, instructions }. " +
       "hardware: map of presetId → { presetId, width, height, origin, axis, serpentine, letterMask }. " +
-      "pages: ordered array of { label, variants, title?, description?, duration?, fadeInTime? }. " +
+      "pages: ordered array of { label, variants, annotations?, title?, description?, duration?, fadeInTime? }. " +
       "Optional `title` is a display string for the page; `description` is free-form notes. " +
       "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing the design; omit when not auto-playing. " +
       "variants: map of presetId → array of { index, x, y, color } — only LIT cells are listed; absent cells are OFF (#000000). " +
+      "Optional `annotations`: map of presetId → array of { id, x, y, w, h, text } — author notes describing rectangular regions of the design (e.g., \"player icon\", \"score\"). Coordinates are in that variant's pixel grid. " +
       "Per-variant LED-chain wiring is described under instructions.variant_indexing[presetId].",
     pages_meaning:
       "Each page is one screen/frame to display on the matrix. To play a design, pick a hardware variant (e.g., '8x8') and render each page's variant for that preset sequentially, with a delay between pages. Single-page designs are static images.",
@@ -182,10 +183,14 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
           }
         }
       }
+      const annotations = variant!.annotations ?? [];
       return {
         label: page.label,
         ...pageMetaFragment(page),
         pixels: lit,
+        ...(annotations.length > 0
+          ? { annotations: annotations.map((a) => ({ ...a })) }
+          : {}),
       };
     });
   return {
@@ -210,10 +215,11 @@ export function buildPresetExportJSON(design: Design, presetId: string) {
       schema:
         "Top level: { version, kind: 'preset-extract', preset, config, pages, instructions }. " +
         "config: { width, height, colorMode, origin, axis, serpentine, letterMask }. " +
-        "pages: ordered array of { label, pixels, title?, description?, duration?, fadeInTime? }. " +
+        "pages: ordered array of { label, pixels, annotations?, title?, description?, duration?, fadeInTime? }. " +
         "Optional `title` is a display string; `description` is free-form notes. " +
         "Optional `duration` (ms) and `fadeInTime` (ms) hint how long the page is shown and how long to fade it in when auto-playing. " +
-        "pixels: array of { index, x, y, color } — only LIT cells are listed.",
+        "pixels: array of { index, x, y, color } — only LIT cells are listed. " +
+        "Optional `annotations`: array of { id, x, y, w, h, text } — labelled rectangles in the variant's pixel grid (author notes describing regions of the design).",
       pages_meaning:
         "Each page is one frame. Render sequentially in array order with a delay; single-page = static image.",
       ...buildVariantIndexing(hw, design.colorMode),
@@ -260,38 +266,51 @@ export function buildExportJSON(design: Design) {
         { ...design.hardware[id] },
       ]),
     ),
-    pages: design.pages.map((page) => ({
-      label: page.label,
-      ...pageMetaFragment(page),
-      variants: Object.fromEntries(
-        presetIdsInOrder(Object.keys(page.variants)).map((presetId) => {
-          const v = page.variants[presetId];
-          const hw = design.hardware[presetId];
-          if (!hw) return [presetId, []];
-          const cfg = hardwareToConfig(hw, design.colorMode);
-          const lit: Array<{
-            index: number;
-            x: number;
-            y: number;
-            color: string;
-          }> = [];
-          for (let y = 0; y < hw.height; y++) {
-            for (let x = 0; x < hw.width; x++) {
-              const c = v.pixels[y * hw.width + x];
-              if (c) {
-                lit.push({
-                  index: computeLedIndex(x, y, cfg),
-                  x,
-                  y,
-                  color: c.toLowerCase(),
-                });
+    pages: design.pages.map((page) => {
+      const orderedIds = presetIdsInOrder(Object.keys(page.variants));
+      const annotationsByPreset: Record<string, Annotation[]> = {};
+      for (const presetId of orderedIds) {
+        const v = page.variants[presetId];
+        if (v?.annotations && v.annotations.length > 0) {
+          annotationsByPreset[presetId] = v.annotations.map((a) => ({ ...a }));
+        }
+      }
+      return {
+        label: page.label,
+        ...pageMetaFragment(page),
+        variants: Object.fromEntries(
+          orderedIds.map((presetId) => {
+            const v = page.variants[presetId];
+            const hw = design.hardware[presetId];
+            if (!hw) return [presetId, []];
+            const cfg = hardwareToConfig(hw, design.colorMode);
+            const lit: Array<{
+              index: number;
+              x: number;
+              y: number;
+              color: string;
+            }> = [];
+            for (let y = 0; y < hw.height; y++) {
+              for (let x = 0; x < hw.width; x++) {
+                const c = v.pixels[y * hw.width + x];
+                if (c) {
+                  lit.push({
+                    index: computeLedIndex(x, y, cfg),
+                    x,
+                    y,
+                    color: c.toLowerCase(),
+                  });
+                }
               }
             }
-          }
-          return [presetId, lit];
-        }),
-      ),
-    })),
+            return [presetId, lit];
+          }),
+        ),
+        ...(Object.keys(annotationsByPreset).length > 0
+          ? { annotations: annotationsByPreset }
+          : {}),
+      };
+    }),
     instructions: buildExportInstructions(design),
   };
 }
@@ -331,6 +350,41 @@ function placePixel(
   } else return;
   if (x < 0 || x >= hw.width || y < 0 || y >= hw.height) return;
   pixels[y * hw.width + x] = p.color;
+}
+
+function sanitizeAnnotations(raw: unknown[], hw: Hardware): Annotation[] {
+  const out: Annotation[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const a = item as Partial<Annotation>;
+    if (
+      typeof a.x !== "number" ||
+      typeof a.y !== "number" ||
+      typeof a.w !== "number" ||
+      typeof a.h !== "number" ||
+      typeof a.text !== "string"
+    ) {
+      continue;
+    }
+    // Clip the rectangle to the variant's grid so a bad import can't crash the
+    // renderer with negative dimensions, but keep otherwise-valid annotations.
+    const x = Math.max(0, Math.min(hw.width - 1, Math.floor(a.x)));
+    const y = Math.max(0, Math.min(hw.height - 1, Math.floor(a.y)));
+    const w = Math.max(1, Math.min(hw.width - x, Math.floor(a.w)));
+    const h = Math.max(1, Math.min(hw.height - y, Math.floor(a.h)));
+    out.push({
+      id:
+        typeof a.id === "string" && a.id
+          ? a.id
+          : `anno-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      x,
+      y,
+      w,
+      h,
+      text: a.text,
+    });
+  }
+  return out;
 }
 
 function hardwareDiffers(
@@ -402,8 +456,19 @@ export function parseImport(raw: string, current: Design): ParseResult {
       duration?: unknown;
       fadeInTime?: unknown;
       variants?: Record<string, unknown>;
+      annotations?: Record<string, unknown>;
     };
-    const variants: Record<string, { pixels: (string | null)[] }> = {};
+    const annotationsByPreset: Record<string, Annotation[]> = {};
+    for (const [presetId, rawAnnos] of Object.entries(p.annotations ?? {})) {
+      const hw = hardware[presetId];
+      if (!hw || !Array.isArray(rawAnnos)) continue;
+      const parsed = sanitizeAnnotations(rawAnnos, hw);
+      if (parsed.length > 0) annotationsByPreset[presetId] = parsed;
+    }
+    const variants: Record<
+      string,
+      { pixels: (string | null)[]; annotations?: Annotation[] }
+    > = {};
     for (const [presetId, rawList] of Object.entries(p.variants ?? {})) {
       const hw = hardware[presetId];
       if (!hw) continue; // ignore variants for unknown hardware
@@ -415,7 +480,12 @@ export function parseImport(raw: string, current: Design): ParseResult {
           placePixel(pixels, hw, colorMode, px);
         }
       }
-      variants[presetId] = { pixels };
+      variants[presetId] = {
+        pixels,
+        ...(annotationsByPreset[presetId]
+          ? { annotations: annotationsByPreset[presetId] }
+          : {}),
+      };
     }
     const title =
       typeof p.title === "string" && p.title.trim() !== ""

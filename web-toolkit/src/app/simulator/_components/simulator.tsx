@@ -14,13 +14,21 @@ import { createSlide } from "@/lib/simulator/hardware/slide";
 import * as launcher from "@/lib/simulator/launcher";
 import { setRuntimeSignal } from "@/lib/simulator/runtime/time";
 import * as screens from "@/lib/simulator/screens";
-import type { DisplayMode, JoyButton } from "@/lib/simulator/types";
+import type { App, DisplayMode, JoyButton } from "@/lib/simulator/types";
+import { installUserAppRuntime } from "@/lib/simulator/user-app-runtime";
+import {
+  loadUserApp,
+  readUserApps,
+  writeUserApps,
+  type UserAppSource,
+} from "@/lib/simulator/user-apps";
 import { AppLauncher } from "./app-launcher";
 import { DisplayPicker } from "./display-picker";
 import { JoystickPad } from "./joystick-pad";
 import { ModeToggle } from "./mode-toggle";
 import { SlideSwitch } from "./slide-switch";
 import { SimulatorGrid, type SimGridHandle } from "./simulator-grid";
+import { UserAppsPanel } from "./user-apps-panel";
 
 export function Simulator() {
   const gridRef = useRef<SimGridHandle>(null);
@@ -38,7 +46,55 @@ export function Simulator() {
 
   const joy = useMemo(() => createJoystick(), []);
   const slide = useMemo(() => createSlide(), []);
-  const apps = useMemo(() => launcher.getApps(), []);
+  const builtInApps = useMemo(() => launcher.getApps(), []);
+
+  // User apps live in localStorage; we compile each source string to an App
+  // object on change. Compilation errors surface in the panel, not the grid.
+  const [userAppSources, setUserAppSources] = useState<UserAppSource[]>([]);
+  const [compiledUserApps, setCompiledUserApps] = useState<App[]>([]);
+  const [appError, setAppError] = useState<
+    { label: string; message: string } | null
+  >(null);
+
+  // Hydrate user apps + expose the simulator runtime under globalThis.lumatrix
+  // before any user code runs. The setState-in-effect is the canonical
+  // hydration shape for localStorage-backed values (matches setDisplay above).
+  useEffect(() => {
+    installUserAppRuntime();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUserAppSources(readUserApps());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const compiled: App[] = [];
+      for (const src of userAppSources) {
+        try {
+          compiled.push(await loadUserApp(src));
+        } catch {
+          // Skip apps that fail to compile; the panel surfaces the error
+          // when the user tries to save them.
+        }
+      }
+      if (!cancelled) setCompiledUserApps(compiled);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userAppSources]);
+
+  const apps = useMemo(
+    () => [...builtInApps, ...compiledUserApps],
+    [builtInApps, compiledUserApps],
+  );
+
+  const handleUserAppsChange = useCallback((next: UserAppSource[]) => {
+    setUserAppSources(next);
+    writeUserApps(next);
+    // The launcher effect depends on compiledUserApps, so it'll restart once
+    // the recompile finishes — no manual resetKey bump needed.
+  }, []);
 
   const handleDisplay = useCallback((next: DisplayConfig) => {
     setDisplay(next);
@@ -95,7 +151,16 @@ export function Simulator() {
       });
 
     launcher
-      .run({ joy, display, createNeoPixel: createNp })
+      .run({
+        joy,
+        display,
+        createNeoPixel: createNp,
+        userApps: compiledUserApps,
+        onAppError: (app, err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          setAppError({ label: app.NAME, message });
+        },
+      })
       .catch((err: unknown) => {
         const name = (err as { name?: string } | null)?.name;
         if (name !== "AbortError") console.error("simulator:", err);
@@ -109,7 +174,7 @@ export function Simulator() {
     // or when the user hits Reset. Responsive apps need NeoPixels of a
     // different size; non-responsive apps need the grid to know the new
     // geometry too. Easier than coordinating a hot-swap.
-  }, [joy, display.width, display.height, resetKey]);
+  }, [joy, display, compiledUserApps, resetKey]);
 
   useEffect(() => {
     gridRef.current?.setMode(mode);
@@ -179,6 +244,12 @@ export function Simulator() {
             activeIdx={activeIdx}
             onLaunch={handleLaunch}
             onBackToLauncher={handleBackToLauncher}
+          />
+          <UserAppsPanel
+            apps={userAppSources}
+            onChange={handleUserAppsChange}
+            appError={appError}
+            onDismissError={() => setAppError(null)}
           />
         </div>
 

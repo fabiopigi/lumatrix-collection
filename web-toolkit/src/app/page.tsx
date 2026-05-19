@@ -13,6 +13,11 @@ export default function Home() {
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         <Tool
+          href="/create"
+          name="Create"
+          summary="Build your own LumenLab app without writing code — describe it, let an AI write it, test it in the browser."
+        />
+        <Tool
           href="/pixel-designer"
           name="Designer"
           summary="Paint pixels, draw shapes, stamp symbols and text, export to JSON or PNG."

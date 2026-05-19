@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { SYMBOLS } from "@/lib/pixel-designer/symbols";
-import type { FontKey, Mode } from "@/lib/pixel-designer/types";
+import type {
+  Annotation,
+  FontKey,
+  Mode,
+  Selection,
+} from "@/lib/pixel-designer/types";
 import { FontPreviewModal } from "./font-preview-modal";
 
 const FONT_OPTIONS: Array<{ value: FontKey; label: string }> = [
@@ -28,10 +33,13 @@ interface SidePanelProps {
   symbol: string | null;
   onSymbol: (s: string) => void;
 
-  jsonValue: string;
-  onJsonChange: (v: string) => void;
-  onImport: () => void;
-  importError: string | null;
+  annotations: Annotation[];
+  selection: Selection | null;
+  showAnnotations: boolean;
+  onShowAnnotations: (v: boolean) => void;
+  onAddAnnotation: (text: string) => void;
+  onUpdateAnnotation: (id: string, text: string) => void;
+  onDeleteAnnotation: (id: string) => void;
 }
 
 export function SidePanel(props: SidePanelProps) {
@@ -188,25 +196,15 @@ export function SidePanel(props: SidePanelProps) {
         </div>
       </Section>
 
-      <Section title="Import JSON" hint="paste then Import">
-        <textarea
-          value={props.jsonValue}
-          onChange={(e) => props.onJsonChange(e.target.value)}
-          spellCheck={false}
-          placeholder="Paste design JSON here and click Import. Use Export… in the header to save."
-          className="w-full h-[120px] bg-[#0a0a0c] border border-edge text-foreground p-2 rounded font-mono text-[10.5px] leading-[1.4] resize-y outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
-        />
-        <div className="flex gap-1.5 mt-1.5">
-          <Btn primary onClick={props.onImport} className="flex-1">
-            Import
-          </Btn>
-        </div>
-        {props.importError && (
-          <div className="mt-1.5 text-[11px] text-[#ff8888] font-mono">
-            {props.importError}
-          </div>
-        )}
-      </Section>
+      <AnnotationsSection
+        annotations={props.annotations}
+        selection={props.selection}
+        show={props.showAnnotations}
+        onShow={props.onShowAnnotations}
+        onAdd={props.onAddAnnotation}
+        onUpdate={props.onUpdateAnnotation}
+        onDelete={props.onDeleteAnnotation}
+      />
 
       <Section title="Shortcuts">
         <Tip>
@@ -281,32 +279,6 @@ function ToggleButton({
   );
 }
 
-function Btn({
-  children,
-  onClick,
-  primary,
-  className,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  primary?: boolean;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded text-xs cursor-pointer transition-colors ${
-        primary
-          ? "bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee]"
-          : "bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
-      } ${className ?? ""}`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function Tip({ children }: { children: React.ReactNode }) {
   return (
     <div className="text-[10.5px] text-[#666] leading-[1.5] mt-1">
@@ -345,4 +317,151 @@ function SymbolSvg({ rows }: { rows: string[] }) {
 
 function normalizeHex(c: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#ff0000";
+}
+
+function AnnotationsSection({
+  annotations,
+  selection,
+  show,
+  onShow,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  annotations: Annotation[];
+  selection: Selection | null;
+  show: boolean;
+  onShow: (v: boolean) => void;
+  onAdd: (text: string) => void;
+  onUpdate: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const hasSelection = !!selection;
+  const canAdd = hasSelection && draft.trim() !== "";
+  const handleAdd = () => {
+    if (!canAdd) return;
+    onAdd(draft);
+    setDraft("");
+  };
+  return (
+    <Section title="Annotations" hint="label regions of the design">
+      <label className="flex items-center gap-2 mb-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={show}
+          onChange={(e) => onShow(e.target.checked)}
+          className="cursor-pointer accent-[#f5a623]"
+        />
+        <span className="text-[11px] text-[#aaa]">Show on grid</span>
+      </label>
+
+      <div className="rounded border border-edge bg-[#0a0a0c] p-2 mb-2">
+        {hasSelection ? (
+          <div className="text-[10.5px] text-[#aaa] font-mono mb-1.5">
+            Selection {selection!.x},{selection!.y} ·{" "}
+            {selection!.w}×{selection!.h}
+          </div>
+        ) : (
+          <div className="text-[10.5px] text-[#666] mb-1.5">
+            Make a selection (
+            <Kbd>S</Kbd> tool) to label its region.
+          </div>
+        )}
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+            placeholder={
+              hasSelection ? "e.g. player icon" : "Selection needed…"
+            }
+            disabled={!hasSelection}
+            className="flex-1 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#f5a623] focus:bg-[#0e0e12] disabled:opacity-50 select-text"
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!canAdd}
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#f5a623] text-[#1a1308] border border-[#f5a623] font-semibold hover:bg-[#ffb83c] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#f5a623]"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {annotations.length === 0 ? (
+        <div className="text-[10.5px] text-[#555] italic">
+          No annotations on this variant.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {annotations.map((a) => (
+            <AnnotationRow
+              key={a.id}
+              annotation={a}
+              onUpdate={(t) => onUpdate(a.id, t)}
+              onDelete={() => onDelete(a.id)}
+            />
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function AnnotationRow({
+  annotation,
+  onUpdate,
+  onDelete,
+}: {
+  annotation: Annotation;
+  onUpdate: (text: string) => void;
+  onDelete: () => void;
+}) {
+  const [draft, setDraft] = useState(annotation.text);
+  // Re-sync local draft if the annotation text changes externally (e.g. undo).
+  // Using a key on the input keeps this branch-free.
+  return (
+    <div className="flex items-center gap-1.5 rounded border border-[#1f1f25] bg-[#0a0a0c]/40 px-2 py-1.5">
+      <div className="w-1.5 h-1.5 rounded-full bg-[#f5a623] shrink-0" />
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <input
+          key={annotation.id + "-" + annotation.text}
+          type="text"
+          defaultValue={annotation.text}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            const t = draft.trim();
+            if (t && t !== annotation.text) onUpdate(t);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              setDraft(annotation.text);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          className="bg-transparent border border-transparent text-foreground px-1.5 py-0.5 rounded text-xs outline-none hover:border-[#2a2a30] focus:bg-[#0a0a0c] focus:border-[#f5a623] select-text"
+        />
+        <div className="text-[10px] text-[#666] font-mono px-1.5">
+          {annotation.x},{annotation.y} · {annotation.w}×{annotation.h}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        title="Delete annotation"
+        className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#3a2020] hover:text-[#ff8888] hover:border-[#5a3030] shrink-0"
+      >
+        ✕
+      </button>
+    </div>
+  );
 }

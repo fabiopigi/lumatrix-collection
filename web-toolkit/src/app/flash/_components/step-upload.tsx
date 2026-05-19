@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import type { CustomPicoApp } from "@/lib/pico/custom-apps";
 import type {
-  BundleFile,
   HardwarePreset,
   PicoBundleManifest,
 } from "@/lib/pico/manifest";
@@ -11,12 +11,14 @@ import {
   runUpload,
   type UploadEvent,
   type UploadFileState,
+  type UploadPlanFile,
 } from "@/lib/pico/uploader";
 
 interface Props {
   manifest: PicoBundleManifest;
   preset: HardwarePreset;
   enabledIds: Set<string>;
+  customApps: readonly CustomPicoApp[];
   port: SerialPort;
   onReset(): void;
 }
@@ -27,6 +29,7 @@ export function StepUpload({
   manifest,
   preset,
   enabledIds,
+  customApps,
   port,
   onReset,
 }: Props) {
@@ -42,13 +45,18 @@ export function StepUpload({
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    const selectedApps: BundleFile[] = manifest.apps.filter((a) =>
-      enabledIds.has(a.id),
-    );
-    const planFiles: BundleFile[] = [
+    const selectedBuiltIns = manifest.apps.filter((a) => enabledIds.has(a.id));
+    const selectedCustom = customApps.filter((a) => enabledIds.has(a.id));
+    const customPlanFiles: UploadPlanFile[] = selectedCustom.map((a) => ({
+      src: `custom/${a.id}.py`,
+      pico: `/apps/${a.id}.py`,
+      contents: a.contents,
+    }));
+    const planFiles: UploadPlanFile[] = [
       ...manifest.core,
       ...manifest.data,
-      ...selectedApps,
+      ...selectedBuiltIns,
+      ...customPlanFiles,
     ];
 
     const handle = (e: UploadEvent) => {
@@ -86,9 +94,10 @@ export function StepUpload({
         config: {
           width: preset.width,
           height: preset.height,
-          enabledIds: manifest.apps
-            .filter((a) => enabledIds.has(a.id))
-            .map((a) => a.id),
+          enabledIds: [
+            ...selectedBuiltIns.map((a) => a.id),
+            ...selectedCustom.map((a) => a.id),
+          ],
         },
       },
       handle,

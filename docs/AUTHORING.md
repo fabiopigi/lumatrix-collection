@@ -272,7 +272,7 @@ Pick one per app and stick with it — the helper functions you write will be cl
 
 ## Using Pixel Designer designs
 
-The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is the browser tool used to design the launcher boot animation, game-over backgrounds, and end-screen arrow in this repo. It exports JSON files where each page is one screen/frame and only the lit pixels are listed. Cells you didn't paint are off.
+The **[Pixel Designer](https://lumenlab.fabs.au/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is the browser tool used to design the launcher boot animation, game-over backgrounds, and end-screen arrow in this repo. It exports JSON files where each page is one screen/frame and only the lit pixels are listed. Cells you didn't paint are off.
 
 A typical export looks like this:
 

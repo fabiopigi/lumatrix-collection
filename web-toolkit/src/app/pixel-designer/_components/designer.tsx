@@ -30,6 +30,7 @@ import {
 } from "@/lib/pixel-designer/palette";
 import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
+  Annotation,
   Config,
   Design,
   FontKey,
@@ -57,6 +58,7 @@ import {
 import { ConfigModal } from "./config-modal";
 import { DeletePageModal } from "./delete-page-modal";
 import { ExportModal } from "./export-modal";
+import { ImportModal } from "./import-modal";
 import {
   PageMetaModal,
   type PageMetaPatch,
@@ -153,7 +155,10 @@ function applyPageViewToDesign(
         label: vp.label,
         variants: {
           ...existing.variants,
-          [presetId]: { pixels: vp.pixels.slice() },
+          [presetId]: {
+            ...existing.variants[presetId],
+            pixels: vp.pixels.slice(),
+          },
         },
       };
     }),
@@ -201,9 +206,25 @@ function applyConfigToDesign(
                 oldPixels[y * prev.width + x] ?? null;
             }
           }
+          // Clip annotations to the new grid; drop ones that no longer fit.
+          const clipped = (oldVariant?.annotations ?? [])
+            .map((a) => {
+              const x = Math.max(0, Math.min(next.width - 1, a.x));
+              const y = Math.max(0, Math.min(next.height - 1, a.y));
+              const w = Math.max(0, Math.min(next.width - x, a.w));
+              const h = Math.max(0, Math.min(next.height - y, a.h));
+              return { ...a, x, y, w, h };
+            })
+            .filter((a) => a.w > 0 && a.h > 0);
           return {
             ...p,
-            variants: { ...p.variants, [presetId]: { pixels: newPixels } },
+            variants: {
+              ...p.variants,
+              [presetId]: {
+                pixels: newPixels,
+                ...(clipped.length > 0 ? { annotations: clipped } : {}),
+              },
+            },
           };
         })
       : d.pages,
@@ -367,6 +388,8 @@ export function Designer() {
   const [addVariantResult, setAddVariantResult] =
     useState<AddVariantResult | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(true);
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
   const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
 
@@ -558,6 +581,139 @@ export function Designer() {
     });
   }, [commitSelectionInto, pushHistory]);
 
+  // ============ annotations ============
+
+  const currentAnnotations = useMemo<Annotation[]>(() => {
+    const v = design.pages[currentPage]?.variants[activePreset];
+    return v?.annotations ?? [];
+  }, [design, currentPage, activePreset]);
+
+  /** Make a new annotation from the current selection's bounding rectangle.
+   *  If the selection is floating (pixels were cut), its pixels are committed
+   *  back to the canvas first — annotations are metadata, so we shouldn't
+   *  destroy artwork in the act of labelling it. */
+  const addAnnotationFromSelection = useCallback(
+    (text: string) => {
+      const sel = selection;
+      const t = text.trim();
+      if (!sel || !t) return;
+      const pi = currentPageRef.current;
+      const presetId = resolveActivePresetFor(
+        designRef.current,
+        activePresetByPageRef.current,
+        pi,
+      );
+      const anno: Annotation = {
+        id: `anno-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        x: sel.x,
+        y: sel.y,
+        w: sel.w,
+        h: sel.h,
+        text: t,
+      };
+      setDesign((prev) => {
+        const page = prev.pages[pi];
+        if (!page) return prev;
+        const v = page.variants[presetId];
+        if (!v) return prev;
+        // Bake floating-selection pixels back in. Skips when the selection is
+        // transient/non-floating since no pixels were cut in that case.
+        let nextPixels = v.pixels;
+        if (sel.floating) {
+          const cfg = activeConfig(prev, presetId);
+          nextPixels = v.pixels.slice();
+          for (let dy = 0; dy < sel.h; dy++) {
+            for (let dx = 0; dx < sel.w; dx++) {
+              const c = sel.contents[dy * sel.w + dx];
+              if (!c) continue;
+              const tx = sel.x + dx;
+              const ty = sel.y + dy;
+              if (tx < 0 || tx >= cfg.width || ty < 0 || ty >= cfg.height)
+                continue;
+              nextPixels[ty * cfg.width + tx] = c;
+            }
+          }
+        }
+        const annotations = [...(v.annotations ?? []), anno];
+        return {
+          ...prev,
+          pages: prev.pages.map((p, i) =>
+            i === pi
+              ? {
+                  ...p,
+                  variants: {
+                    ...p.variants,
+                    [presetId]: {
+                      ...v,
+                      pixels: nextPixels,
+                      annotations,
+                    },
+                  },
+                }
+              : p,
+          ),
+        };
+      });
+      setSelection(null);
+      queueMicrotask(() => pushHistory());
+    },
+    [selection, setDesign, pushHistory],
+  );
+
+  const updateAnnotationText = useCallback(
+    (id: string, text: string) => {
+      const pi = currentPageRef.current;
+      const presetId = resolveActivePresetFor(
+        designRef.current,
+        activePresetByPageRef.current,
+        pi,
+      );
+      setDesign((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p, i) => {
+          if (i !== pi) return p;
+          const v = p.variants[presetId];
+          if (!v) return p;
+          const annotations = (v.annotations ?? []).map((a) =>
+            a.id === id ? { ...a, text } : a,
+          );
+          return {
+            ...p,
+            variants: { ...p.variants, [presetId]: { ...v, annotations } },
+          };
+        }),
+      }));
+      queueMicrotask(() => pushHistory());
+    },
+    [setDesign, pushHistory],
+  );
+
+  const deleteAnnotation = useCallback(
+    (id: string) => {
+      const pi = currentPageRef.current;
+      const presetId = resolveActivePresetFor(
+        designRef.current,
+        activePresetByPageRef.current,
+        pi,
+      );
+      setDesign((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p, i) => {
+          if (i !== pi) return p;
+          const v = p.variants[presetId];
+          if (!v) return p;
+          const annotations = (v.annotations ?? []).filter((a) => a.id !== id);
+          return {
+            ...p,
+            variants: { ...p.variants, [presetId]: { ...v, annotations } },
+          };
+        }),
+      }));
+      queueMicrotask(() => pushHistory());
+    },
+    [setDesign, pushHistory],
+  );
+
   // ============ tool/mode/color ============
 
   const handleSetTool = useCallback(
@@ -608,7 +764,10 @@ export function Designer() {
       setDesign((prev) => {
         const sourcePage = prev.pages[currentPageRef.current];
         if (!sourcePage) return prev;
-        const newVariants: Record<string, { pixels: (string | null)[] }> = {};
+        const newVariants: Record<
+          string,
+          { pixels: (string | null)[]; annotations?: Annotation[] }
+        > = {};
         for (const presetId of Object.keys(sourcePage.variants)) {
           const sv = sourcePage.variants[presetId];
           const hw = prev.hardware[presetId];
@@ -617,6 +776,16 @@ export function Designer() {
             pixels: copy
               ? sv.pixels.slice()
               : new Array(hw.width * hw.height).fill(null),
+            // Annotations describe regions of the artwork — carry them along
+            // with a copied page so the labels match the inherited pixels.
+            ...(copy && sv.annotations && sv.annotations.length > 0
+              ? {
+                  annotations: sv.annotations.map((a) => ({
+                    ...a,
+                    id: `anno-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  })),
+                }
+              : {}),
           };
         }
         const newPage = {
@@ -1342,6 +1511,8 @@ export function Designer() {
       setSelection(null);
       queueMicrotask(() => pushHistory(undefined, 0));
       setImportError(null);
+      setImportOpen(false);
+      setJsonValue("");
     } catch (err) {
       setImportError(`Import error: ${(err as Error).message}`);
     }
@@ -1418,6 +1589,15 @@ export function Designer() {
           Clear
         </HeaderBtn>
         <HeaderBtn
+          onClick={() => {
+            setImportError(null);
+            setImportOpen(true);
+          }}
+          title="Import design JSON"
+        >
+          Import…
+        </HeaderBtn>
+        <HeaderBtn
           onClick={() => setExportOpen(true)}
           title="Export JSON or PNG"
         >
@@ -1457,9 +1637,9 @@ export function Designer() {
                 pageConfig.width,
                 pageConfig.height,
               );
-              const pageHasVariant = !!design.pages[pi]?.variants[
-                pageActivePreset
-              ];
+              const pageVariant = design.pages[pi]?.variants[pageActivePreset];
+              const pageHasVariant = !!pageVariant;
+              const pageAnnotations = pageVariant?.annotations ?? [];
               const pageLabelForPreset =
                 HARDWARE_PRESETS.find((p) => p.id === pageActivePreset)?.label ??
                 `${pageConfig.width}×${pageConfig.height}`;
@@ -1541,6 +1721,8 @@ export function Designer() {
                         preview={isActive ? preview : null}
                         selection={isActive ? selection : null}
                         isActive={isActive}
+                        annotations={pageAnnotations}
+                        showAnnotations={showAnnotations}
                       />
                     </div>
                   ) : (
@@ -1613,10 +1795,13 @@ export function Designer() {
             setSymbol(s);
             handleSetTool("stamp");
           }}
-          jsonValue={jsonValue}
-          onJsonChange={setJsonValue}
-          onImport={handleImport}
-          importError={importError}
+          annotations={currentAnnotations}
+          selection={selection}
+          showAnnotations={showAnnotations}
+          onShowAnnotations={setShowAnnotations}
+          onAddAnnotation={addAnnotationFromSelection}
+          onUpdateAnnotation={updateAnnotationText}
+          onDeleteAnnotation={deleteAnnotation}
         />
       </div>
 
@@ -1657,6 +1842,20 @@ export function Designer() {
         activePreset={activePreset}
         mode={mode}
         onClose={() => setExportOpen(false)}
+      />
+      <ImportModal
+        open={importOpen}
+        value={jsonValue}
+        onValueChange={(v) => {
+          setJsonValue(v);
+          if (importError) setImportError(null);
+        }}
+        onImport={handleImport}
+        error={importError}
+        onClose={() => {
+          setImportOpen(false);
+          setImportError(null);
+        }}
       />
       <PageMetaModal
         open={metaModalFor !== null}
