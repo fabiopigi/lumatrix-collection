@@ -1253,10 +1253,32 @@ export function Designer() {
 
   const handleClear = useCallback(() => {
     setSelection(null);
+    // Clear annotations on the current page's active variant first. setDesign's
+    // updater syncs designRef.current synchronously, so the pushHistory that
+    // writePixels schedules picks up the annotation-cleared design AND the
+    // pixel-cleared pages in a single snapshot — one undo step restores both.
+    const pi = currentPageRef.current;
+    const presetId = resolveActivePresetFor(
+      designRef.current,
+      activePresetByPageRef.current,
+      pi,
+    );
+    setDesign((prev) => ({
+      ...prev,
+      pages: prev.pages.map((p, i) => {
+        if (i !== pi) return p;
+        const v = p.variants[presetId];
+        if (!v || !v.annotations || v.annotations.length === 0) return p;
+        return {
+          ...p,
+          variants: { ...p.variants, [presetId]: { ...v, annotations: [] } },
+        };
+      }),
+    }));
     writePixels((px) => {
       px.fill(null);
     });
-  }, [writePixels]);
+  }, [setDesign, writePixels]);
 
   // ============ keyboard ============
 
