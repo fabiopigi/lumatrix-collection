@@ -56,7 +56,7 @@ export function SidePanel(props: SidePanelProps) {
   };
 
   return (
-    <aside className="w-[340px] bg-[#131316] border-l border-edge p-3.5 overflow-y-auto shrink-0">
+    <aside className="w-[340px] bg-[#131316] border-l border-edge p-3.5 overflow-y-scroll shrink-0">
       <Section title="Mode">
         <div className="toggle-row flex bg-[#0a0a0c] p-0.5 rounded-md border border-edge">
           <ToggleButton
