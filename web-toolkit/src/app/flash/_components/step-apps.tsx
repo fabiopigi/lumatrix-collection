@@ -19,6 +19,10 @@ interface Props {
   onContinue(): void;
 }
 
+type EditorState =
+  | { mode: "new" }
+  | { mode: "edit"; app: CustomPicoApp };
+
 export function StepApps({
   apps,
   enabled,
@@ -27,7 +31,7 @@ export function StepApps({
   onCustomAppsChange,
   onContinue,
 }: Props) {
-  const [showAdd, setShowAdd] = useState(false);
+  const [editor, setEditor] = useState<EditorState | null>(null);
 
   const toggle = (id: string) => {
     const next = new Set(enabled);
@@ -36,16 +40,20 @@ export function StepApps({
     onChange(next);
   };
 
-  const handleAdd = (app: CustomPicoApp) => {
-    // Replace if id collides with an existing custom app.
-    const next = customApps.filter((a) => a.id !== app.id);
+  const handleSave = (app: CustomPicoApp, previousId?: string) => {
+    // Drop the previous record (handles id renames in edit mode and dedupes
+    // against an existing slot with the same new id).
+    const dropIds = new Set([app.id, ...(previousId ? [previousId] : [])]);
+    const next = customApps.filter((a) => !dropIds.has(a.id));
     next.push(app);
     onCustomAppsChange(next);
-    // Auto-enable newly added apps so they're in the flash.
+
     const enabledNext = new Set(enabled);
+    if (previousId && previousId !== app.id) enabledNext.delete(previousId);
     enabledNext.add(app.id);
     onChange(enabledNext);
-    setShowAdd(false);
+
+    setEditor(null);
   };
 
   const handleRemove = (id: string) => {
@@ -62,6 +70,16 @@ export function StepApps({
 
   const canContinue = enabled.size > 0;
   const totalCount = apps.length + customApps.length;
+  const soleEnabledName =
+    enabled.size === 1
+      ? (() => {
+          const id = [...enabled][0];
+          const match =
+            apps.find((a) => a.id === id) ??
+            customApps.find((a) => a.id === id);
+          return match?.name ?? id;
+        })()
+      : null;
 
   return (
     <section>
@@ -95,6 +113,16 @@ export function StepApps({
           {enabled.size} of {totalCount} selected
         </span>
       </div>
+
+      {enabled.size === 1 && (
+        <div className="mt-3 rounded border border-accent/40 bg-accent/10 px-3 py-2 text-[11px] text-accent/90 leading-snug">
+          <span className="font-semibold text-accent">Single-app mode:</span>{" "}
+          with only one app selected, the Pico will boot straight into{" "}
+          <code className="font-mono text-accent">{soleEnabledName}</code> —
+          the launcher menu and loading spinner are skipped, and the
+          game-over screen returns directly to gameplay.
+        </div>
+      )}
 
       <ul className="mt-3 divide-y divide-edge rounded border border-edge overflow-hidden">
         {apps.map((app) => {
@@ -147,6 +175,16 @@ export function StepApps({
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
+                    setEditor({ mode: "edit", app });
+                  }}
+                  className="text-[10px] text-muted hover:text-accent cursor-pointer"
+                >
+                  edit
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
                     handleRemove(app.id);
                   }}
                   className="text-[10px] text-muted hover:text-red-300 cursor-pointer"
@@ -162,7 +200,7 @@ export function StepApps({
       <div className="mt-3">
         <button
           type="button"
-          onClick={() => setShowAdd(true)}
+          onClick={() => setEditor({ mode: "new" })}
           className="text-[11px] px-3 py-1.5 rounded border border-dashed border-edge text-muted hover:text-accent hover:border-accent cursor-pointer"
         >
           + Add custom .py
@@ -180,34 +218,43 @@ export function StepApps({
         </button>
       </div>
 
-      {showAdd && (
-        <AddCustomAppModal
+      {editor && (
+        <CustomAppEditorModal
+          state={editor}
           existingIds={new Set([
             ...apps.map((a) => a.id),
             ...customApps.map((a) => a.id),
           ])}
-          onCancel={() => setShowAdd(false)}
-          onAdd={handleAdd}
+          onCancel={() => setEditor(null)}
+          onSave={handleSave}
         />
       )}
     </section>
   );
 }
 
-interface AddCustomAppModalProps {
+interface CustomAppEditorModalProps {
+  state: EditorState;
   existingIds: Set<string>;
   onCancel(): void;
-  onAdd(app: CustomPicoApp): void;
+  onSave(app: CustomPicoApp, previousId?: string): void;
 }
 
-function AddCustomAppModal({
+function CustomAppEditorModal({
+  state,
   existingIds,
   onCancel,
-  onAdd,
-}: AddCustomAppModalProps) {
-  const [contents, setContents] = useState("");
-  const [id, setId] = useState("");
-  const [idTouched, setIdTouched] = useState(false);
+  onSave,
+}: CustomAppEditorModalProps) {
+  const isEdit = state.mode === "edit";
+  const previousId = isEdit ? state.app.id : undefined;
+
+  const [contents, setContents] = useState(isEdit ? state.app.contents : "");
+  const [id, setId] = useState(isEdit ? state.app.id : "");
+  // In edit mode the user has already committed to an id; if they tweak it
+  // we want their input to win immediately. In add mode, only flip after a
+  // manual edit so auto-derivation still works.
+  const [idTouched, setIdTouched] = useState(isEdit);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -236,12 +283,15 @@ function AddCustomAppModal({
   };
 
   const validation = validatePicoApp(contents);
+  // In edit mode, the original id isn't a collision against itself.
+  const idClashes =
+    existingIds.has(effectiveId) && effectiveId !== previousId;
   const idError =
     effectiveId.length === 0
       ? "Pick a module name."
       : !isValidAppId(effectiveId)
         ? "Module name must start with a letter and contain only lowercase letters, digits, and underscores."
-        : existingIds.has(effectiveId)
+        : idClashes
           ? "That id is already in use. Pick a different one."
           : null;
 
@@ -251,7 +301,10 @@ function AddCustomAppModal({
     e.preventDefault();
     if (!canSubmit) return;
     const name = derivedName || effectiveId;
-    onAdd({ id: effectiveId, name, contents });
+    onSave(
+      { id: effectiveId, name, contents },
+      previousId,
+    );
   };
 
   return (
@@ -265,7 +318,9 @@ function AddCustomAppModal({
         className="w-full max-w-3xl max-h-full overflow-auto rounded-lg border border-edge bg-panel p-5 flex flex-col gap-3"
       >
         <div className="flex items-center gap-3">
-          <h3 className="text-[14px] font-semibold text-white">Add custom .py</h3>
+          <h3 className="text-[14px] font-semibold text-white">
+            {isEdit ? `Edit ${state.app.name}` : "Add custom .py"}
+          </h3>
           <button
             type="button"
             onClick={onCancel}
@@ -348,7 +403,7 @@ function AddCustomAppModal({
             disabled={!canSubmit}
             className="rounded bg-accent px-3 py-1.5 text-[12px] font-semibold text-black disabled:opacity-40 cursor-pointer hover:bg-accent/90"
           >
-            Add app
+            {isEdit ? "Save changes" : "Add app"}
           </button>
           <button
             type="button"

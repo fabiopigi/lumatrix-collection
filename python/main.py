@@ -63,6 +63,15 @@ for _name in _ENABLED:
     except ImportError:
         pass
 
+# Single-app mode: when the user flashed exactly one app the device acts
+# like a single-purpose appliance — boot animation, then straight into
+# gameplay, no launcher menu, no loading spinner. The flag also tells the
+# shared _screens module to drop the hold-center exit path (there's no menu
+# to go back to) and treat hold-center on game_over as restart.
+import _screens as _screens_mod
+SINGLE_APP_MODE = len(APPS) == 1
+_screens_mod.set_single_app_mode(SINGLE_APP_MODE)
+
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 BRIGHTNESS = 0.25
@@ -454,6 +463,26 @@ def main():
         lumatrix_np = _LegacyBuffer(display_np)
 
     boot_animation()
+
+    if SINGLE_APP_MODE:
+        # Appliance mode: skip the menu entirely, run the one app forever.
+        # The shared _screens module short-circuits its loading_screen and
+        # hold-center exit so the user never sees launcher chrome. If the
+        # app's run() ever does return (e.g. an unexpected internal exit),
+        # clear the buffer and call it again — the device should feel
+        # like the app is the firmware.
+        app = APPS[0]
+        responsive = getattr(app, "RESPONSIVE", False)
+        app_np = display_np if responsive else lumatrix_np
+        display = {"width": _W, "height": _H}
+        while True:
+            app.run(app_np, JOY, display, display_np)
+            np = display_np
+            _clear()
+            np.write()
+            sleep_ms(150)
+        return
+
     while True:
         np = display_np
         i = menu_select()

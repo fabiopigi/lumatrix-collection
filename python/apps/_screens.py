@@ -57,6 +57,21 @@ _h = 8
 _exit_press_start = None
 _exit_consumed = False
 
+# Set by main.py at boot when exactly one app is enabled. Short-circuits
+# loading_screen (no menu to go back to), check_exit (no destination), and
+# game_over_screen / end_screen (treat hold-center as restart instead of exit).
+# Apps don't need to know about this — they call the same screens API and the
+# screens module makes them feel like single-purpose appliances.
+_single_app_mode = False
+
+
+def set_single_app_mode(on):
+    """Called by main.py at boot. True when the Pico has only one app
+    installed — the launcher menu is bypassed and the device feels like a
+    dedicated appliance. init() does NOT reset this flag."""
+    global _single_app_mode
+    _single_app_mode = bool(on)
+
 
 def init(neopixel, joystick, w=None, h=None):
     """Bind hardware refs. Call once at the start of run().
@@ -105,7 +120,12 @@ def _wait_release():
 
 def check_exit():
     """Non-blocking hold-center exit detector. Returns True once when the
-    1.5 s threshold is crossed; callers should treat that as a one-shot."""
+    1.5 s threshold is crossed; callers should treat that as a one-shot.
+
+    Always returns False in single-app mode — there's no launcher menu to
+    exit back to, so apps stay running indefinitely."""
+    if _single_app_mode:
+        return False
     global _exit_press_start, _exit_consumed
     if _joy is None:
         return False
@@ -126,7 +146,11 @@ def check_exit():
 
 def _decision_input():
     """Returns 'exit' (center held ≥1.5 s), 'restart' (center released before
-    hold threshold OR any directional input), or None."""
+    hold threshold OR any directional input), or None.
+
+    In single-app mode there's nowhere to 'exit' to, so a hold-center is
+    interpreted as 'restart' — the game-over banner dismisses straight back
+    into a fresh round."""
     global _exit_press_start, _exit_consumed
     if _joy["center"].value() == 0:
         now = ticks_ms()
@@ -136,7 +160,7 @@ def _decision_input():
         elif (not _exit_consumed and
               ticks_diff(now, _exit_press_start) >= EXIT_HOLD_MS):
             _exit_consumed = True
-            return "exit"
+            return "restart" if _single_app_mode else "exit"
     else:
         if _exit_press_start is not None and not _exit_consumed:
             _exit_press_start = None
@@ -181,7 +205,12 @@ def _loading_ring():
 
 def loading_screen():
     """Spinner. Blocks until user reacts.
-    Returns 'start' (any press) or 'exit' (hold center 1.5 s)."""
+    Returns 'start' (any press) or 'exit' (hold center 1.5 s).
+
+    In single-app mode the spinner is skipped entirely — the device boots
+    straight into gameplay and re-enters gameplay after the game-over screen."""
+    if _single_app_mode:
+        return "start"
     global _exit_press_start, _exit_consumed
     _exit_press_start = None
     _exit_consumed = False
