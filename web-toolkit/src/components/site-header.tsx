@@ -7,9 +7,9 @@ import { useRegisterHeaderActionsSlot } from "@/components/header-actions-slot";
 
 const NAV_LINKS = [
   { href: "/", label: "LumenLab" },
-  { href: "/create", label: "LumenCreate" },
-  { href: "/pixel-designer", label: "LumenDesigner" },
   { href: "/simulator", label: "LumenSimulator" },
+  { href: "/pixel-designer", label: "LumenDesigner" },
+  { href: "/create", label: "LumenCreate" },
   { href: "/flash", label: "LumenFlash" },
 ];
 
