@@ -64,11 +64,11 @@ LumaMatrix/
 
 ## Designing screens with the Pixel Designer
 
-The **[Pixel Designer](https://pigagnelli.ch/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
+The **[Pixel Designer](https://lumenlab.fabs.au/pixel-designer/)** (locally: `cd web-toolkit && npm run dev`, then [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer)) is a browser-based tool for designing 8×8 LED-matrix screens visually, exporting them as JSON, and dropping them into MicroPython apps. It's what generated the launcher backgrounds, the game-over halftones, and the end-screen arrow in this repo.
 
 ### Workflow
 
-1. Open [pigagnelli.ch/pixel-designer](https://pigagnelli.ch/pixel-designer/) in your browser.
+1. Open [lumenlab.fabs.au/pixel-designer](https://lumenlab.fabs.au/pixel-designer/) in your browser.
 2. Pick a color from the palette and click cells on the grid to paint them. Hold to fill, or use the tool palette for line / rect / fill modes.
 3. Use **Add page** to design multi-frame animations or alternate states (loading / game-over / etc.). Each page is one frame.
 4. Configure under **Settings**: matrix size (defaults to 8×8), color mode, wiring (axis, serpentine, origin). The defaults match the LUMATRIX.
@@ -103,7 +103,7 @@ The `instructions` field embedded in every export includes the LED-index formula
 
 ## Writing a new app without coding (LLM workflow)
 
-If you don't write code: design your screens visually in [Pixel Designer](https://pigagnelli.ch/pixel-designer/), then hand **[docs/llm-app-prompt.md](docs/llm-app-prompt.md)** to ChatGPT (or any LLM) together with the JSON export and a plain-English description of what the app should do. The LLM returns the `.py` file (for the Pico) and the `.ts` file (for the browser simulator), plus the two lines you need to add to register the app. The prompt file is fully self-contained — you don't need to share any other part of this repo.
+If you don't write code: design your screens visually in [Pixel Designer](https://lumenlab.fabs.au/pixel-designer/), then hand **[docs/llm-app-prompt.md](docs/llm-app-prompt.md)** to ChatGPT (or any LLM) together with the JSON export and a plain-English description of what the app should do. The LLM returns the `.py` file (for the Pico) and the `.ts` file (for the browser simulator), plus the two lines you need to add to register the app. The prompt file is fully self-contained — you don't need to share any other part of this repo.
 
 ## Writing a new app
 

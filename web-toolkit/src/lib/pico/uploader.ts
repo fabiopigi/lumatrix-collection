@@ -13,6 +13,22 @@ import { renderConfigPy, type PicoConfig } from "./config-py";
 import { enterRaw, execute, softReset } from "./raw-repl";
 import { PicoSerial } from "./serial";
 
+/** A file whose bytes are supplied inline (e.g. a custom .py the user
+ *  pasted) rather than fetched from /pico-bundle. */
+export interface InlineFile {
+  /** Display key for logs + the file list UI. */
+  readonly src: string;
+  /** Absolute path on the Pico filesystem. */
+  readonly pico: string;
+  readonly contents: string;
+}
+
+export type UploadPlanFile = BundleFile | InlineFile;
+
+function isInline(f: UploadPlanFile): f is InlineFile {
+  return typeof (f as InlineFile).contents === "string";
+}
+
 export type UploadStatus = "queued" | "uploading" | "done" | "failed";
 
 export interface UploadFileState {
@@ -114,8 +130,9 @@ function dirsFor(files: ReadonlyArray<{ pico: string }>): string[] {
 }
 
 export interface UploadPlan {
-  /** Bundle files that ship verbatim (core + data + selected apps). */
-  readonly files: ReadonlyArray<BundleFile>;
+  /** Bundle files that ship verbatim (core + data + selected apps) or
+   *  inline files supplied by the user (e.g. a custom .py). */
+  readonly files: ReadonlyArray<UploadPlanFile>;
   /** Per-user config written last so a partial upload doesn't leave stale config. */
   readonly config: PicoConfig;
 }
@@ -138,16 +155,25 @@ export async function runUpload(
     log("Interrupting and entering raw REPL…");
     await enterRaw(serial);
 
-    // Pre-fetch every file from the dev server so progress reflects pure Pico
-    // upload time, not download time. Also lets us fail fast if the bundle is
-    // missing pieces.
-    log(`Fetching bundle (${plan.files.length} files)…`);
+    // Pre-fetch every bundle file from the dev server so progress reflects
+    // pure Pico upload time, not download time. Inline files (user-supplied)
+    // skip the fetch — their contents are already in memory.
+    log(`Preparing bundle (${plan.files.length} files)…`);
     const bundles: Array<{ src: string; pico: string; data: Uint8Array }> = [];
     for (let i = 0; i < plan.files.length; i++) {
       const f = plan.files[i];
-      log(`  [${i + 1}/${plan.files.length}] fetching ${f.src}…`);
-      const data = await fetchBundleFile(f.src);
-      bundles.push({ src: f.src, pico: f.pico, data });
+      if (isInline(f)) {
+        log(`  [${i + 1}/${plan.files.length}] inline ${f.src}…`);
+        bundles.push({
+          src: f.src,
+          pico: f.pico,
+          data: new TextEncoder().encode(f.contents),
+        });
+      } else {
+        log(`  [${i + 1}/${plan.files.length}] fetching ${f.src}…`);
+        const data = await fetchBundleFile(f.src);
+        bundles.push({ src: f.src, pico: f.pico, data });
+      }
     }
 
     // Generate config.py text and treat it as the final file.

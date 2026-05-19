@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
+  readCustomPicoApps,
+  writeCustomPicoApps,
+  type CustomPicoApp,
+} from "@/lib/pico/custom-apps";
+import {
   fetchManifest,
   type HardwarePreset,
   type PicoBundleManifest,
@@ -29,18 +34,25 @@ export function FlashWizard() {
   const [step, setStep] = useState<Step>("hardware");
   const [preset, setPreset] = useState<HardwarePreset | null>(null);
   const [enabledIds, setEnabledIds] = useState<Set<string>>(() => new Set());
+  const [customApps, setCustomApps] = useState<CustomPicoApp[]>([]);
   const [port, setPort] = useState<SerialPort | null>(null);
   // `null` = check pending (initial SSR/client mismatch protection); `false` =
   // browser doesn't expose Web Serial; `true` = ready to connect.
   const [supported, setSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Setting state once in an effect is the canonical way to hydrate a value
-    // that depends on `navigator` — server-rendered HTML stays neutral until
-    // the client takes over.
+    // Setting state once in an effect is the canonical way to hydrate values
+    // that depend on browser-only globals (`navigator`, `localStorage`) —
+    // server-rendered HTML stays neutral until the client takes over.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSupported(isWebSerialSupported());
+    setCustomApps(readCustomPicoApps());
   }, []);
+
+  const handleCustomAppsChange = (next: CustomPicoApp[]) => {
+    setCustomApps(next);
+    writeCustomPicoApps(next);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -48,10 +60,14 @@ export function FlashWizard() {
       .then((m) => {
         if (cancelled) return;
         setManifest(m);
-        // Default preset = 8×8, default apps = every "default: true" app.
+        // Default preset = 8×8, default apps = every "default: true" app,
+        // plus any persisted custom apps so the user doesn't have to retick
+        // them every time they reopen the page.
         const def = m.hardware_presets.find((p) => p.id === "8x8") ?? m.hardware_presets[0];
         if (def) setPreset(def);
-        setEnabledIds(new Set(m.apps.filter((a) => a.default).map((a) => a.id)));
+        const builtInIds = m.apps.filter((a) => a.default).map((a) => a.id);
+        const customIds = readCustomPicoApps().map((a) => a.id);
+        setEnabledIds(new Set([...builtInIds, ...customIds]));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -72,8 +88,12 @@ export function FlashWizard() {
   const reset = () => {
     setStep("hardware");
     setPort(null);
+    // Keep customApps — they're persisted and the user typically wants to
+    // re-flash the same set or layer more apps on top.
     if (manifest) {
-      setEnabledIds(new Set(manifest.apps.filter((a) => a.default).map((a) => a.id)));
+      const builtInIds = manifest.apps.filter((a) => a.default).map((a) => a.id);
+      const customIds = customApps.map((a) => a.id);
+      setEnabledIds(new Set([...builtInIds, ...customIds]));
     }
   };
 
@@ -116,6 +136,8 @@ export function FlashWizard() {
             apps={manifest.apps}
             enabled={enabledIds}
             onChange={setEnabledIds}
+            customApps={customApps}
+            onCustomAppsChange={handleCustomAppsChange}
             onContinue={() => setStep("connect")}
           />
         )}
@@ -133,6 +155,7 @@ export function FlashWizard() {
             manifest={manifest}
             preset={preset}
             enabledIds={enabledIds}
+            customApps={customApps}
             port={port}
             onReset={reset}
           />

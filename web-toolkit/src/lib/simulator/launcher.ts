@@ -40,6 +40,12 @@ export interface LauncherDeps {
   readonly joy: Joystick;
   readonly display: DisplayDims;
   readonly createNeoPixel: NeoPixelFactory;
+  /** Extra apps appended to the menu, indexed after the built-ins.
+   *  Pending-app indices are computed against the combined list. */
+  readonly userApps?: readonly App[];
+  /** Fired when an app throws during run(). Built-ins shouldn't throw;
+   *  user apps may. The launcher recovers by returning to the menu. */
+  readonly onAppError?: (app: App, err: unknown) => void;
 }
 
 const APPS: readonly App[] = [
@@ -59,6 +65,12 @@ const APPS: readonly App[] = [
 
 export function getApps(): readonly App[] {
   return APPS;
+}
+
+let _runningApps: readonly App[] = APPS;
+
+function currentApps(): readonly App[] {
+  return _runningApps;
 }
 
 let _pendingAppIndex: number | null = null;
@@ -409,8 +421,9 @@ function marqueeOffsetAt(elapsedMs: number, stepMs: number): number {
 
 async function menuSelect(): Promise<number> {
   const { font } = chooseFont();
+  const apps = currentApps();
   let idx = 0;
-  let bitmap = textToBitmap(APPS[idx].NAME, font, _w);
+  let bitmap = textToBitmap(apps[idx].NAME, font, _w);
   // Start at offset 0 so the first letter is at the left edge from frame one;
   // scrolling then walks it leftward until the trailing gap wraps back around.
   let offset = 0;
@@ -431,9 +444,9 @@ async function menuSelect(): Promise<number> {
 
     if (nav !== 0) {
       await waitRelease();
-      const n = APPS.length;
+      const n = apps.length;
       idx = (((idx + nav) % n) + n) % n;
-      bitmap = textToBitmap(APPS[idx].NAME, font, _w);
+      bitmap = textToBitmap(apps[idx].NAME, font, _w);
       offset = 0;
       nameStart = ticks_ms();
     }
@@ -441,14 +454,17 @@ async function menuSelect(): Promise<number> {
     const elapsed = ticks_diff(ticks_ms(), nameStart);
     offset = marqueeOffsetAt(elapsed, marqueeStepMs()) % bitmap.width;
 
-    renderMenu(bitmap, offset, idx, APPS.length);
+    renderMenu(bitmap, offset, idx, apps.length);
     await sleep_ms(10);
   }
 }
 
 export async function run(deps: LauncherDeps): Promise<void> {
   joy = deps.joy;
-  const { display, createNeoPixel } = deps;
+  const { display, createNeoPixel, userApps, onAppError } = deps;
+  _runningApps = userApps && userApps.length > 0
+    ? [...APPS, ...userApps]
+    : APPS;
   _w = display.width;
   _h = display.height;
   // displayNp: launcher's W×H buffer, shared as screensNp with every app so
@@ -493,9 +509,17 @@ export async function run(deps: LauncherDeps): Promise<void> {
     screens.clearExternalExit();
 
     notifyAppChange(i);
-    const app = APPS[i];
+    const apps = currentApps();
+    const app = apps[i];
     const appNp = app.RESPONSIVE ? createNeoPixel(_w * _h) : lumatrixNp;
-    await app.run(appNp, joy, display, displayNp);
+    try {
+      await app.run(appNp, joy, display, displayNp);
+    } catch (err) {
+      const name = (err as { name?: string } | null)?.name;
+      if (name === "AbortError") throw err;
+      if (onAppError) onAppError(app, err);
+      else console.error("simulator app error:", err);
+    }
     // After an app exits its gameplay buffer (8×8 or W×H) may still be on
     // screen; the menu loop below clears + redraws to displayNp immediately.
     np = displayNp;
