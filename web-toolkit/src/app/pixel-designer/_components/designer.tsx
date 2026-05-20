@@ -392,6 +392,9 @@ export function Designer() {
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
   const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
+  // Sidepanel collapses into a drawer below `lg`. State is harmless at lg+
+  // because the drawer's positioning classes become inert at that breakpoint.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -1798,34 +1801,64 @@ export function Designer() {
           </div>
         </section>
 
-        <SidePanel
-          mode={mode}
-          maskAvailable={maskAvailable}
-          onMode={setMode}
-          color={color}
-          palette={palette}
-          onColor={setColor}
-          font={font}
-          text={text}
-          onFont={setFont}
-          onText={(t) => {
-            setText(t);
-            if (t && tool !== "text") handleSetTool("text");
-          }}
-          symbol={symbol}
-          onSymbol={(s) => {
-            setSymbol(s);
-            handleSetTool("stamp");
-          }}
-          annotations={currentAnnotations}
-          selection={selection}
-          showAnnotations={showAnnotations}
-          onShowAnnotations={setShowAnnotations}
-          onAddAnnotation={addAnnotationFromSelection}
-          onUpdateAnnotation={updateAnnotationText}
-          onDeleteAnnotation={deleteAnnotation}
-        />
+        {/* Sidepanel: inline column at lg+, off-canvas drawer below lg. The
+            same component renders in both modes — wrapper handles positioning,
+            SidePanel keeps its own dimensions and overflow. */}
+        <div
+          id="designer-side-panel"
+          className={`fixed top-14 bottom-0 right-0 z-30 shrink-0 transition-transform duration-200 ease-out lg:static lg:transform-none lg:transition-none ${
+            drawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+          }`}
+        >
+          <SidePanel
+            mode={mode}
+            maskAvailable={maskAvailable}
+            onMode={setMode}
+            color={color}
+            palette={palette}
+            onColor={setColor}
+            font={font}
+            text={text}
+            onFont={setFont}
+            onText={(t) => {
+              setText(t);
+              if (t && tool !== "text") handleSetTool("text");
+            }}
+            symbol={symbol}
+            onSymbol={(s) => {
+              setSymbol(s);
+              handleSetTool("stamp");
+            }}
+            annotations={currentAnnotations}
+            selection={selection}
+            showAnnotations={showAnnotations}
+            onShowAnnotations={setShowAnnotations}
+            onAddAnnotation={addAnnotationFromSelection}
+            onUpdateAnnotation={updateAnnotationText}
+            onDeleteAnnotation={deleteAnnotation}
+          />
+        </div>
       </div>
+
+      {/* Drawer trigger + backdrop, only shown below lg. */}
+      <button
+        type="button"
+        onClick={() => setDrawerOpen((v) => !v)}
+        aria-label={drawerOpen ? "Close tools panel" : "Open tools panel"}
+        aria-expanded={drawerOpen}
+        aria-controls="designer-side-panel"
+        className="lg:hidden fixed bottom-4 right-4 z-40 h-12 px-4 rounded-full bg-panel border border-edge text-foreground text-[12px] font-semibold tracking-[0.04em] shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:border-accent hover:text-accent transition-colors cursor-pointer"
+      >
+        {drawerOpen ? "Close ✕" : "Tools ▸"}
+      </button>
+      {drawerOpen && (
+        <button
+          type="button"
+          aria-label="Close tools panel"
+          onClick={() => setDrawerOpen(false)}
+          className="lg:hidden fixed inset-0 z-20 bg-black/40 cursor-default"
+        />
+      )}
 
       <AddPageModal
         open={addPageOpen}
