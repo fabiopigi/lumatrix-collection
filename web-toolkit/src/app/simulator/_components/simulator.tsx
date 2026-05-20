@@ -29,6 +29,7 @@ import { JoystickPad } from "./joystick-pad";
 import { ModeToggle } from "./mode-toggle";
 import { SlideSwitch } from "./slide-switch";
 import { SimulatorGrid, type SimGridHandle } from "./simulator-grid";
+import { SwipeOverlay } from "./swipe-overlay";
 import { UserAppsPanel } from "./user-apps-panel";
 
 export function Simulator() {
@@ -274,7 +275,9 @@ export function Simulator() {
         </div>
 
         <div className="flex flex-col items-center gap-4 order-1 md:order-2">
-          <SimulatorGrid ref={gridRef} display={display} />
+          <SwipeOverlay joy={joy}>
+            <SimulatorGrid ref={gridRef} display={display} />
+          </SwipeOverlay>
           <div className="flex items-center gap-2">
             <ModeToggle
               mode={mode}
