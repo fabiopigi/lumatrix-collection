@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { activeConfig } from "@/lib/pixel-designer/config";
 import {
   buildExportJSON,
@@ -11,6 +11,10 @@ import {
   exportPngGrid,
   type PngGridSection,
 } from "@/lib/pixel-designer/png-export";
+import {
+  buildShareUrl,
+  SHARE_WARN_BYTES,
+} from "@/lib/pixel-designer/share-link";
 import type { Design, Mode } from "@/lib/pixel-designer/types";
 import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
 import { ModalShell } from "./modal-shell";
@@ -190,6 +194,14 @@ function ExportModalInner({
           ×
         </button>
       </div>
+
+      <Section title="Share link">
+        <ShareLinkRow design={design} />
+        <div className="text-[10.5px] text-fg-faint mt-1 px-1 leading-[1.4]">
+          Anyone with this link opens your design directly in their browser.
+          The data lives in the URL — no upload, no account.
+        </div>
+      </Section>
 
       <Section title="JSON">
         <Row
@@ -374,4 +386,115 @@ function downloadJSON(obj: unknown, filename: string) {
   a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function ShareLinkRow({ design }: { design: Design }) {
+  const [state, setState] = useState<
+    | { kind: "loading" }
+    | { kind: "ready"; url: string; bytes: number; oversize: boolean }
+    | { kind: "error"; message: string }
+  >({ kind: "loading" });
+  const [copied, setCopied] = useState(false);
+
+  // Recompute the share link whenever the design changes. Encoding + compress
+  // is ~milliseconds for 8×8 designs and ~tens of ms for large multi-page
+  // animations, so eager generation keeps the modal responsive without
+  // surfacing a separate "Generate" button. The synchronous resets to
+  // "loading" + clear-copied are intentional cascading renders — we want
+  // the stale URL to disappear immediately on design change, not after the
+  // async build resolves.
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState({ kind: "loading" });
+    setCopied(false);
+    (async () => {
+      try {
+        const r = await buildShareUrl(
+          design,
+          window.location.origin,
+          window.location.pathname,
+        );
+        if (!cancelled) {
+          setState({
+            kind: "ready",
+            url: r.url,
+            bytes: r.bytes,
+            oversize: r.oversize,
+          });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setState({
+            kind: "error",
+            message: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [design]);
+
+  const handleCopy = async () => {
+    if (state.kind !== "ready") return;
+    try {
+      await navigator.clipboard.writeText(state.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard write failed (insecure context, denied permission, etc.).
+      // The input is selectable so the user can still copy manually.
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 px-2.5 py-2 rounded border border-line-mute bg-sunken/30">
+      {state.kind === "loading" && (
+        <div className="text-[11px] text-fg-faint">Generating link…</div>
+      )}
+      {state.kind === "error" && (
+        <div className="text-[11px] text-danger">
+          Couldn&apos;t build share link: {state.message}
+        </div>
+      )}
+      {state.kind === "ready" && (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              aria-label="Shareable design URL"
+              value={state.url}
+              onFocus={(e) => e.currentTarget.select()}
+              onClick={(e) => e.currentTarget.select()}
+              className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1 rounded font-mono text-[11px] outline-none focus:border-cta select-text min-w-0"
+            />
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover shrink-0"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <div className="text-[10.5px] text-fg-faint">
+            {formatBytes(state.bytes)}
+            {state.oversize && (
+              <span className="text-warning ml-1.5">
+                — over {Math.round(SHARE_WARN_BYTES / 1000)} KB; some chat apps
+                truncate long URLs, consider exporting JSON instead.
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  return `${(n / 1024).toFixed(1)} KB`;
 }
