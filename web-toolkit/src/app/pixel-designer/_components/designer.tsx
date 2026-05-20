@@ -393,6 +393,19 @@ export function Designer() {
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
   const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
 
+  // Page reorder drag state. `dragFromIdx` is the index being dragged;
+  // `dragOverIdx` is the gap index where dropping would insert the page
+  // (0…pages.length, where N means "after the last page"). A mirroring ref
+  // is read by dragover/drop handlers — those fire synchronously and can
+  // race React's post-dragstart re-render, so the ref keeps them correct.
+  const [dragFromIdx, _setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const dragFromIdxRef = useRef<number | null>(null);
+  const setDragFromIdx = useCallback((v: number | null) => {
+    dragFromIdxRef.current = v;
+    _setDragFromIdx(v);
+  }, []);
+
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
@@ -828,6 +841,41 @@ export function Designer() {
         next.splice(idx, 1);
         return next;
       });
+    },
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
+  );
+
+  const movePage = useCallback(
+    (from: number, to: number) => {
+      const len = designRef.current.pages.length;
+      if (from === to) return;
+      if (from < 0 || from >= len) return;
+      if (to < 0 || to >= len) return;
+
+      // Keep the currently-edited page tracking through the move. If the page
+      // being moved is the active one, follow it to its new slot; otherwise
+      // adjust the active index by the shift the move induces.
+      const cur = currentPageRef.current;
+      let nextCurrent = cur;
+      if (cur === from) nextCurrent = to;
+      else if (from < cur && to >= cur) nextCurrent = cur - 1;
+      else if (from > cur && to <= cur) nextCurrent = cur + 1;
+
+      setDesign((prev) => {
+        const nextPages = prev.pages.slice();
+        const [moved] = nextPages.splice(from, 1);
+        if (!moved) return prev;
+        nextPages.splice(to, 0, moved);
+        return { ...prev, pages: nextPages };
+      });
+      setActivePresetByPage((prev) => {
+        const next = prev.slice();
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved ?? DEFAULT_PRESET_ID);
+        return next;
+      });
+      if (nextCurrent !== cur) setCurrentPage(nextCurrent);
+      queueMicrotask(() => pushHistory(undefined, nextCurrent));
     },
     [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
   );
@@ -1665,16 +1713,95 @@ export function Designer() {
               const pageLabelForPreset =
                 HARDWARE_PRESETS.find((p) => p.id === pageActivePreset)?.label ??
                 `${pageConfig.width}×${pageConfig.height}`;
+              const isDragSource = dragFromIdx === pi;
+              const showDropAbove =
+                dragFromIdx !== null &&
+                dragOverIdx === pi &&
+                dragFromIdx !== pi &&
+                dragFromIdx !== pi - 1;
+              const showDropBelow =
+                dragFromIdx !== null &&
+                pi === pages.length - 1 &&
+                dragOverIdx === pages.length &&
+                dragFromIdx !== pi;
+              const canReorder = pages.length > 1;
               return (
                 <div
                   key={pi}
-                  className={`flex flex-col gap-2 items-stretch rounded-xl p-1.5 border-2 transition-colors ${
+                  onDragOver={(e) => {
+                    if (dragFromIdxRef.current === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    const rect = (
+                      e.currentTarget as HTMLDivElement
+                    ).getBoundingClientRect();
+                    const gap =
+                      e.clientY - rect.top < rect.height / 2 ? pi : pi + 1;
+                    if (gap !== dragOverIdx) setDragOverIdx(gap);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = dragFromIdxRef.current;
+                    if (from === null) {
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                      return;
+                    }
+                    const rect = (
+                      e.currentTarget as HTMLDivElement
+                    ).getBoundingClientRect();
+                    const gap =
+                      dragOverIdx ??
+                      (e.clientY - rect.top < rect.height / 2 ? pi : pi + 1);
+                    const finalIdx = from < gap ? gap - 1 : gap;
+                    setDragFromIdx(null);
+                    setDragOverIdx(null);
+                    if (finalIdx !== from) movePage(from, finalIdx);
+                  }}
+                  className={`relative flex flex-col gap-2 items-stretch rounded-xl p-1.5 border-2 transition-colors ${
                     isActive
                       ? "border-accent/40 bg-accent/[0.04]"
                       : "border-transparent"
-                  }`}
+                  } ${isDragSource ? "opacity-40" : ""}`}
                 >
+                  {showDropAbove && (
+                    <div className="absolute -top-2 left-2 right-2 h-0.5 bg-[#4a90e2] rounded-full pointer-events-none" />
+                  )}
+                  {showDropBelow && (
+                    <div className="absolute -bottom-2 left-2 right-2 h-0.5 bg-[#4a90e2] rounded-full pointer-events-none" />
+                  )}
                   <div className="flex items-center gap-2 px-1.5">
+                    <span
+                      draggable={canReorder}
+                      onDragStart={(e) => {
+                        if (!canReorder) {
+                          e.preventDefault();
+                          return;
+                        }
+                        e.dataTransfer.effectAllowed = "move";
+                        // Safari/Firefox require data to be set for the drag
+                        // to actually fire.
+                        e.dataTransfer.setData("text/plain", String(pi));
+                        setDragFromIdx(pi);
+                      }}
+                      onDragEnd={() => {
+                        setDragFromIdx(null);
+                        setDragOverIdx(null);
+                      }}
+                      title={
+                        canReorder
+                          ? "Drag to reorder"
+                          : "Add another page to enable reordering"
+                      }
+                      aria-label="Drag to reorder page"
+                      className={`select-none leading-none px-1 text-[14px] ${
+                        canReorder
+                          ? "cursor-grab active:cursor-grabbing text-[#666] hover:text-foreground"
+                          : "cursor-not-allowed text-[#333]"
+                      }`}
+                    >
+                      ⋮⋮
+                    </span>
                     <span
                       className={`font-mono text-[11px] font-bold min-w-[24px] ${
                         isActive ? "text-accent" : "text-[#555]"
@@ -1690,6 +1817,26 @@ export function Designer() {
                       placeholder="Page label"
                       className="flex-1 bg-transparent border border-transparent text-foreground px-2 py-1 rounded text-xs outline-none hover:border-[#2a2a30] focus:bg-[#0a0a0c] focus:border-[#4a90e2] select-text"
                     />
+                    <button
+                      type="button"
+                      onClick={() => movePage(pi, pi - 1)}
+                      disabled={pi === 0}
+                      title="Move page up"
+                      aria-label="Move page up"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => movePage(pi, pi + 1)}
+                      disabled={pi === pages.length - 1}
+                      title="Move page down"
+                      aria-label="Move page down"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
+                    >
+                      ▼
+                    </button>
                     <button
                       type="button"
                       onClick={() => setMetaModalFor(pi)}
