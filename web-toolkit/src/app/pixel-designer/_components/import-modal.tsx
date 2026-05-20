@@ -65,8 +65,9 @@ function ImportModalInner({
           <div className="text-[15px] font-semibold text-foreground">Import</div>
           <div className="text-[11px] text-[#777] mt-0.5">
             Paste a design JSON below or load a .json file (replaces the
-            current design). Or import a PNG to append it as a new page on
-            the active hardware variant.
+            current design). Or import a PNG / GIF to append it as new pages
+            on the active hardware variant — GIF frames become consecutive
+            pages with their frame delays as page durations.
           </div>
         </div>
         <button
@@ -119,12 +120,12 @@ function ImportModalInner({
             disabled={readingFile || importingImage}
             className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {importingImage ? "Importing…" : "Import PNG…"}
+            {importingImage ? "Importing…" : "Import PNG / GIF…"}
           </button>
           <input
             ref={imageInputRef}
             type="file"
-            accept="image/png,.png"
+            accept="image/png,image/gif,.png,.gif"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];

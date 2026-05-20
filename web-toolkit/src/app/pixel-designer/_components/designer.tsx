@@ -1607,31 +1607,38 @@ export function Designer() {
         setImportError("Active hardware variant is missing — cannot import.");
         return;
       }
-      let result;
+      let frames;
       try {
-        result = await importImageForHardware(file, hw.width, hw.height);
+        frames = await importImageForHardware(file, hw.width, hw.height);
       } catch (err) {
         setImportError(`Image import error: ${(err as Error).message}`);
         return;
       }
+      if (frames.length === 0) {
+        setImportError("Image had no frames.");
+        return;
+      }
       const insertAt = currentPageRef.current + 1;
       setDesign((prev) => {
-        const newPage = {
-          label: result.label,
+        const newPages = frames.map((f) => ({
+          label: f.label,
+          ...(f.durationMs !== undefined ? { duration: f.durationMs } : {}),
           variants: {
-            [presetId]: { pixels: result.pixels.slice() },
+            [presetId]: { pixels: f.pixels.slice() },
           },
-        };
+        }));
         const nextPages = prev.pages.slice();
-        nextPages.splice(insertAt, 0, newPage);
+        nextPages.splice(insertAt, 0, ...newPages);
         queueMicrotask(() => pushHistory(undefined, insertAt));
         return { ...prev, pages: nextPages };
       });
       setActivePresetByPage((prev) => {
         const next = prev.slice();
-        next.splice(insertAt, 0, presetId);
+        next.splice(insertAt, 0, ...frames.map(() => presetId));
         return next;
       });
+      // Focus on the first newly-inserted page — for a GIF that means the
+      // user lands on frame 1 of the animation rather than the last frame.
       setCurrentPage(insertAt);
       setImportError(null);
       setImportOpen(false);
