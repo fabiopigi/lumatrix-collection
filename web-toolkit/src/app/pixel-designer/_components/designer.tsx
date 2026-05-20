@@ -22,6 +22,7 @@ import {
   rectPoints,
 } from "@/lib/pixel-designer/geometry";
 import { computeLedIndex } from "@/lib/pixel-designer/led-index";
+import { importImageForHardware } from "@/lib/pixel-designer/image-import";
 import { parseImport } from "@/lib/pixel-designer/json-io";
 import {
   COLOR_MODES,
@@ -64,6 +65,7 @@ import {
   type PageMetaPatch,
 } from "./page-meta-modal";
 import { PixelGrid } from "./pixel-grid";
+import { PlayPreviewPanel } from "./play-preview-panel";
 import { SidePanel } from "./side-panel";
 import { Toolbar } from "./toolbar";
 import { VariantPicker } from "./variant-picker";
@@ -395,6 +397,20 @@ export function Designer() {
   // Sidepanel collapses into a drawer below `lg`. State is harmless at lg+
   // because the drawer's positioning classes become inert at that breakpoint.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Page reorder drag state. `dragFromIdx` is the index being dragged;
+  // `dragOverIdx` is the gap index where dropping would insert the page
+  // (0…pages.length, where N means "after the last page"). A mirroring ref
+  // is read by dragover/drop handlers; those fire synchronously and can
+  // race React's post-dragstart re-render, so the ref keeps them correct.
+  const [dragFromIdx, _setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const dragFromIdxRef = useRef<number | null>(null);
+  const setDragFromIdx = useCallback((v: number | null) => {
+    dragFromIdxRef.current = v;
+    _setDragFromIdx(v);
+  }, []);
 
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -831,6 +847,41 @@ export function Designer() {
         next.splice(idx, 1);
         return next;
       });
+    },
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
+  );
+
+  const movePage = useCallback(
+    (from: number, to: number) => {
+      const len = designRef.current.pages.length;
+      if (from === to) return;
+      if (from < 0 || from >= len) return;
+      if (to < 0 || to >= len) return;
+
+      // Keep the currently-edited page tracking through the move. If the page
+      // being moved is the active one, follow it to its new slot; otherwise
+      // adjust the active index by the shift the move induces.
+      const cur = currentPageRef.current;
+      let nextCurrent = cur;
+      if (cur === from) nextCurrent = to;
+      else if (from < cur && to >= cur) nextCurrent = cur - 1;
+      else if (from > cur && to <= cur) nextCurrent = cur + 1;
+
+      setDesign((prev) => {
+        const nextPages = prev.pages.slice();
+        const [moved] = nextPages.splice(from, 1);
+        if (!moved) return prev;
+        nextPages.splice(to, 0, moved);
+        return { ...prev, pages: nextPages };
+      });
+      setActivePresetByPage((prev) => {
+        const next = prev.slice();
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved ?? DEFAULT_PRESET_ID);
+        return next;
+      });
+      if (nextCurrent !== cur) setCurrentPage(nextCurrent);
+      queueMicrotask(() => pushHistory(undefined, nextCurrent));
     },
     [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
   );
@@ -1550,6 +1601,56 @@ export function Designer() {
     pushHistory,
   ]);
 
+  // ============ image import ============
+
+  const handleImageImport = useCallback(
+    async (file: File) => {
+      const currentDesign = designRef.current;
+      const presetId = activePresetByPageRef.current[currentPageRef.current];
+      const hw = currentDesign.hardware[presetId];
+      if (!hw) {
+        setImportError("Active hardware variant is missing — cannot import.");
+        return;
+      }
+      let frames;
+      try {
+        frames = await importImageForHardware(file, hw.width, hw.height);
+      } catch (err) {
+        setImportError(`Image import error: ${(err as Error).message}`);
+        return;
+      }
+      if (frames.length === 0) {
+        setImportError("Image had no frames.");
+        return;
+      }
+      const insertAt = currentPageRef.current + 1;
+      setDesign((prev) => {
+        const newPages = frames.map((f) => ({
+          label: f.label,
+          ...(f.durationMs !== undefined ? { duration: f.durationMs } : {}),
+          variants: {
+            [presetId]: { pixels: f.pixels.slice() },
+          },
+        }));
+        const nextPages = prev.pages.slice();
+        nextPages.splice(insertAt, 0, ...newPages);
+        queueMicrotask(() => pushHistory(undefined, insertAt));
+        return { ...prev, pages: nextPages };
+      });
+      setActivePresetByPage((prev) => {
+        const next = prev.slice();
+        next.splice(insertAt, 0, ...frames.map(() => presetId));
+        return next;
+      });
+      // Focus on the first newly-inserted page — for a GIF that means the
+      // user lands on frame 1 of the animation rather than the last frame.
+      setCurrentPage(insertAt);
+      setImportError(null);
+      setImportOpen(false);
+    },
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
+  );
+
   // ============ config save ============
 
   const handleConfigSave = useCallback(
@@ -1591,6 +1692,15 @@ export function Designer() {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
+  // Play preview is available once there's a sequence to play AND the active
+  // preset exists on every page (so we can show one consistent variant the
+  // whole way through). The panel itself is guarded at the mount site —
+  // when the condition is false the panel unmounts, and reappears if the
+  // condition holds again while `previewOpen` is still true.
+  const canPreview =
+    design.pages.length > 1 &&
+    design.pages.every((p) => p.variants[activePreset]);
+
   const headerSlot = useHeaderActionsSlot();
   const headerActions = (
     <>
@@ -1610,6 +1720,19 @@ export function Designer() {
       />
       <div className="w-px h-5 bg-edge mx-1" />
       <div className="flex gap-1.5">
+        <HeaderBtn
+          onClick={() => setPreviewOpen((v) => !v)}
+          disabled={!canPreview}
+          title={
+            canPreview
+              ? previewOpen
+                ? "Close play preview"
+                : "Play multi-page preview"
+              : "Need at least 2 pages all sharing the active variant"
+          }
+        >
+          {previewOpen ? "Hide preview" : "Play preview"}
+        </HeaderBtn>
         <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
           Clear
         </HeaderBtn>
@@ -1668,16 +1791,95 @@ export function Designer() {
               const pageLabelForPreset =
                 HARDWARE_PRESETS.find((p) => p.id === pageActivePreset)?.label ??
                 `${pageConfig.width}×${pageConfig.height}`;
+              const isDragSource = dragFromIdx === pi;
+              const showDropAbove =
+                dragFromIdx !== null &&
+                dragOverIdx === pi &&
+                dragFromIdx !== pi &&
+                dragFromIdx !== pi - 1;
+              const showDropBelow =
+                dragFromIdx !== null &&
+                pi === pages.length - 1 &&
+                dragOverIdx === pages.length &&
+                dragFromIdx !== pi;
+              const canReorder = pages.length > 1;
               return (
                 <div
                   key={pi}
-                  className={`flex flex-col gap-2 items-stretch rounded-xl p-1.5 border-2 transition-colors ${
+                  onDragOver={(e) => {
+                    if (dragFromIdxRef.current === null) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    const rect = (
+                      e.currentTarget as HTMLDivElement
+                    ).getBoundingClientRect();
+                    const gap =
+                      e.clientY - rect.top < rect.height / 2 ? pi : pi + 1;
+                    if (gap !== dragOverIdx) setDragOverIdx(gap);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = dragFromIdxRef.current;
+                    if (from === null) {
+                      setDragFromIdx(null);
+                      setDragOverIdx(null);
+                      return;
+                    }
+                    const rect = (
+                      e.currentTarget as HTMLDivElement
+                    ).getBoundingClientRect();
+                    const gap =
+                      dragOverIdx ??
+                      (e.clientY - rect.top < rect.height / 2 ? pi : pi + 1);
+                    const finalIdx = from < gap ? gap - 1 : gap;
+                    setDragFromIdx(null);
+                    setDragOverIdx(null);
+                    if (finalIdx !== from) movePage(from, finalIdx);
+                  }}
+                  className={`relative flex flex-col gap-2 items-stretch rounded-xl p-1.5 border-2 transition-colors ${
                     isActive
                       ? "border-accent/40 bg-accent/[0.04]"
                       : "border-transparent"
-                  }`}
+                  } ${isDragSource ? "opacity-40" : ""}`}
                 >
+                  {showDropAbove && (
+                    <div className="absolute -top-2 left-2 right-2 h-0.5 bg-cta rounded-full pointer-events-none" />
+                  )}
+                  {showDropBelow && (
+                    <div className="absolute -bottom-2 left-2 right-2 h-0.5 bg-cta rounded-full pointer-events-none" />
+                  )}
                   <div className="flex items-center gap-2 px-1.5">
+                    <span
+                      draggable={canReorder}
+                      onDragStart={(e) => {
+                        if (!canReorder) {
+                          e.preventDefault();
+                          return;
+                        }
+                        e.dataTransfer.effectAllowed = "move";
+                        // Safari/Firefox require data to be set for the drag
+                        // to actually fire.
+                        e.dataTransfer.setData("text/plain", String(pi));
+                        setDragFromIdx(pi);
+                      }}
+                      onDragEnd={() => {
+                        setDragFromIdx(null);
+                        setDragOverIdx(null);
+                      }}
+                      title={
+                        canReorder
+                          ? "Drag to reorder"
+                          : "Add another page to enable reordering"
+                      }
+                      aria-label="Drag to reorder page"
+                      className={`select-none leading-none px-1 text-[14px] ${
+                        canReorder
+                          ? "cursor-grab active:cursor-grabbing text-fg-faint hover:text-foreground"
+                          : "cursor-not-allowed text-line-stronger"
+                      }`}
+                    >
+                      ⋮⋮
+                    </span>
                     <span
                       className={`font-mono text-[11px] font-bold min-w-[24px] ${
                         isActive ? "text-accent" : "text-fg-faint"
@@ -1694,6 +1896,26 @@ export function Designer() {
                       aria-label={`Label for page ${pi + 1}`}
                       className="flex-1 bg-transparent border border-transparent text-foreground px-2 py-1 rounded text-xs outline-none hover:border-line-strong focus:bg-sunken focus:border-cta select-text"
                     />
+                    <button
+                      type="button"
+                      onClick={() => movePage(pi, pi - 1)}
+                      disabled={pi === 0}
+                      title="Move page up"
+                      aria-label="Move page up"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => movePage(pi, pi + 1)}
+                      disabled={pi === pages.length - 1}
+                      title="Move page down"
+                      aria-label="Move page down"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
+                    >
+                      ▼
+                    </button>
                     <button
                       type="button"
                       onClick={() => setMetaModalFor(pi)}
@@ -1907,6 +2129,7 @@ export function Designer() {
           if (importError) setImportError(null);
         }}
         onImport={handleImport}
+        onImageImport={handleImageImport}
         error={importError}
         onClose={() => {
           setImportOpen(false);
@@ -1954,6 +2177,14 @@ export function Designer() {
           setDeletePromptFor(null);
         }}
       />
+      {previewOpen && canPreview && (
+        <PlayPreviewPanel
+          pages={design.pages}
+          presetId={activePreset}
+          config={config}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1966,17 +2197,20 @@ function HeaderBtn({
   children,
   onClick,
   title,
+  disabled,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   title?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
+      disabled={disabled}
+      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-raised"
     >
       {children}
     </button>

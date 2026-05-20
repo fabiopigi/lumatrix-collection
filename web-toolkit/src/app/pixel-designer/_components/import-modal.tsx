@@ -8,6 +8,7 @@ interface ImportModalProps {
   value: string;
   onValueChange: (v: string) => void;
   onImport: () => void;
+  onImageImport: (file: File) => void | Promise<void>;
   error: string | null;
   onClose: () => void;
 }
@@ -21,11 +22,14 @@ function ImportModalInner({
   value,
   onValueChange,
   onImport,
+  onImageImport,
   error,
   onClose,
 }: Omit<ImportModalProps, "open">) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [readingFile, setReadingFile] = useState(false);
+  const [importingImage, setImportingImage] = useState(false);
 
   // Focus the textarea on open so the user can paste immediately. The modal
   // mounts when `open` flips to true, so an effect tied to first mount is the
@@ -45,14 +49,25 @@ function ImportModalInner({
     }
   };
 
+  const handleImageFile = async (file: File) => {
+    setImportingImage(true);
+    try {
+      await onImageImport(file);
+    } finally {
+      setImportingImage(false);
+    }
+  };
+
   return (
     <ModalShell onClose={onClose} label="Import design" className="w-[560px] max-h-[88vh] overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">Import</div>
           <div className="text-[11px] text-fg-faint mt-0.5">
-            Paste a design JSON below or load a .json file. Importing replaces
-            the current design.
+            Paste a design JSON below or load a .json file (replaces the
+            current design). Or import a PNG / GIF to append it as new pages
+            on the active hardware variant; GIF frames become consecutive
+            pages with their frame delays as page durations.
           </div>
         </div>
         <button
@@ -83,10 +98,10 @@ function ImportModalInner({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={readingFile}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
+            disabled={readingFile || importingImage}
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {readingFile ? "Reading…" : "Load file…"}
+            {readingFile ? "Reading…" : "Load JSON…"}
           </button>
           <input
             ref={fileInputRef}
@@ -96,6 +111,25 @@ function ImportModalInner({
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) handleFile(f);
+              e.currentTarget.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={readingFile || importingImage}
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {importingImage ? "Importing…" : "Import PNG / GIF…"}
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/gif,.png,.gif"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImageFile(f);
               e.currentTarget.value = "";
             }}
           />
