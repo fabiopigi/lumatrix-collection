@@ -27,6 +27,10 @@ import {
   renameDesign,
   saveAs,
 } from "@/lib/pixel-designer/library";
+import {
+  decodeDesign,
+  parseShareHash,
+} from "@/lib/pixel-designer/share-link";
 import { textPoints } from "@/lib/pixel-designer/fonts";
 import {
   ellipsePoints,
@@ -1671,6 +1675,40 @@ export function Designer() {
     const flushed = autosave(lib, designRef.current);
     libraryRef.current = flushed;
     _setLibraryBase(flushed);
+  }, []);
+
+  // ============ shared-link autoload ============
+  // If the page was opened with #d=<payload>, decode the design and add it to
+  // the library as a new entry. Runs once on mount, after the library has
+  // hydrated (libraryRef is set synchronously in the mount effect above, so
+  // it's already populated by the time this effect's callback runs).
+  useEffect(() => {
+    const payload = parseShareHash(window.location.hash);
+    if (!payload) return;
+    let cancelled = false;
+    (async () => {
+      const decoded = await decodeDesign(payload);
+      if (cancelled || !decoded || !libraryRef.current) return;
+      // Strip the hash so a reload doesn't re-import (and so the URL bar
+      // stops showing a 6 KB blob the moment we've consumed it).
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+      const next = importIntoLibrary(
+        libraryRef.current,
+        decoded,
+        "Shared design",
+      );
+      libraryRef.current = next;
+      _setLibraryBase(next);
+      adoptDesign(next.designs[next.currentId].data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============ JSON import ============
