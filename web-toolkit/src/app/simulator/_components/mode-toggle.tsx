@@ -16,7 +16,7 @@ export function ModeToggle({
   maskAvailable = true,
 }: ModeToggleProps) {
   return (
-    <div className="inline-flex bg-[#0a0a0c] border border-edge rounded-md p-[3px]">
+    <div className="inline-flex bg-sunken border border-edge rounded-md p-[3px]">
       <ModeButton
         on={mode === "pixel"}
         onClick={() => mode !== "pixel" && onChange("pixel")}
@@ -62,7 +62,7 @@ function ModeButton({
         disabled
           ? "bg-transparent text-muted/40 cursor-not-allowed"
           : on
-            ? "bg-[#1d2937] text-accent cursor-pointer"
+            ? "bg-active text-accent cursor-pointer"
             : "bg-transparent text-muted hover:text-white cursor-pointer"
       }`}
     >

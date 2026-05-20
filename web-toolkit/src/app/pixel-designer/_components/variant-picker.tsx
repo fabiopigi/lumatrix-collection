@@ -39,14 +39,14 @@ export function VariantPicker({
     HARDWARE_PRESETS.find((p) => p.id === id)?.label ?? id;
 
   return (
-    <label className="flex items-center gap-1.5 text-[11px] text-[#aaa]">
-      <span className="font-medium tracking-[0.02em] text-[#888]">
+    <label className="flex items-center gap-1.5 text-[11px] text-fg-2">
+      <span className="font-medium tracking-[0.02em] text-muted">
         {label}:
       </span>
       <select
         value={activePreset}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-[#22222a] border border-[#2f2f37] text-foreground px-2 py-1 rounded text-[11px] outline-none cursor-pointer hover:bg-[#2c2c34] focus:border-[#4a90e2]"
+        className="bg-raised border border-line-strong text-foreground px-2 py-1 rounded text-[11px] outline-none cursor-pointer hover:bg-raised-hover focus:border-cta"
       >
         {presetIds.map((id) => (
           <option key={id} value={id}>

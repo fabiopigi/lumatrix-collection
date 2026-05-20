@@ -40,8 +40,8 @@ function DeletePageModalInner({
           <div className="text-[15px] font-semibold text-foreground">
             Delete what?
           </div>
-          <div className="text-[11px] text-[#777] mt-0.5">
-            <span className="font-mono text-[#aaa]">
+          <div className="text-[11px] text-fg-faint mt-0.5">
+            <span className="font-mono text-fg-2">
               #{pageIndex + 1} {pageLabel}
             </span>
             {" — "}
@@ -51,7 +51,7 @@ function DeletePageModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -86,7 +86,7 @@ function DeletePageModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
         >
           Cancel
         </button>
@@ -115,15 +115,15 @@ function ActionRow({
       disabled={disabled}
       className={`text-left px-3 py-2 rounded border transition-colors ${
         disabled
-          ? "bg-[#0a0a0c]/30 border-[#1f1f25] text-[#555] cursor-not-allowed"
+          ? "bg-sunken/30 border-line-mute text-fg-faint cursor-not-allowed"
           : danger
-            ? "bg-[#1a0a0a] border-[#3a2020] text-[#ff8888] hover:bg-[#2a1010] hover:border-[#5a3030] cursor-pointer"
-            : "bg-[#0a0a0c] border-[#2a2a30] text-foreground hover:bg-[#101015] hover:border-[#3a3a42] cursor-pointer"
+            ? "bg-[#1a0a0a] border-danger-soft text-danger hover:bg-[#2a1010] hover:border-danger-line cursor-pointer"
+            : "bg-sunken border-line-strong text-foreground hover:bg-[#101015] hover:border-line-stronger cursor-pointer"
       }`}
     >
       <div className="text-xs font-medium">{label}</div>
       <div
-        className={`text-[10.5px] mt-0.5 leading-[1.4] ${disabled ? "text-[#444]" : danger ? "text-[#cc6666]" : "text-[#777]"}`}
+        className={`text-[10.5px] mt-0.5 leading-[1.4] ${disabled ? "text-[#444]" : danger ? "text-[#cc6666]" : "text-fg-faint"}`}
       >
         {hint}
       </div>

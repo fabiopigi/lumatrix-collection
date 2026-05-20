@@ -27,7 +27,7 @@ export function DisplayPicker({ display, onChange }: DisplayPickerProps) {
             onChange({ width: preset.width, height: preset.height });
           }
         }}
-        className="bg-panel-2 border border-edge text-foreground px-2 py-1.5 rounded text-[12px] outline-none cursor-pointer hover:border-[#3a3a42] focus:border-accent"
+        className="bg-panel-2 border border-edge text-foreground px-2 py-1.5 rounded text-[12px] outline-none cursor-pointer hover:border-line-stronger focus:border-accent"
       >
         {DISPLAY_PRESETS.map((p) => (
           <option key={p.id} value={p.id}>

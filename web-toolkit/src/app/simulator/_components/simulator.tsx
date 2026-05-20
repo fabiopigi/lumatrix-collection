@@ -290,10 +290,10 @@ export function Simulator() {
                   ? "Copied!"
                   : "Copy the current screen as designer-importable JSON"
               }
-              className={`w-9 h-9 inline-flex items-center justify-center border rounded-md transition-colors cursor-pointer bg-[#0a0a0c] ${
+              className={`w-9 h-9 inline-flex items-center justify-center border rounded-md transition-colors cursor-pointer bg-sunken ${
                 screenCopied
                   ? "border-accent text-accent"
-                  : "border-edge text-muted hover:text-white hover:border-[#3a3a42]"
+                  : "border-edge text-muted hover:text-white hover:border-line-stronger"
               }`}
             >
               <svg

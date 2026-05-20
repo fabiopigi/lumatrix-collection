@@ -1,23 +1,82 @@
 @import "tailwindcss";
 
 :root {
+  /* Base */
   --background: #0e0e10;
   --foreground: #e9e9ef;
-  --panel: #16161a;
-  --panel-2: #1a1a1f;
-  --edge: #232328;
-  --muted: #8a8a96;
-  --accent: #6cf;
+  --accent: #6cf; /* link / focus / active accent */
+
+  /* Surfaces — sunken (deepest) → raised (interactive) */
+  --sunken: #0a0a0c; /* pixel cell, dark inset surfaces */
+  --surface-1: #131316; /* sidepanel, toolbar */
+  --panel: #16161a; /* default panel bg */
+  --panel-2: #1a1a1f; /* lighter panel */
+  --raised: #22222a; /* secondary button bg */
+  --raised-hover: #2c2c34; /* secondary button hover */
+  --active: #1d2937; /* tinted-accent active state */
+  --input-focus: #0e0e12; /* input bg when focused */
+
+  /* Borders — mute → stronger. Named `line-*` so the resulting
+     `border-line-strong` class doesn't read as `border-border-strong`. */
+  --line-mute: #1f1f25;
+  --edge: #232328; /* default border */
+  --line-strong: #2a2a30;
+  --line-stronger: #3a3a42;
+
+  /* Text — raised floors so #555 / #666 / #777 hit WCAG AA on --background */
+  --fg-2: #aaaab0; /* secondary text */
+  --muted: #a0a0a8; /* tertiary text (was #8a8a96, raised to ~5:1) */
+  --fg-faint: #7a7a82; /* hint / caption (was #555/#666/#777, raised to ~4.5:1) */
+
+  /* CTA accent — distinct from the link accent so both roles stay readable */
+  --cta: #4a90e2;
+  --cta-hover: #5fa0ee;
+  --cta-fg: #06121e;
+
+  /* Warning (annotation orange) */
+  --warning: #f5a623;
+  --warning-fg: #1a1308;
+
+  /* Danger (destructive hover states) */
+  --danger: #ff8888;
+  --danger-soft: #3a2020;
+  --danger-line: #5a3030;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+
+  --color-sunken: var(--sunken);
+  --color-surface-1: var(--surface-1);
   --color-panel: var(--panel);
   --color-panel-2: var(--panel-2);
+  --color-raised: var(--raised);
+  --color-raised-hover: var(--raised-hover);
+  --color-active: var(--active);
+  --color-input-focus: var(--input-focus);
+
+  --color-line-mute: var(--line-mute);
   --color-edge: var(--edge);
+  --color-line-strong: var(--line-strong);
+  --color-line-stronger: var(--line-stronger);
+
+  --color-fg-2: var(--fg-2);
   --color-muted: var(--muted);
-  --color-accent: var(--accent);
+  --color-fg-faint: var(--fg-faint);
+
+  --color-cta: var(--cta);
+  --color-cta-hover: var(--cta-hover);
+  --color-cta-fg: var(--cta-fg);
+
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
     system-ui, sans-serif;
   --font-mono: "SF Mono", Menlo, Consolas, monospace;

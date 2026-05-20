@@ -56,7 +56,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
         <div
           key={`${x},${y}`}
           className={`flex items-center justify-center font-mono text-[8px] rounded-sm aspect-square min-w-[20px] ${
-            zero ? "bg-[#2a3a4a] text-accent font-bold" : "bg-[#1a1a1f] text-[#888]"
+            zero ? "bg-[#2a3a4a] text-accent font-bold" : "bg-panel-2 text-muted"
           }`}
         >
           {idx}
@@ -96,7 +96,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
           )?.label ?? `${current.width}×${current.height}`}
         </span>
       </h2>
-      <p className="text-[10.5px] text-[#777] -mt-2 mb-3 leading-[1.4]">
+      <p className="text-[10.5px] text-fg-faint -mt-2 mb-3 leading-[1.4]">
         These fields describe the active variant&apos;s hardware (size, wiring,
         letter mask) plus the design&apos;s global colour mode. Other variants
         keep their own wiring.
@@ -121,7 +121,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
                 setWidth(p.width);
                 setHeight(p.height);
               }}
-              className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+              className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
             >
               {p.width}×{p.height}
             </button>
@@ -174,7 +174,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
           </label>
         </div>
         <div className="mt-3.5">
-          <div className="text-[11px] text-[#888] mb-1.5 flex justify-between">
+          <div className="text-[11px] text-muted mb-1.5 flex justify-between">
             <span>Index preview</span>
             <span className="text-accent font-mono">
               {previewCfg.width}×{previewCfg.height} ={" "}
@@ -183,7 +183,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
             </span>
           </div>
           <div
-            className="bg-[#0a0a0c] border border-edge rounded p-2 grid gap-0.5 justify-start overflow-x-auto"
+            className="bg-sunken border border-edge rounded p-2 grid gap-0.5 justify-start overflow-x-auto"
             style={{
               gridTemplateColumns: `repeat(${previewCfg.width}, ${cellPx}px)`,
             }}
@@ -201,7 +201,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
           placeholder={
             "Type letters, one per LED.\nLines shorter than the matrix width are padded with blanks.\nLines beyond the matrix height are ignored."
           }
-          className="w-full min-h-[140px] bg-[#0a0a0c] border border-edge text-foreground p-2 rounded font-mono text-[13px] leading-[1.4] tracking-[0.12em] uppercase resize-y whitespace-pre overflow-x-auto outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
+          className="w-full min-h-[140px] bg-sunken border border-edge text-foreground p-2 rounded font-mono text-[13px] leading-[1.4] tracking-[0.12em] uppercase resize-y whitespace-pre overflow-x-auto outline-none focus:border-cta focus:bg-input-focus select-text"
         />
         <div
           className={`mt-1.5 text-[11px] font-mono ${maskWarn ? "text-[#d8a000]" : "text-accent"}`}
@@ -212,14 +212,14 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
           <button
             type="button"
             onClick={() => setMask("")}
-            className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
           >
             Clear
           </button>
           <button
             type="button"
             onClick={() => setMask(LUMATRIX_MASK)}
-            className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
           >
             Use LUMATRIX preset
           </button>
@@ -230,21 +230,21 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={resetToDefaults}
-          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#2a1818] border border-[#3a2020] text-[#ff8888] hover:bg-[#3a2020]"
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#2a1818] border border-danger-soft text-danger hover:bg-danger-soft"
         >
           Reset to LUMATRIX defaults
         </button>
         <button
           type="button"
           onClick={save}
-          className="ml-auto px-3 py-1.5 rounded text-xs cursor-pointer bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee]"
+          className="ml-auto px-3 py-1.5 rounded text-xs cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover"
         >
           Save
         </button>
@@ -264,10 +264,10 @@ function CfgSection({
 }) {
   return (
     <div className="mb-4 pb-3.5 border-b border-edge last-of-type:border-b-0">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-[#888] mb-2 font-semibold">
+      <div className="text-[11px] uppercase tracking-[0.08em] text-muted mb-2 font-semibold">
         {title}
         {hint && (
-          <span className="ml-1 font-normal text-[#666] normal-case tracking-normal text-[11px]">
+          <span className="ml-1 font-normal text-fg-faint normal-case tracking-normal text-[11px]">
             — {hint}
           </span>
         )}
@@ -306,7 +306,7 @@ function NumInput({
       max={64}
       value={value}
       onChange={(e) => onChange(Number(e.target.value) || 1)}
-      className="w-[70px] flex-none bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12]"
+      className="w-[70px] flex-none bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus"
     />
   );
 }
@@ -339,7 +339,7 @@ function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12]"
+      className="w-full bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

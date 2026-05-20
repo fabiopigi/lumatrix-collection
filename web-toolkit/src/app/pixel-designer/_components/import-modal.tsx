@@ -50,7 +50,7 @@ function ImportModalInner({
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">Import</div>
-          <div className="text-[11px] text-[#777] mt-0.5">
+          <div className="text-[11px] text-fg-faint mt-0.5">
             Paste a design JSON below or load a .json file. Importing replaces
             the current design.
           </div>
@@ -58,7 +58,7 @@ function ImportModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -71,11 +71,11 @@ function ImportModalInner({
         onChange={(e) => onValueChange(e.target.value)}
         spellCheck={false}
         placeholder='Paste design JSON here. Use Export… to produce one.'
-        className="w-full h-[280px] bg-[#0a0a0c] border border-edge text-foreground p-2 rounded font-mono text-[11px] leading-[1.4] resize-y outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
+        className="w-full h-[280px] bg-sunken border border-edge text-foreground p-2 rounded font-mono text-[11px] leading-[1.4] resize-y outline-none focus:border-cta focus:bg-input-focus select-text"
       />
 
       {error && (
-        <div className="mt-2 text-[11px] text-[#ff8888] font-mono">{error}</div>
+        <div className="mt-2 text-[11px] text-danger font-mono">{error}</div>
       )}
 
       <div className="flex justify-between mt-3 gap-2">
@@ -84,7 +84,7 @@ function ImportModalInner({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={readingFile}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
           >
             {readingFile ? "Reading…" : "Load file…"}
           </button>
@@ -104,7 +104,7 @@ function ImportModalInner({
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
           >
             Cancel
           </button>
@@ -112,7 +112,7 @@ function ImportModalInner({
             type="button"
             onClick={onImport}
             disabled={value.trim() === ""}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#4a90e2]"
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-cta"
           >
             Import
           </button>

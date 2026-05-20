@@ -58,7 +58,7 @@ export function AppLauncher({
               className={`text-[12px] px-3 py-1.5 rounded border text-left font-medium cursor-pointer transition-colors ${
                 active
                   ? "bg-accent/[0.12] border-accent text-accent"
-                  : "bg-panel-2 border-edge text-foreground hover:bg-[#22222a] hover:border-[#3a3a42]"
+                  : "bg-panel-2 border-edge text-foreground hover:bg-raised hover:border-line-stronger"
               }`}
             >
               {app.NAME}

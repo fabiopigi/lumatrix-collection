@@ -38,7 +38,7 @@ export function VariantsStrip({
 
   return (
     <div className="flex items-center gap-1 px-1.5 flex-wrap">
-      <span className="text-[9px] text-[#555] uppercase tracking-wider mr-1 font-semibold">
+      <span className="text-[9px] text-fg-faint uppercase tracking-wider mr-1 font-semibold">
         Variants
       </span>
       {variantIds.map((id) => {
@@ -52,7 +52,7 @@ export function VariantsStrip({
             className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
               isActive
                 ? "bg-[#2a3a4a] text-accent border border-[#3a4a5a]"
-                : "bg-[#22222a] text-[#888] border border-[#2f2f37] hover:bg-[#2c2c34] hover:text-foreground"
+                : "bg-raised text-muted border border-line-strong hover:bg-raised-hover hover:text-foreground"
             }`}
           >
             {sizeLabel(id)}
@@ -63,7 +63,7 @@ export function VariantsStrip({
         type="button"
         onClick={onAddClicked}
         title="Add a variant for another hardware preset"
-        className="px-1.5 py-0.5 rounded text-[10px] cursor-pointer bg-transparent text-[#666] border border-dashed border-[#3a3a42] hover:bg-[#22222a] hover:text-accent hover:border-[#4a90e2]"
+        className="px-1.5 py-0.5 rounded text-[10px] cursor-pointer bg-transparent text-fg-faint border border-dashed border-line-stronger hover:bg-raised hover:text-accent hover:border-cta"
       >
         + Add
       </button>

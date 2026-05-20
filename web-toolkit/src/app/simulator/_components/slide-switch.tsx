@@ -25,7 +25,7 @@ export function SlideSwitch({ slide }: SlideSwitchProps) {
       </span>
       <span
         className={`relative w-[52px] h-6 rounded-[14px] border transition-colors ${
-          on ? "bg-[#1d2937] border-accent" : "bg-[#0a0a0c] border-edge"
+          on ? "bg-active border-accent" : "bg-sunken border-edge"
         }`}
       >
         <span

@@ -73,8 +73,8 @@ export function JoystickPad({ joy }: JoystickPadProps) {
               btn === "center" ? "text-sm" : "text-lg"
             } ${
               active
-                ? "bg-[#1d2937] text-accent border-accent scale-95"
-                : "bg-panel-2 text-muted border-edge hover:text-white hover:border-[#333]"
+                ? "bg-active text-accent border-accent scale-95"
+                : "bg-panel-2 text-muted border-edge hover:text-white hover:border-line-stronger"
             }`}
           >
             {ICONS[btn]}

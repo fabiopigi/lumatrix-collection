@@ -174,7 +174,7 @@ function ExportModalInner({
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">Export</div>
-          <div className="text-[11px] text-[#777] mt-0.5">
+          <div className="text-[11px] text-fg-faint mt-0.5">
             {design.pages.length} page{design.pages.length === 1 ? "" : "s"} ·{" "}
             {totalVariants} variant{totalVariants === 1 ? "" : "s"} across{" "}
             {presetIds.length} hardware preset
@@ -184,7 +184,7 @@ function ExportModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -225,7 +225,7 @@ function ExportModalInner({
                 value={presetForFlat}
                 onChange={(e) => setPresetForFlat(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-[#0a0a0c] border border-edge text-foreground px-1.5 py-0.5 rounded text-[11px] outline-none cursor-pointer focus:border-[#4a90e2]"
+                className="bg-sunken border border-edge text-foreground px-1.5 py-0.5 rounded text-[11px] outline-none cursor-pointer focus:border-cta"
               >
                 {presetIds.map((id) => (
                   <option key={id} value={id}>
@@ -283,7 +283,7 @@ function ExportModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
         >
           Close
         </button>
@@ -301,7 +301,7 @@ function Section({
 }) {
   return (
     <div className="mb-4">
-      <div className="text-[10px] uppercase tracking-[0.1em] text-[#777] mb-1.5 font-semibold">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-1.5 font-semibold">
         {title}
       </div>
       <div className="flex flex-col gap-1.5">{children}</div>
@@ -335,11 +335,11 @@ function Row({
   };
   return (
     <div
-      className={`flex items-center gap-3 px-2.5 py-2 rounded border border-[#1f1f25] bg-[#0a0a0c]/30 ${disabled ? "opacity-50" : ""}`}
+      className={`flex items-center gap-3 px-2.5 py-2 rounded border border-line-mute bg-sunken/30 ${disabled ? "opacity-50" : ""}`}
     >
       <div className="flex-1 min-w-0">
         <div className="text-xs text-foreground">{label}</div>
-        <div className="text-[10.5px] text-[#777] mt-0.5 leading-[1.4]">
+        <div className="text-[10.5px] text-fg-faint mt-0.5 leading-[1.4]">
           {hint}
         </div>
       </div>
@@ -348,7 +348,7 @@ function Row({
           type="button"
           onClick={handleCopy}
           disabled={disabled}
-          className="px-2 py-1 rounded text-[11px] cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] disabled:cursor-not-allowed disabled:hover:bg-[#22222a] shrink-0"
+          className="px-2 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:cursor-not-allowed disabled:hover:bg-raised shrink-0"
         >
           {copyState === "copied" ? "Copied" : "Copy"}
         </button>
@@ -357,7 +357,7 @@ function Row({
         type="button"
         onClick={onDownload}
         disabled={disabled}
-        className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] disabled:cursor-not-allowed disabled:hover:bg-[#4a90e2] shrink-0"
+        className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover disabled:cursor-not-allowed disabled:hover:bg-cta shrink-0"
       >
         Download
       </button>

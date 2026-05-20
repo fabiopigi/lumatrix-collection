@@ -187,7 +187,7 @@ function Stepper({ current }: { current: number }) {
             ? "text-accent"
             : state === "done"
               ? "text-foreground"
-              : "text-muted/60";
+              : "text-fg-faint";
         return (
           <li key={s} className="flex items-center gap-2">
             <span className={`font-semibold ${color}`}>

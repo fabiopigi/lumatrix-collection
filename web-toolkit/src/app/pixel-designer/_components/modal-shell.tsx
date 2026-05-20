@@ -95,7 +95,7 @@ export function ModalShell({
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className={`bg-panel border border-[#2a2a30] rounded-lg p-4 max-w-[90vw] outline-none ${className ?? ""}`}
+        className={`bg-panel border border-line-strong rounded-lg p-4 max-w-[90vw] outline-none ${className ?? ""}`}
         style={width ? { width } : undefined}
       >
         {children}
