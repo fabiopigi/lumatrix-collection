@@ -101,6 +101,7 @@ export function SidePanel(props: SidePanelProps) {
           </label>
           <input
             type="text"
+            aria-label="Color hex value"
             defaultValue={props.color.toUpperCase()}
             key={props.color}
             onBlur={(e) => handleHexBlur(e.target.value)}
@@ -156,6 +157,7 @@ export function SidePanel(props: SidePanelProps) {
         </div>
         <input
           type="text"
+          aria-label="Text to stamp onto the grid"
           value={props.text}
           onChange={(e) => props.onText(e.target.value)}
           placeholder="Type to preview…"
@@ -371,6 +373,7 @@ function AnnotationsSection({
         <div className="flex gap-1.5">
           <input
             type="text"
+            aria-label="Annotation label for selected region"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -435,6 +438,7 @@ function AnnotationRow({
         <input
           key={annotation.id + "-" + annotation.text}
           type="text"
+          aria-label="Annotation text"
           defaultValue={annotation.text}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {

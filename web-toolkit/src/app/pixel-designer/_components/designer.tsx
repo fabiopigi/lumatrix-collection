@@ -1691,6 +1691,7 @@ export function Designer() {
                       onFocus={() => setActivePage(pi)}
                       onBlur={() => pushHistory()}
                       placeholder="Page label"
+                      aria-label={`Label for page ${pi + 1}`}
                       className="flex-1 bg-transparent border border-transparent text-foreground px-2 py-1 rounded text-xs outline-none hover:border-line-strong focus:bg-sunken focus:border-cta select-text"
                     />
                     <button
