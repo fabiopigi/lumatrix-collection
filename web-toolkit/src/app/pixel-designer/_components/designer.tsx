@@ -11,9 +11,22 @@ import {
   DEFAULT_DESIGN,
   DEFAULT_PRESET_ID,
   isMaskAvailable,
-  loadDesign,
-  saveDesign,
 } from "@/lib/pixel-designer/config";
+import {
+  autosave,
+  deleteDesign,
+  getCurrent,
+  importIntoLibrary,
+  isScratch as libIsScratch,
+  type Library,
+  listDesigns,
+  loadLibrary,
+  newDesign,
+  nextUntitledName,
+  openDesign,
+  renameDesign,
+  saveAs,
+} from "@/lib/pixel-designer/library";
 import { textPoints } from "@/lib/pixel-designer/fonts";
 import {
   ellipsePoints,
@@ -51,6 +64,10 @@ import {
   type VariantSource,
 } from "@/lib/pixel-designer/variants";
 import { AddPageModal } from "./add-page-modal";
+import { DesignNameModal } from "./design-name-modal";
+import { DesignsMenu } from "./designs-menu";
+import { ModalShell } from "./modal-shell";
+import { OpenDesignModal } from "./open-design-modal";
 import {
   AddVariantModal,
   type AddVariantInit,
@@ -415,6 +432,32 @@ export function Designer() {
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
+  // Library is the persistence layer. We mirror it in state so React updates
+  // when the user opens / renames / deletes; autosave writes through here
+  // too. A ref tracks the latest value so synchronous handlers (beforeunload,
+  // pre-switch flush) can read it without waiting for the next render.
+  const [library, _setLibraryBase] = useState<Library | null>(null);
+  const libraryRef = useRef<Library | null>(null);
+  const setLibrary = useCallback(
+    (updater: Library | ((prev: Library) => Library)) => {
+      _setLibraryBase((prev) => {
+        if (!prev) return prev;
+        const next =
+          typeof updater === "function"
+            ? (updater as (p: Library) => Library)(prev)
+            : updater;
+        libraryRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+  // Modals for the Designs menu.
+  const [openListOpen, setOpenListOpen] = useState(false);
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteDesignOpen, setDeleteDesignOpen] = useState(false);
+
   const isDownRef = useRef(false);
   const dragModeRef = useRef<DragMode>(null);
   const dragStartRef = useRef<Point | null>(null);
@@ -508,14 +551,19 @@ export function Designer() {
     applySnapshot(history[ni]);
   }, [applySnapshot, history, historyIndex]);
 
-  // ============ load persisted design + initial history snapshot ============
+  // ============ load library + initial history snapshot ============
 
-  // One-shot hydration from localStorage. The effect-with-setState pattern is the
-  // correct shape here: a lazy useState initializer would compute different values
-  // on server vs. client, causing a hydration mismatch.
+  // One-shot hydration from the design library. The effect-with-setState
+  // pattern is the correct shape here: a lazy useState initializer would
+  // compute different values on server vs. client (localStorage is undefined
+  // on the server), causing a hydration mismatch.
   useEffect(() => {
-    const persisted = loadDesign();
+    const lib = loadLibrary();
+    const current = getCurrent(lib);
+    const persisted = current.data;
+    libraryRef.current = lib;
     /* eslint-disable react-hooks/set-state-in-effect */
+    _setLibraryBase(lib);
     setDesign(cloneDesign(persisted));
     // Each page starts with its first canonical-order variant active. If a
     // page has no variants (shouldn't happen for a valid design), fall back
@@ -537,6 +585,33 @@ export function Designer() {
     setHistoryIndex(0);
     /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ============ autosave to the library ============
+
+  // Debounce so rapid pixel paints don't hammer localStorage. 500ms is short
+  // enough that a tab close + reopen feels seamless and long enough that drag-
+  // paint runs aren't constantly serializing.
+  useEffect(() => {
+    if (!libraryRef.current) return;
+    const t = setTimeout(() => {
+      setLibrary((lib) => autosave(lib, designRef.current));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [design, setLibrary]);
+
+  // Flush any pending autosave synchronously before the tab unloads. With the
+  // 500ms debounce, a fast close could otherwise drop the last few edits.
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const lib = libraryRef.current;
+      if (!lib) return;
+      // autosave writes to localStorage synchronously; the in-memory state
+      // update gets discarded with the page tear-down, which is fine.
+      autosave(lib, designRef.current);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
   // ============ pixel writes ============
@@ -1561,22 +1636,17 @@ export function Designer() {
     [setDesign, setActivePresetByPage, pushHistory],
   );
 
-  // ============ JSON import ============
-  // (Export lives in ExportModal; this side covers paste-and-import only.)
+  // ============ design adoption helpers ============
+  // Declared up here (rather than alongside the rest of the library handlers
+  // further down) because handleImport needs to call them.
 
-  const handleImport = useCallback(() => {
-    try {
-      const result = parseImport(jsonValue, design);
-      if (result.hardwareChanged) {
-        const ok = window.confirm(
-          "Imported design uses different hardware variants. Replace the current design?",
-        );
-        if (!ok) return;
-      }
-      setDesign(cloneDesign(result.design));
-      // Rebuild per-page active variants from the imported design — each
-      // page defaults to its first variant in canonical order.
-      const presetByPage = result.design.pages.map((p) => {
+  /** Drop a fresh Design into the editor: reset pixel buffer, per-page active
+   *  variants, current page, selection, history. Shared by Open / New /
+   *  Import so all code paths leave the editor in a known state. */
+  const adoptDesign = useCallback(
+    (next: Design) => {
+      setDesign(cloneDesign(next));
+      const presetByPage = next.pages.map((p) => {
         const ordered = presetIdsInOrder(Object.keys(p.variants));
         return ordered[0] ?? DEFAULT_PRESET_ID;
       });
@@ -1585,21 +1655,48 @@ export function Designer() {
       );
       setCurrentPage(0);
       setSelection(null);
-      queueMicrotask(() => pushHistory(undefined, 0));
+      setColor(getDefaultColor(next.colorMode));
+      setHistory([{ design: cloneDesign(next), activePage: 0 }]);
+      setHistoryIndex(0);
+    },
+    [setDesign, setActivePresetByPage, setCurrentPage],
+  );
+
+  /** Before switching away from the current design, make sure its latest edits
+   *  are flushed to its library slot. Otherwise the debounced autosave could
+   *  land in the wrong slot after the switch. */
+  const flushAutosaveSync = useCallback(() => {
+    const lib = libraryRef.current;
+    if (!lib) return;
+    const flushed = autosave(lib, designRef.current);
+    libraryRef.current = flushed;
+    _setLibraryBase(flushed);
+  }, []);
+
+  // ============ JSON import ============
+  // (Export lives in ExportModal; this side covers paste-and-import only.)
+
+  const handleImport = useCallback(() => {
+    try {
+      const result = parseImport(jsonValue, design);
+      // Add the imported design as a new library entry rather than
+      // replacing the current one. The user can switch back via Open… if
+      // the import wasn't what they wanted, and we keep their current
+      // work intact regardless.
+      flushAutosaveSync();
+      const lib = libraryRef.current;
+      if (!lib) return;
+      const next = importIntoLibrary(lib, result.design, "Imported design");
+      libraryRef.current = next;
+      _setLibraryBase(next);
+      adoptDesign(next.designs[next.currentId].data);
       setImportError(null);
       setImportOpen(false);
       setJsonValue("");
     } catch (err) {
       setImportError(`Import error: ${(err as Error).message}`);
     }
-  }, [
-    jsonValue,
-    design,
-    setDesign,
-    setActivePresetByPage,
-    setCurrentPage,
-    pushHistory,
-  ]);
+  }, [jsonValue, design, flushAutosaveSync, adoptDesign]);
 
   // ============ image import ============
 
@@ -1666,10 +1763,13 @@ export function Designer() {
         setColor(getDefaultColor(next.colorMode));
       }
       setSelection(null);
-      // Persist + reset history once the design state has settled.
+      // Persist + reset history once the design state has settled. The
+      // debounced autosave effect would catch this too, but config changes
+      // are deliberate "save points" — flushing immediately avoids a
+      // 500ms window where a tab close could lose the new config.
       queueMicrotask(() => {
         const latest = designRef.current;
-        saveDesign(latest);
+        setLibrary((lib) => autosave(lib, latest));
         setHistory([
           {
             design: cloneDesign(latest),
@@ -1682,7 +1782,78 @@ export function Designer() {
       if (!isMaskAvailable(next) && mode === "mask") setMode("pixel");
       setConfigOpen(false);
     },
-    [setConfig, setCurrentPage, color, mode],
+    [setConfig, setCurrentPage, setLibrary, color, mode],
+  );
+
+  // ============ design library handlers ============
+
+  const handleNewDesign = useCallback(() => {
+    if (!libraryRef.current) return;
+    flushAutosaveSync();
+    setLibrary((lib) => newDesign(lib));
+    adoptDesign(DEFAULT_DESIGN);
+  }, [flushAutosaveSync, setLibrary, adoptDesign]);
+
+  const handleSaveAs = useCallback(
+    (name: string) => {
+      if (!libraryRef.current) return;
+      flushAutosaveSync();
+      setLibrary((lib) => saveAs(lib, name, designRef.current));
+      setSaveAsOpen(false);
+    },
+    [flushAutosaveSync, setLibrary],
+  );
+
+  const handleOpenDesign = useCallback(
+    (id: string) => {
+      const lib = libraryRef.current;
+      if (!lib || !lib.designs[id]) return;
+      flushAutosaveSync();
+      const opened = openDesign(libraryRef.current!, id);
+      libraryRef.current = opened;
+      _setLibraryBase(opened);
+      adoptDesign(opened.designs[id].data);
+    },
+    [flushAutosaveSync, adoptDesign],
+  );
+
+  const handleRenameDesign = useCallback(
+    (name: string) => {
+      const lib = libraryRef.current;
+      if (!lib) return;
+      setLibrary((l) => renameDesign(l, l.currentId, name));
+      setRenameOpen(false);
+    },
+    [setLibrary],
+  );
+
+  const handleDeleteDesign = useCallback(() => {
+    const lib = libraryRef.current;
+    if (!lib) return;
+    const deletedId = lib.currentId;
+    const next = deleteDesign(lib, deletedId);
+    libraryRef.current = next;
+    _setLibraryBase(next);
+    // After deletion, currentId falls back to scratch. Adopt that design.
+    adoptDesign(next.designs[next.currentId].data);
+    setDeleteDesignOpen(false);
+  }, [adoptDesign]);
+
+  /** From the Open modal — delete a design without necessarily switching to
+   *  it. Distinct from handleDeleteDesign which always targets currentId. */
+  const handleDeleteFromList = useCallback(
+    (id: string) => {
+      const lib = libraryRef.current;
+      if (!lib) return;
+      const next = deleteDesign(lib, id);
+      libraryRef.current = next;
+      _setLibraryBase(next);
+      // If we just deleted the design we were editing, adopt the new current.
+      if (id === lib.currentId) {
+        adoptDesign(next.designs[next.currentId].data);
+      }
+    },
+    [adoptDesign],
   );
 
   // ============ derived UI ============
@@ -1702,8 +1873,25 @@ export function Designer() {
     design.pages.every((p) => p.variants[activePreset]);
 
   const headerSlot = useHeaderActionsSlot();
+  const currentRecord = library ? getCurrent(library) : null;
+  const onScratch = library ? libIsScratch(library) : true;
+  const savedDesigns = library ? listDesigns(library) : [];
   const headerActions = (
     <>
+      {currentRecord && (
+        <>
+          <DesignsMenu
+            currentName={currentRecord.name}
+            isScratch={onScratch}
+            onNew={handleNewDesign}
+            onSaveAs={() => setSaveAsOpen(true)}
+            onOpen={() => setOpenListOpen(true)}
+            onRename={() => setRenameOpen(true)}
+            onDelete={() => setDeleteDesignOpen(true)}
+          />
+          <div className="w-px h-5 bg-edge mx-1" />
+        </>
+      )}
       <div className="flex gap-1.5">
         <IconBtn title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>
           ↶
@@ -2185,7 +2373,82 @@ export function Designer() {
           onClose={() => setPreviewOpen(false)}
         />
       )}
+      <DesignNameModal
+        open={saveAsOpen}
+        title="Save as"
+        initialValue={
+          currentRecord && !onScratch
+            ? currentRecord.name
+            : library
+              ? nextUntitledName(library)
+              : "Untitled"
+        }
+        confirmLabel="Save"
+        onClose={() => setSaveAsOpen(false)}
+        onConfirm={handleSaveAs}
+      />
+      <DesignNameModal
+        open={renameOpen}
+        title="Rename design"
+        initialValue={currentRecord?.name ?? ""}
+        confirmLabel="Rename"
+        onClose={() => setRenameOpen(false)}
+        onConfirm={handleRenameDesign}
+      />
+      <OpenDesignModal
+        open={openListOpen}
+        designs={savedDesigns}
+        currentId={library?.currentId ?? ""}
+        onClose={() => setOpenListOpen(false)}
+        onOpen={handleOpenDesign}
+        onDelete={handleDeleteFromList}
+      />
+      {deleteDesignOpen && currentRecord && (
+        <DeleteDesignConfirm
+          name={currentRecord.name}
+          onCancel={() => setDeleteDesignOpen(false)}
+          onConfirm={handleDeleteDesign}
+        />
+      )}
     </div>
+  );
+}
+
+function DeleteDesignConfirm({
+  name,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ModalShell onClose={onCancel} label="Delete design" width={400}>
+      <h2 className="m-0 mb-2 text-[13px] font-semibold">Delete design?</h2>
+      <p className="text-[12px] text-muted leading-relaxed mb-4">
+        Removes{" "}
+        <span className="font-mono text-fg-2">&ldquo;{name}&rdquo;</span> from
+        your library. You&apos;ll land on the scratch canvas. This can&apos;t
+        be undone.
+      </p>
+      <div className="flex justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-danger-soft border border-danger-line text-danger font-semibold hover:bg-danger-soft hover:border-danger"
+        >
+          Delete
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 

@@ -64,10 +64,11 @@ function ImportModalInner({
         <div>
           <div className="text-[15px] font-semibold text-foreground">Import</div>
           <div className="text-[11px] text-fg-faint mt-0.5">
-            Paste a design JSON below or load a .json file (replaces the
-            current design). Or import a PNG / GIF to append it as new pages
-            on the active hardware variant; GIF frames become consecutive
-            pages with their frame delays as page durations.
+            Paste a design JSON below or load a .json file. The imported
+            design is added to your library as a new entry. Or import a PNG /
+            GIF to append it as new pages on the active hardware variant;
+            GIF frames become consecutive pages with their frame delays as
+            page durations.
           </div>
         </div>
         <button
