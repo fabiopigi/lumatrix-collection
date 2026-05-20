@@ -394,12 +394,15 @@ export function Designer() {
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
   const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
+  // Sidepanel collapses into a drawer below `lg`. State is harmless at lg+
+  // because the drawer's positioning classes become inert at that breakpoint.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Page reorder drag state. `dragFromIdx` is the index being dragged;
   // `dragOverIdx` is the gap index where dropping would insert the page
   // (0…pages.length, where N means "after the last page"). A mirroring ref
-  // is read by dragover/drop handlers — those fire synchronously and can
+  // is read by dragover/drop handlers; those fire synchronously and can
   // race React's post-dragstart re-render, so the ref keeps them correct.
   const [dragFromIdx, _setDragFromIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -1840,10 +1843,10 @@ export function Designer() {
                   } ${isDragSource ? "opacity-40" : ""}`}
                 >
                   {showDropAbove && (
-                    <div className="absolute -top-2 left-2 right-2 h-0.5 bg-[#4a90e2] rounded-full pointer-events-none" />
+                    <div className="absolute -top-2 left-2 right-2 h-0.5 bg-cta rounded-full pointer-events-none" />
                   )}
                   {showDropBelow && (
-                    <div className="absolute -bottom-2 left-2 right-2 h-0.5 bg-[#4a90e2] rounded-full pointer-events-none" />
+                    <div className="absolute -bottom-2 left-2 right-2 h-0.5 bg-cta rounded-full pointer-events-none" />
                   )}
                   <div className="flex items-center gap-2 px-1.5">
                     <span
@@ -1871,15 +1874,15 @@ export function Designer() {
                       aria-label="Drag to reorder page"
                       className={`select-none leading-none px-1 text-[14px] ${
                         canReorder
-                          ? "cursor-grab active:cursor-grabbing text-[#666] hover:text-foreground"
-                          : "cursor-not-allowed text-[#333]"
+                          ? "cursor-grab active:cursor-grabbing text-fg-faint hover:text-foreground"
+                          : "cursor-not-allowed text-line-stronger"
                       }`}
                     >
                       ⋮⋮
                     </span>
                     <span
                       className={`font-mono text-[11px] font-bold min-w-[24px] ${
-                        isActive ? "text-accent" : "text-[#555]"
+                        isActive ? "text-accent" : "text-fg-faint"
                       }`}
                     >
                       #{pi + 1}
@@ -1890,7 +1893,8 @@ export function Designer() {
                       onFocus={() => setActivePage(pi)}
                       onBlur={() => pushHistory()}
                       placeholder="Page label"
-                      className="flex-1 bg-transparent border border-transparent text-foreground px-2 py-1 rounded text-xs outline-none hover:border-[#2a2a30] focus:bg-[#0a0a0c] focus:border-[#4a90e2] select-text"
+                      aria-label={`Label for page ${pi + 1}`}
+                      className="flex-1 bg-transparent border border-transparent text-foreground px-2 py-1 rounded text-xs outline-none hover:border-line-strong focus:bg-sunken focus:border-cta select-text"
                     />
                     <button
                       type="button"
@@ -1898,7 +1902,7 @@ export function Designer() {
                       disabled={pi === 0}
                       title="Move page up"
                       aria-label="Move page up"
-                      className="w-6 h-6 rounded text-[10px] leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
                     >
                       ▲
                     </button>
@@ -1908,7 +1912,7 @@ export function Designer() {
                       disabled={pi === pages.length - 1}
                       title="Move page down"
                       aria-label="Move page down"
-                      className="w-6 h-6 rounded text-[10px] leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
+                      className="w-6 h-6 rounded text-[10px] leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
                     >
                       ▼
                     </button>
@@ -1916,7 +1920,7 @@ export function Designer() {
                       type="button"
                       onClick={() => setMetaModalFor(pi)}
                       title="Page metadata"
-                      className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#22222a] hover:text-foreground hover:border-[#3a3a42]"
+                      className="w-8 h-8 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger"
                     >
                       ⓘ
                     </button>
@@ -1928,13 +1932,13 @@ export function Designer() {
                         Object.keys(design.pages[pi]?.variants ?? {}).length <= 1
                       }
                       title="Delete page or variant"
-                      className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#3a2020] hover:text-[#ff8888] hover:border-[#5a3030] disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#888] disabled:hover:border-[#2a2a30]"
+                      className="w-8 h-8 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-danger-soft hover:text-danger hover:border-danger-line disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
                     >
                       ✕
                     </button>
                   </div>
                   {design.pages[pi]?.title && (
-                    <div className="px-2 -mt-1 text-[11px] text-[#aaa] italic">
+                    <div className="px-2 -mt-1 text-[11px] text-fg-2 italic">
                       {design.pages[pi].title}
                     </div>
                   )}
@@ -1970,10 +1974,10 @@ export function Designer() {
                       />
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#3a3a42] rounded-lg bg-[#0a0a0c]/40 px-6 py-8 min-h-[140px]">
-                      <div className="text-[12px] text-[#777] text-center max-w-[280px] leading-[1.5]">
+                    <div className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-line-stronger rounded-lg bg-sunken/40 px-6 py-8 min-h-[140px]">
+                      <div className="text-[12px] text-fg-faint text-center max-w-[280px] leading-[1.5]">
                         No variant for{" "}
-                        <span className="font-mono text-[#aaa]">
+                        <span className="font-mono text-fg-2">
                           {pageLabelForPreset}
                         </span>{" "}
                         on this page yet.
@@ -1981,7 +1985,7 @@ export function Designer() {
                       <button
                         type="button"
                         onClick={() => setAddVariantFor(pi)}
-                        className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+                        className="px-3 py-1.5 rounded text-xs bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover cursor-pointer"
                       >
                         + Add variant for {pageLabelForPreset}
                       </button>
@@ -1995,59 +1999,89 @@ export function Designer() {
           <button
             type="button"
             onClick={() => setAddPageOpen(true)}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] mt-1"
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover mt-1"
           >
             + Add page
           </button>
 
-          <div className="font-mono text-[11px] text-[#777] flex gap-[18px] flex-wrap justify-center">
+          <div className="font-mono text-[11px] text-fg-faint flex gap-[18px] flex-wrap justify-center">
             <span>
-              <b className="text-[#aaa] font-medium">Page:</b>{" "}
+              <b className="text-fg-2 font-medium">Page:</b>{" "}
               {currentPage + 1}/{pages.length}
             </span>
             <span>
-              <b className="text-[#aaa] font-medium">Cell:</b> {stCell}
+              <b className="text-fg-2 font-medium">Cell:</b> {stCell}
             </span>
             <span>
-              <b className="text-[#aaa] font-medium">LED:</b> {String(stLed)}
+              <b className="text-fg-2 font-medium">LED:</b> {String(stLed)}
             </span>
             <span>
-              <b className="text-[#aaa] font-medium">Tool:</b> {tool}
+              <b className="text-fg-2 font-medium">Tool:</b> {tool}
             </span>
             <span>
-              <b className="text-[#aaa] font-medium">Mode:</b> {mode}
+              <b className="text-fg-2 font-medium">Mode:</b> {mode}
             </span>
           </div>
         </section>
 
-        <SidePanel
-          mode={mode}
-          maskAvailable={maskAvailable}
-          onMode={setMode}
-          color={color}
-          palette={palette}
-          onColor={setColor}
-          font={font}
-          text={text}
-          onFont={setFont}
-          onText={(t) => {
-            setText(t);
-            if (t && tool !== "text") handleSetTool("text");
-          }}
-          symbol={symbol}
-          onSymbol={(s) => {
-            setSymbol(s);
-            handleSetTool("stamp");
-          }}
-          annotations={currentAnnotations}
-          selection={selection}
-          showAnnotations={showAnnotations}
-          onShowAnnotations={setShowAnnotations}
-          onAddAnnotation={addAnnotationFromSelection}
-          onUpdateAnnotation={updateAnnotationText}
-          onDeleteAnnotation={deleteAnnotation}
-        />
+        {/* Sidepanel: inline column at lg+, off-canvas drawer below lg. The
+            same component renders in both modes — wrapper handles positioning,
+            SidePanel keeps its own dimensions and overflow. */}
+        <div
+          id="designer-side-panel"
+          className={`fixed top-14 bottom-0 right-0 z-30 shrink-0 transition-transform duration-200 ease-out lg:static lg:transform-none lg:transition-none ${
+            drawerOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+          }`}
+        >
+          <SidePanel
+            mode={mode}
+            maskAvailable={maskAvailable}
+            onMode={setMode}
+            color={color}
+            palette={palette}
+            onColor={setColor}
+            font={font}
+            text={text}
+            onFont={setFont}
+            onText={(t) => {
+              setText(t);
+              if (t && tool !== "text") handleSetTool("text");
+            }}
+            symbol={symbol}
+            onSymbol={(s) => {
+              setSymbol(s);
+              handleSetTool("stamp");
+            }}
+            annotations={currentAnnotations}
+            selection={selection}
+            showAnnotations={showAnnotations}
+            onShowAnnotations={setShowAnnotations}
+            onAddAnnotation={addAnnotationFromSelection}
+            onUpdateAnnotation={updateAnnotationText}
+            onDeleteAnnotation={deleteAnnotation}
+          />
+        </div>
       </div>
+
+      {/* Drawer trigger + backdrop, only shown below lg. */}
+      <button
+        type="button"
+        onClick={() => setDrawerOpen((v) => !v)}
+        aria-label={drawerOpen ? "Close tools panel" : "Open tools panel"}
+        aria-expanded={drawerOpen}
+        aria-controls="designer-side-panel"
+        className="lg:hidden fixed bottom-4 right-4 z-40 h-12 px-4 rounded-full bg-panel border border-edge text-foreground text-[12px] font-semibold tracking-[0.04em] shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:border-accent hover:text-accent transition-colors cursor-pointer"
+      >
+        {drawerOpen ? "Close ✕" : "Tools ▸"}
+      </button>
+      {drawerOpen && (
+        <button
+          type="button"
+          aria-label="Close tools panel"
+          onClick={() => setDrawerOpen(false)}
+          className="lg:hidden fixed inset-0 z-20 bg-black/40 cursor-default"
+        />
+      )}
 
       <AddPageModal
         open={addPageOpen}
@@ -2176,7 +2210,7 @@ function HeaderBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#22222a]"
+      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-raised"
     >
       {children}
     </button>
@@ -2200,7 +2234,7 @@ function IconBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="w-8 h-8 p-0 inline-flex items-center justify-center rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#22222a]"
+      className="w-8 h-8 p-0 inline-flex items-center justify-center rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-raised"
     >
       {children}
     </button>

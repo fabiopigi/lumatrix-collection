@@ -70,11 +70,11 @@ export function SiteHeader() {
 
           <nav
             id="site-nav"
-            aria-hidden={!open}
+            inert={!open}
             className={`absolute left-0 top-full mt-1 z-20 w-64 origin-top-left border border-edge bg-panel shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition duration-150 ${
               open
-                ? "opacity-100 translate-y-0 pointer-events-auto"
-                : "opacity-0 -translate-y-1 pointer-events-none"
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 -translate-y-1"
             }`}
           >
             <ul className="flex flex-col py-2">
@@ -83,7 +83,7 @@ export function SiteHeader() {
                   <Link
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="block px-4 py-2 text-[13px] tracking-[0.04em] text-muted hover:text-foreground hover:bg-panel-2 no-underline"
+                    className="block px-4 py-3 text-[13px] tracking-[0.04em] text-muted hover:text-foreground hover:bg-panel-2 no-underline"
                   >
                     {link.label}
                   </Link>

@@ -256,8 +256,8 @@ export function Simulator() {
 
   return (
     <div className="flex flex-col items-center gap-6 px-6 py-10">
-      <div className="flex items-start gap-8 justify-center w-full max-w-[1100px]">
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8 justify-center w-full max-w-[1100px]">
+        <div className="flex flex-col gap-6 w-full md:w-auto order-3 md:order-1">
           <DisplayPicker display={display} onChange={handleDisplay} />
           <AppLauncher
             apps={apps}
@@ -273,7 +273,7 @@ export function Simulator() {
           />
         </div>
 
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 order-1 md:order-2">
           <SimulatorGrid ref={gridRef} display={display} />
           <div className="flex items-center gap-2">
             <ModeToggle
@@ -290,10 +290,10 @@ export function Simulator() {
                   ? "Copied!"
                   : "Copy the current screen as designer-importable JSON"
               }
-              className={`w-9 h-9 inline-flex items-center justify-center border rounded-md transition-colors cursor-pointer bg-[#0a0a0c] ${
+              className={`w-9 h-9 inline-flex items-center justify-center border rounded-md transition-colors cursor-pointer bg-sunken ${
                 screenCopied
                   ? "border-accent text-accent"
-                  : "border-edge text-muted hover:text-white hover:border-[#3a3a42]"
+                  : "border-edge text-muted hover:text-white hover:border-line-stronger"
               }`}
             >
               <svg
@@ -314,7 +314,7 @@ export function Simulator() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-4 w-48 shrink-0">
+        <div className="flex flex-col items-center gap-4 w-auto md:w-48 shrink-0 order-2 md:order-3">
           <div className="text-[10px] uppercase tracking-[0.1em] text-muted font-semibold self-start">
             Input
           </div>

@@ -70,6 +70,7 @@ function PageMetaModalInner({
   return (
     <ModalShell
       onClose={onClose}
+      label="Page metadata"
       className="w-[480px] max-h-[88vh] overflow-y-auto"
     >
       <div className="flex items-center justify-between mb-3">
@@ -77,8 +78,8 @@ function PageMetaModalInner({
           <div className="text-[15px] font-semibold text-foreground">
             Page metadata
           </div>
-          <div className="text-[11px] text-[#777] mt-0.5">
-            <span className="font-mono text-[#aaa]">
+          <div className="text-[11px] text-fg-faint mt-0.5">
+            <span className="font-mono text-fg-2">
               #{pageIndex + 1} {page.label}
             </span>
           </div>
@@ -86,7 +87,7 @@ function PageMetaModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -103,13 +104,13 @@ function PageMetaModalInner({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Welcome"
           maxLength={120}
-          className="w-full bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] placeholder:text-[#555]"
+          className="w-full bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus placeholder:text-fg-faint"
         />
       </Field>
 
       <Field
         label="Description"
-        hint="Free-form notes. JSON-only — never shown in the editor outside this modal."
+        hint="Free-form notes. JSON-only; never shown in the editor outside this modal."
       >
         <textarea
           value={description}
@@ -117,7 +118,7 @@ function PageMetaModalInner({
           spellCheck={false}
           rows={3}
           placeholder="e.g. Splash frame for the launcher; static for 3s before the first animation."
-          className="w-full bg-[#0a0a0c] border border-edge text-foreground p-2 rounded text-xs leading-[1.4] resize-y outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] placeholder:text-[#555]"
+          className="w-full bg-sunken border border-edge text-foreground p-2 rounded text-xs leading-[1.4] resize-y outline-none focus:border-cta focus:bg-input-focus placeholder:text-fg-faint"
         />
       </Field>
 
@@ -134,7 +135,7 @@ function PageMetaModalInner({
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
               placeholder="—"
-              className="w-24 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] text-right placeholder:text-[#555]"
+              className="w-24 bg-sunken border border-edge text-foreground px-2 py-1 rounded text-xs outline-none focus:border-cta focus:bg-input-focus text-right placeholder:text-fg-faint"
             />
             <UnitTag>ms</UnitTag>
           </SubField>
@@ -146,7 +147,7 @@ function PageMetaModalInner({
               value={fadeInTime}
               onChange={(e) => setFadeInTime(e.target.value)}
               placeholder="—"
-              className="w-24 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] text-right placeholder:text-[#555]"
+              className="w-24 bg-sunken border border-edge text-foreground px-2 py-1 rounded text-xs outline-none focus:border-cta focus:bg-input-focus text-right placeholder:text-fg-faint"
             />
             <UnitTag>ms</UnitTag>
           </SubField>
@@ -157,14 +158,14 @@ function PageMetaModalInner({
         <button
           type="button"
           onClick={onClose}
-          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+          className="px-3 py-1.5 rounded text-xs bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover cursor-pointer"
         >
           Save
         </button>
@@ -184,11 +185,11 @@ function Field({
 }) {
   return (
     <div className="mb-3">
-      <div className="text-[10px] uppercase tracking-[0.1em] text-[#777] mb-1 font-semibold">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-1 font-semibold">
         {label}
       </div>
       {children}
-      <div className="text-[10.5px] text-[#666] mt-1 leading-[1.4]">{hint}</div>
+      <div className="text-[10.5px] text-fg-faint mt-1 leading-[1.4]">{hint}</div>
     </div>
   );
 }
@@ -201,13 +202,13 @@ function SubField({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-[11px] text-[#aaa]">
-      <span className="font-medium text-[#888]">{label}</span>
+    <label className="flex items-center gap-1.5 text-[11px] text-fg-2">
+      <span className="font-medium text-muted">{label}</span>
       {children}
     </label>
   );
 }
 
 function UnitTag({ children }: { children: React.ReactNode }) {
-  return <span className="text-[10px] text-[#666]">{children}</span>;
+  return <span className="text-[10px] text-fg-faint">{children}</span>;
 }

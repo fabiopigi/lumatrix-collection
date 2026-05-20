@@ -96,7 +96,7 @@ function AddVariantModalInner({
     : sourcePreset;
   const shrinkNote =
     sourceHw && target && !sourceFits
-      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Scale/Center aren't available — Start blank is the only option for this target.`
+      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Scale/Center aren't available; Start blank is the only option for this target.`
       : null;
 
   // When the source doesn't fit, scale/center can't carry the source pixels
@@ -119,32 +119,32 @@ function AddVariantModalInner({
   // dismisses it.
   if (result) {
     return (
-      <ModalShell onClose={onClose} className="w-[480px]">
+      <ModalShell onClose={onClose} label="Add variant result" className="w-[480px]">
         <ResultView result={result} onDone={onClose} />
       </ModalShell>
     );
   }
 
   return (
-    <ModalShell onClose={onClose} className="w-[440px]">
+    <ModalShell onClose={onClose} label="Add variant" className="w-[440px]">
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">
             Add variant
           </div>
-          <div className="text-[11px] text-[#777] mt-0.5">
+          <div className="text-[11px] text-fg-faint mt-0.5">
             For{" "}
-            <span className="font-mono text-[#aaa]">
+            <span className="font-mono text-fg-2">
               {page?.label ?? `Page ${pageIdx + 1}`}
             </span>
-            {" — source: "}
-            <span className="font-mono text-[#aaa]">{sourceLabel}</span>
+            {" · source: "}
+            <span className="font-mono text-fg-2">{sourceLabel}</span>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -152,7 +152,7 @@ function AddVariantModalInner({
       </div>
 
       {eligible.length === 0 ? (
-        <p className="text-[12px] text-[#888] py-4">
+        <p className="text-[12px] text-muted py-4">
           This page already has every available hardware variant. Add a new
           hardware preset to design for from the variant settings (⚙).
         </p>
@@ -162,7 +162,7 @@ function AddVariantModalInner({
             <select
               value={targetId}
               onChange={(e) => setTargetId(e.target.value)}
-              className="w-full bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] cursor-pointer"
+              className="w-full bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus cursor-pointer"
             >
               {eligible.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -191,7 +191,7 @@ function AddVariantModalInner({
               checked={init === "blank"}
               onChange={() => setInit("blank")}
               title="Start blank"
-              hint="Create the variant as an empty canvas — ignore the source. Useful when scaling down or when you want to redesign for the new size from scratch."
+              hint="Create the variant as an empty canvas, ignoring the source. Useful when scaling down or when you want to redesign for the new size from scratch."
             />
           </Section>
 
@@ -207,16 +207,16 @@ function AddVariantModalInner({
                 type="checkbox"
                 checked={applyToAll}
                 onChange={(e) => setApplyToAll(e.target.checked)}
-                className="mt-0.5 cursor-pointer accent-[#4a90e2]"
+                className="mt-0.5 cursor-pointer accent-cta"
               />
               <span className="text-xs leading-[1.4]">
                 <span className="text-foreground">
                   Apply to all {design.pages.length} pages
                 </span>
-                <span className="block text-[10.5px] text-[#777]">
+                <span className="block text-[10.5px] text-fg-faint">
                   Each page sources from its own{" "}
                   <span className="font-mono">{sourceLabel}</span> variant.
-                  Pages without one — or whose source doesn&apos;t fit — are
+                  Pages without one, or whose source doesn&apos;t fit, are
                   skipped and reported afterwards.
                 </span>
               </span>
@@ -227,14 +227,14 @@ function AddVariantModalInner({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+              className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleAdd}
-              className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+              className="px-3 py-1.5 rounded text-xs bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover cursor-pointer"
             >
               Add variant
             </button>
@@ -268,11 +268,11 @@ function InitOption({
         checked={checked}
         disabled={disabled}
         onChange={onChange}
-        className={`mt-0.5 accent-[#4a90e2] ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+        className={`mt-0.5 accent-cta ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
       />
       <span className="text-xs leading-[1.4]">
         <span className="text-foreground">{title}</span>
-        <span className="block text-[10.5px] text-[#777]">{hint}</span>
+        <span className="block text-[10.5px] text-fg-faint">{hint}</span>
       </span>
     </label>
   );
@@ -287,7 +287,7 @@ function Section({
 }) {
   return (
     <div className="mb-3">
-      <div className="text-[10px] uppercase tracking-[0.1em] text-[#777] mb-1.5 font-semibold">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-1.5 font-semibold">
         {title}
       </div>
       {children}
@@ -313,7 +313,7 @@ function ResultView({
           <div className="text-[15px] font-semibold text-foreground">
             Bulk add complete
           </div>
-          <div className="text-[11px] text-[#777] mt-0.5">
+          <div className="text-[11px] text-fg-faint mt-0.5">
             Created on {result.created} page
             {result.created === 1 ? "" : "s"} · skipped {totalSkipped}
           </div>
@@ -321,16 +321,16 @@ function ResultView({
       </div>
 
       {result.skippedDetails.length > 0 && (
-        <div className="mb-3 bg-[#0a0a0c] border border-[#2a2a30] rounded max-h-[260px] overflow-y-auto">
+        <div className="mb-3 bg-sunken border border-line-strong rounded max-h-[260px] overflow-y-auto">
           {result.skippedDetails.map((d) => (
             <div
               key={d.pageIdx}
-              className="flex items-start gap-2 px-2.5 py-1.5 border-b border-[#1a1a1f] last:border-b-0 text-[11px]"
+              className="flex items-start gap-2 px-2.5 py-1.5 border-b border-panel-2 last:border-b-0 text-[11px]"
             >
-              <span className="font-mono text-[#aaa] min-w-[90px]">
+              <span className="font-mono text-fg-2 min-w-[90px]">
                 {d.pageLabel}
               </span>
-              <span className="text-[#888] leading-[1.4]">{d.reason}</span>
+              <span className="text-muted leading-[1.4]">{d.reason}</span>
             </div>
           ))}
         </div>
@@ -340,7 +340,7 @@ function ResultView({
         <button
           type="button"
           onClick={onDone}
-          className="px-3 py-1.5 rounded text-xs bg-[#4a90e2] text-[#06121e] border border-[#4a90e2] font-semibold hover:bg-[#5fa0ee] cursor-pointer"
+          className="px-3 py-1.5 rounded text-xs bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover cursor-pointer"
         >
           Done
         </button>

@@ -56,9 +56,12 @@ export function SidePanel(props: SidePanelProps) {
   };
 
   return (
-    <aside className="w-[340px] bg-[#131316] border-l border-edge p-3.5 overflow-y-scroll shrink-0">
+    <aside
+      className="w-[340px] h-full bg-surface-1 border-l border-edge p-3.5 overflow-y-auto shrink-0"
+      style={{ scrollbarGutter: "stable" }}
+    >
       <Section title="Mode">
-        <div className="toggle-row flex bg-[#0a0a0c] p-0.5 rounded-md border border-edge">
+        <div className="toggle-row flex bg-sunken p-0.5 rounded-md border border-edge">
           <ToggleButton
             on={props.mode === "pixel"}
             onClick={() => props.onMode("pixel")}
@@ -101,6 +104,7 @@ export function SidePanel(props: SidePanelProps) {
           </label>
           <input
             type="text"
+            aria-label="Color hex value"
             defaultValue={props.color.toUpperCase()}
             key={props.color}
             onBlur={(e) => handleHexBlur(e.target.value)}
@@ -108,7 +112,7 @@ export function SidePanel(props: SidePanelProps) {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             maxLength={7}
-            className="flex-1 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded font-mono text-xs uppercase outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
+            className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1.5 rounded font-mono text-xs uppercase outline-none focus:border-cta focus:bg-input-focus select-text"
           />
         </div>
         <div className="grid grid-cols-8 gap-1">
@@ -137,7 +141,7 @@ export function SidePanel(props: SidePanelProps) {
           <select
             value={props.font}
             onChange={(e) => props.onFont(e.target.value as FontKey)}
-            className="flex-1 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] cursor-pointer"
+            className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus cursor-pointer"
           >
             {FONT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -149,18 +153,19 @@ export function SidePanel(props: SidePanelProps) {
             type="button"
             onClick={() => setPreviewOpen(true)}
             title="Preview all glyphs"
-            className="px-2 py-1.5 rounded text-xs bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] cursor-pointer shrink-0"
+            className="px-2 py-1.5 rounded text-xs bg-raised border border-line-strong text-foreground hover:bg-raised-hover cursor-pointer shrink-0"
           >
             Preview
           </button>
         </div>
         <input
           type="text"
+          aria-label="Text to stamp onto the grid"
           value={props.text}
           onChange={(e) => props.onText(e.target.value)}
           placeholder="Type to preview…"
           maxLength={32}
-          className="w-full bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#4a90e2] focus:bg-[#0e0e12] select-text"
+          className="w-full bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus select-text"
         />
         <Tip>
           Picks Text tool automatically. Hover the grid for placement; click to
@@ -184,10 +189,10 @@ export function SidePanel(props: SidePanelProps) {
               type="button"
               title={key}
               onClick={() => props.onSymbol(key)}
-              className={`w-10 h-10 shrink-0 rounded border bg-[#1a1a1f] cursor-pointer p-[5px] flex items-center justify-center ${
+              className={`w-10 h-10 shrink-0 rounded border bg-panel-2 cursor-pointer p-[5px] flex items-center justify-center ${
                 props.symbol === key
-                  ? "border-accent bg-[#1d2937]"
-                  : "border-[#25252b] hover:bg-[#22222a] hover:border-[#333]"
+                  ? "border-accent bg-active"
+                  : "border-line-strong hover:bg-raised hover:border-line-stronger"
               }`}
             >
               <SymbolSvg rows={rows} />
@@ -238,10 +243,10 @@ function Section({
 }) {
   return (
     <div className="mb-[18px]">
-      <div className="text-[10px] uppercase tracking-[0.1em] text-[#777] mb-2 font-semibold flex items-center gap-2">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-2 font-semibold flex items-center gap-2">
         {title}
         {hint && (
-          <span className="font-normal text-[#555] normal-case tracking-normal text-[10px]">
+          <span className="font-normal text-fg-faint normal-case tracking-normal text-[10px]">
             {hint}
           </span>
         )}
@@ -271,7 +276,7 @@ function ToggleButton({
       disabled={disabled}
       title={title}
       className={`flex-1 px-2 py-1.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${
-        on ? "bg-[#2a3a4a] text-accent" : "bg-transparent text-[#888]"
+        on ? "bg-[#2a3a4a] text-accent" : "bg-transparent text-muted"
       } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {children}
@@ -281,7 +286,7 @@ function ToggleButton({
 
 function Tip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10.5px] text-[#666] leading-[1.5] mt-1">
+    <div className="text-[10.5px] text-fg-faint leading-[1.5] mt-1">
       {children}
     </div>
   );
@@ -289,7 +294,7 @@ function Tip({ children }: { children: React.ReactNode }) {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block font-mono text-[10px] bg-[#2a2a30] border border-[#3a3a42] rounded-[3px] px-[4px] py-px text-[#aaa] min-w-[14px] text-center">
+    <span className="inline-block font-mono text-[10px] bg-line-strong border border-line-stronger rounded-[3px] px-[4px] py-px text-fg-2 min-w-[14px] text-center">
       {children}
     </span>
   );
@@ -351,19 +356,19 @@ function AnnotationsSection({
           type="checkbox"
           checked={show}
           onChange={(e) => onShow(e.target.checked)}
-          className="cursor-pointer accent-[#f5a623]"
+          className="cursor-pointer accent-warning"
         />
-        <span className="text-[11px] text-[#aaa]">Show on grid</span>
+        <span className="text-[11px] text-fg-2">Show on grid</span>
       </label>
 
-      <div className="rounded border border-edge bg-[#0a0a0c] p-2 mb-2">
+      <div className="rounded border border-edge bg-sunken p-2 mb-2">
         {hasSelection ? (
-          <div className="text-[10.5px] text-[#aaa] font-mono mb-1.5">
+          <div className="text-[10.5px] text-fg-2 font-mono mb-1.5">
             Selection {selection!.x},{selection!.y} ·{" "}
             {selection!.w}×{selection!.h}
           </div>
         ) : (
-          <div className="text-[10.5px] text-[#666] mb-1.5">
+          <div className="text-[10.5px] text-fg-faint mb-1.5">
             Make a selection (
             <Kbd>S</Kbd> tool) to label its region.
           </div>
@@ -371,6 +376,7 @@ function AnnotationsSection({
         <div className="flex gap-1.5">
           <input
             type="text"
+            aria-label="Annotation label for selected region"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -383,13 +389,13 @@ function AnnotationsSection({
               hasSelection ? "e.g. player icon" : "Selection needed…"
             }
             disabled={!hasSelection}
-            className="flex-1 bg-[#0a0a0c] border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-[#f5a623] focus:bg-[#0e0e12] disabled:opacity-50 select-text"
+            className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-warning focus:bg-input-focus disabled:opacity-50 select-text"
           />
           <button
             type="button"
             onClick={handleAdd}
             disabled={!canAdd}
-            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#f5a623] text-[#1a1308] border border-[#f5a623] font-semibold hover:bg-[#ffb83c] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#f5a623]"
+            className="px-3 py-1.5 rounded text-xs cursor-pointer bg-warning text-warning-fg border border-warning font-semibold hover:bg-[#ffb83c] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-warning"
           >
             Add
           </button>
@@ -397,7 +403,7 @@ function AnnotationsSection({
       </div>
 
       {annotations.length === 0 ? (
-        <div className="text-[10.5px] text-[#555] italic">
+        <div className="text-[10.5px] text-fg-faint italic">
           No annotations on this variant.
         </div>
       ) : (
@@ -429,12 +435,13 @@ function AnnotationRow({
   // Re-sync local draft if the annotation text changes externally (e.g. undo).
   // Using a key on the input keeps this branch-free.
   return (
-    <div className="flex items-center gap-1.5 rounded border border-[#1f1f25] bg-[#0a0a0c]/40 px-2 py-1.5">
-      <div className="w-1.5 h-1.5 rounded-full bg-[#f5a623] shrink-0" />
+    <div className="flex items-center gap-1.5 rounded border border-line-mute bg-sunken/40 px-2 py-1.5">
+      <div className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <input
           key={annotation.id + "-" + annotation.text}
           type="text"
+          aria-label="Annotation text"
           defaultValue={annotation.text}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
@@ -448,9 +455,9 @@ function AnnotationRow({
               (e.target as HTMLInputElement).blur();
             }
           }}
-          className="bg-transparent border border-transparent text-foreground px-1.5 py-0.5 rounded text-xs outline-none hover:border-[#2a2a30] focus:bg-[#0a0a0c] focus:border-[#f5a623] select-text"
+          className="bg-transparent border border-transparent text-foreground px-1.5 py-0.5 rounded text-xs outline-none hover:border-line-strong focus:bg-sunken focus:border-warning select-text"
         />
-        <div className="text-[10px] text-[#666] font-mono px-1.5">
+        <div className="text-[10px] text-fg-faint font-mono px-1.5">
           {annotation.x},{annotation.y} · {annotation.w}×{annotation.h}
         </div>
       </div>
@@ -458,7 +465,7 @@ function AnnotationRow({
         type="button"
         onClick={onDelete}
         title="Delete annotation"
-        className="w-6 h-6 rounded text-sm leading-none border border-[#2a2a30] bg-transparent text-[#888] cursor-pointer hover:bg-[#3a2020] hover:text-[#ff8888] hover:border-[#5a3030] shrink-0"
+        className="w-6 h-6 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-danger-soft hover:text-danger hover:border-danger-line shrink-0"
       >
         ✕
       </button>

@@ -63,7 +63,7 @@ export function StepConnect({ supported, onConnected }: Props) {
       </h2>
       <p className="mt-1 text-[12px] text-muted leading-relaxed max-w-prose">
         Plug the Pico into USB. Click below, then pick its serial port in
-        the OS dialog — it&apos;s the one labelled <span className="font-mono text-foreground">Board in FS mode</span>{" "}
+        the OS dialog; it&apos;s the one labelled <span className="font-mono text-foreground">Board in FS mode</span>{" "}
         or with a vendor ID starting <span className="font-mono text-foreground">2e8a</span>.
       </p>
 

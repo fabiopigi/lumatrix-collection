@@ -88,7 +88,7 @@ export function StepApps({
       </h2>
       <p className="mt-1 text-[12px] text-muted leading-relaxed max-w-prose">
         The launcher will show the selected apps in this order. Untick any
-        you don&apos;t want on the Pico — they won&apos;t be uploaded or imported, so
+        you don&apos;t want on the Pico; they won&apos;t be uploaded or imported, so
         the device stays leaner. Add a custom .py to flash an LLM-generated
         app alongside the built-ins.
       </p>
@@ -118,8 +118,8 @@ export function StepApps({
         <div className="mt-3 rounded border border-accent/40 bg-accent/10 px-3 py-2 text-[11px] text-accent/90 leading-snug">
           <span className="font-semibold text-accent">Single-app mode:</span>{" "}
           with only one app selected, the Pico will boot straight into{" "}
-          <code className="font-mono text-accent">{soleEnabledName}</code> —
-          the launcher menu and loading spinner are skipped, and the
+          <code className="font-mono text-accent">{soleEnabledName}</code>.
+          The launcher menu and loading spinner are skipped, and the
           game-over screen returns directly to gameplay.
         </div>
       )}
@@ -392,7 +392,7 @@ function CustomAppEditorModal({
               ))}
             </ul>
             <div className="text-amber-200/80">
-              The Pico will still try to import it — these checks are advisory.
+              The Pico will still try to import it; these checks are advisory.
             </div>
           </div>
         )}

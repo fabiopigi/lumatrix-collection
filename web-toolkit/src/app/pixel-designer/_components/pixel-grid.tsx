@@ -171,7 +171,7 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
 
     return (
       <div
-        className="relative bg-[#1a1a1f] p-[14px] rounded-[10px]"
+        className="relative bg-panel-2 p-[14px] rounded-[10px]"
         style={{ boxShadow: "0 4px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02)" }}
       >
         <div ref={ref} className="pd-grid" style={wrapStyle}>

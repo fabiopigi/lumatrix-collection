@@ -120,9 +120,9 @@ export function PlayPreviewPanel({
   return (
     <div
       style={{ left: pos.x, top: pos.y }}
-      className="fixed z-50 bg-[#16161a] border border-edge rounded-md shadow-2xl select-none"
+      className="fixed z-50 bg-panel border border-edge rounded-md shadow-2xl select-none"
     >
-      <div className="flex items-center justify-between bg-[#22222a] rounded-t-md">
+      <div className="flex items-center justify-between bg-raised rounded-t-md">
         {/* Drag handle is its own element so the close button below isn't
             covered by pointer capture and stays clickable. */}
         <div
@@ -140,7 +140,7 @@ export function PlayPreviewPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-base leading-none px-2 py-1"
+          className="text-muted hover:text-foreground cursor-pointer text-base leading-none px-2 py-1"
           aria-label="Close preview"
         >
           ×
@@ -192,7 +192,7 @@ export function PlayPreviewPanel({
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
-            className="w-7 h-7 inline-flex items-center justify-center rounded cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="w-7 h-7 inline-flex items-center justify-center rounded cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
             title={playing ? "Pause (space)" : "Play (space)"}
           >
             {playing ? "⏸" : "▶"}
@@ -203,7 +203,7 @@ export function PlayPreviewPanel({
               setDirection((d) => (d === "loop" ? "pingpong" : "loop"));
               pingForwardRef.current = true;
             }}
-            className="w-7 h-7 inline-flex items-center justify-center rounded cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+            className="w-7 h-7 inline-flex items-center justify-center rounded cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
             title={
               direction === "loop"
                 ? "Loop (forward → wrap to start)"
@@ -212,12 +212,12 @@ export function PlayPreviewPanel({
           >
             {direction === "loop" ? "↻" : "↔"}
           </button>
-          <div className="ml-1 flex items-baseline gap-1.5 font-mono text-[#aaa]">
+          <div className="ml-1 flex items-baseline gap-1.5 font-mono text-fg-2">
             <span>
               {safeIdx + 1}/{pages.length}
             </span>
-            <span className="text-[#666]">·</span>
-            <span className="text-[#777]">{currentDur}ms</span>
+            <span className="text-fg-faint">·</span>
+            <span className="text-fg-faint">{currentDur}ms</span>
           </div>
         </div>
       </div>

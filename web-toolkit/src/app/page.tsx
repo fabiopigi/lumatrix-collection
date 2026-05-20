@@ -1,5 +1,43 @@
 import Link from "next/link";
 
+/** Abstract pixel-art marks per tool, drawn in the same 5×5 vocabulary as the
+ *  Designer's stamp symbols so the home cards feel like artefacts of the
+ *  tool kit itself. Each row uses "X" for lit, "." for off. */
+const TOOL_GLYPHS: Record<string, string[]> = {
+  // Play triangle — the run/launch affordance, pointing into the card.
+  Simulator: [
+    "X....",
+    "XX...",
+    "XXX..",
+    "XX...",
+    "X....",
+  ],
+  // A diagonal stroke — pencil moving across the canvas.
+  Designer: [
+    "....X",
+    "...XX",
+    "..XX.",
+    ".XX..",
+    "XX...",
+  ],
+  // Plus + diagonal — a sparkle / "something appearing".
+  Create: [
+    "..X..",
+    "X.X.X",
+    ".XXX.",
+    "X.X.X",
+    "..X..",
+  ],
+  // Zig-zag lightning — the install / current flow.
+  Flash: [
+    "..XX.",
+    ".XX..",
+    "XXXX.",
+    "..XX.",
+    ".XX..",
+  ],
+};
+
 export default function Home() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -25,7 +63,7 @@ export default function Home() {
         <Tool
           href="/create"
           name="Create"
-          summary="Build your own LumenLab app without writing code — describe it, let an AI write it, test it in the browser."
+          summary="Build your own LumenLab app without writing code. Describe it, let an AI write it, test it in the browser."
         />
         <Tool
           href="/flash"
@@ -69,14 +107,47 @@ function Tool({
   return (
     <Link
       href={href}
-      className="block rounded-lg border border-edge bg-panel p-5 no-underline hover:border-accent/40 transition-colors"
+      className="block rounded-lg border border-edge bg-panel p-5 no-underline hover:border-accent/40 transition-colors group"
     >
-      <div className="text-[14px] font-semibold tracking-[0.04em] text-white">
+      <ToolGlyph rows={TOOL_GLYPHS[name]} />
+      <div className="mt-4 text-[14px] font-semibold tracking-[0.04em] text-white">
         Lumen<span className="text-accent">{name}</span>
       </div>
       <p className="mt-1.5 text-[12px] text-muted leading-relaxed">
         {summary}
       </p>
     </Link>
+  );
+}
+
+function ToolGlyph({ rows }: { rows: string[] }) {
+  const w = rows[0].length;
+  const h = rows.length;
+  const cells: React.ReactNode[] = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (rows[y][x] === "X") {
+        cells.push(
+          <rect
+            key={`${x},${y}`}
+            x={x + 0.08}
+            y={y + 0.08}
+            width={0.84}
+            height={0.84}
+            rx={0.12}
+          />,
+        );
+      }
+    }
+  }
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="w-10 h-10 fill-accent/80 group-hover:fill-accent transition-colors"
+      shapeRendering="geometricPrecision"
+      aria-hidden
+    >
+      {cells}
+    </svg>
   );
 }

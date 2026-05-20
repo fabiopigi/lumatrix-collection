@@ -122,7 +122,7 @@ export function StepUpload({
         <div>
           <h2 className="lf-success-title">Success!</h2>
           <p className="mt-2 text-[13px] text-muted">
-            Your Pico is rebooting — boot animation, then the launcher.
+            Your Pico is rebooting: boot animation, then the launcher.
           </p>
         </div>
       ) : (

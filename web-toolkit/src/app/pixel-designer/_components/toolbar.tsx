@@ -64,10 +64,10 @@ interface ToolbarProps {
 
 export function Toolbar({ tool, onTool }: ToolbarProps) {
   return (
-    <aside className="w-14 bg-[#131316] border-r border-edge py-2.5 px-1.5 flex flex-col gap-1 shrink-0">
+    <aside className="w-14 bg-surface-1 border-r border-edge py-2.5 px-1.5 flex flex-col gap-1 shrink-0">
       {TOOL_GROUPS.map((group, gi) => (
         <div key={gi} className="contents">
-          {gi > 0 && <div className="h-px bg-[#2a2a30] mx-1 my-1.5" />}
+          {gi > 0 && <div className="h-px bg-line-strong mx-1 my-1.5" />}
           {group.map((t) => {
             const isActive = tool === t.tool;
             const filled = t.tool === "rectfill" || t.tool === "ellipsefill";
@@ -78,9 +78,9 @@ export function Toolbar({ tool, onTool }: ToolbarProps) {
                 type="button"
                 onClick={() => onTool(t.tool)}
                 title={t.title}
-                className={`relative w-11 h-10 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
+                className={`relative w-11 h-11 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
                   isActive
-                    ? "bg-[#1d2937] border-[#4a90e2] text-accent"
+                    ? "bg-active border-cta text-accent"
                     : "bg-transparent border-transparent text-[#b0b0b8] hover:bg-[#1f1f24] hover:text-white"
                 }`}
               >
@@ -99,7 +99,7 @@ export function Toolbar({ tool, onTool }: ToolbarProps) {
                 {t.key && (
                   <span
                     className={`absolute right-[3px] bottom-px text-[8px] font-mono ${
-                      isActive ? "text-accent" : "text-[#555]"
+                      isActive ? "text-accent" : "text-fg-faint"
                     }`}
                   >
                     {t.key}

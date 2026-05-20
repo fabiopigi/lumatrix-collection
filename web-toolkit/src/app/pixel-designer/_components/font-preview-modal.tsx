@@ -31,20 +31,20 @@ export function FontPreviewModal({
   const entries = Object.entries(glyphs);
 
   return (
-    <ModalShell onClose={onClose} className="w-[760px] max-h-[85vh] flex flex-col">
+    <ModalShell onClose={onClose} label={`Font preview: ${font}`} className="w-[760px] max-h-[85vh] flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div>
           <div className="text-[15px] font-semibold text-foreground">
             {font} preview
           </div>
-          <div className="text-[11px] text-[#777] mt-0.5">
+          <div className="text-[11px] text-fg-faint mt-0.5">
             {entries.length} glyphs · rendered at {PIXEL}× ({PIXEL} browser pixels per font pixel)
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-[#888] hover:text-foreground cursor-pointer text-xl leading-none px-2"
+          className="text-muted hover:text-foreground cursor-pointer text-xl leading-none px-2"
           aria-label="Close"
         >
           ×
@@ -103,8 +103,8 @@ function GlyphCell({
   }
   const label = char === " " ? "␣" : char;
   return (
-    <div className="flex flex-col items-center gap-1.5 p-2 rounded border border-[#25252b] bg-[#0d0d10]">
-      <div className="font-mono text-[10px] text-[#888] uppercase tracking-wider">
+    <div className="flex flex-col items-center gap-1.5 p-2 rounded border border-line-strong bg-[#0d0d10]">
+      <div className="font-mono text-[10px] text-muted uppercase tracking-wider">
         {label}
       </div>
       <div
