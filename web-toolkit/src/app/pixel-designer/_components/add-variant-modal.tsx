@@ -119,14 +119,14 @@ function AddVariantModalInner({
   // dismisses it.
   if (result) {
     return (
-      <ModalShell onClose={onClose} className="w-[480px]">
+      <ModalShell onClose={onClose} label="Add variant — result" className="w-[480px]">
         <ResultView result={result} onDone={onClose} />
       </ModalShell>
     );
   }
 
   return (
-    <ModalShell onClose={onClose} className="w-[440px]">
+    <ModalShell onClose={onClose} label="Add variant" className="w-[440px]">
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">

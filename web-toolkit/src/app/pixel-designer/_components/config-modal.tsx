@@ -87,7 +87,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
   const save = () => onSave(previewCfg);
 
   return (
-    <ModalShell onClose={onClose} width={560} className="max-h-[88vh] overflow-y-auto">
+    <ModalShell onClose={onClose} label="Variant settings" width={560} className="max-h-[88vh] overflow-y-auto">
       <h2 className="m-0 mb-3 text-[13px] font-semibold">
         Variant settings —{" "}
         <span className="text-accent font-mono">

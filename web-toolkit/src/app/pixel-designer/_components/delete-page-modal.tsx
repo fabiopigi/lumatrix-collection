@@ -34,7 +34,7 @@ function DeletePageModalInner({
   onClose,
 }: Omit<DeletePageModalProps, "open">) {
   return (
-    <ModalShell onClose={onClose} className="w-[420px]">
+    <ModalShell onClose={onClose} label="Delete page or variant" className="w-[420px]">
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">

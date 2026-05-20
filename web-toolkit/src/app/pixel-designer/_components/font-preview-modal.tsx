@@ -31,7 +31,7 @@ export function FontPreviewModal({
   const entries = Object.entries(glyphs);
 
   return (
-    <ModalShell onClose={onClose} className="w-[760px] max-h-[85vh] flex flex-col">
+    <ModalShell onClose={onClose} label={`Font preview — ${font}`} className="w-[760px] max-h-[85vh] flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div>
           <div className="text-[15px] font-semibold text-foreground">

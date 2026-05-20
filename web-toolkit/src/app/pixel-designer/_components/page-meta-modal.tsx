@@ -70,6 +70,7 @@ function PageMetaModalInner({
   return (
     <ModalShell
       onClose={onClose}
+      label="Page metadata"
       className="w-[480px] max-h-[88vh] overflow-y-auto"
     >
       <div className="flex items-center justify-between mb-3">

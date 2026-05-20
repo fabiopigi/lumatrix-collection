@@ -46,7 +46,7 @@ function ImportModalInner({
   };
 
   return (
-    <ModalShell onClose={onClose} className="w-[560px] max-h-[88vh] overflow-y-auto">
+    <ModalShell onClose={onClose} label="Import design" className="w-[560px] max-h-[88vh] overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="text-[15px] font-semibold text-foreground">Import</div>
