@@ -92,6 +92,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Respect the system motion preference. Collapses every animation,
+   transition, and scroll-smooth to ~instant — so the confetti shower
+   stays invisible (its pieces keep their opacity: 0 initial state),
+   the success-pop snaps to its end state, the designer drawer + site
+   nav slide-ins become instant, and so on. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ============================================================
    LumenDesigner
    ============================================================ */
