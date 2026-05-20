@@ -1697,7 +1697,7 @@ export function Designer() {
                       type="button"
                       onClick={() => setMetaModalFor(pi)}
                       title="Page metadata"
-                      className="w-6 h-6 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger"
+                      className="w-8 h-8 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-raised hover:text-foreground hover:border-line-stronger"
                     >
                       ⓘ
                     </button>
@@ -1709,7 +1709,7 @@ export function Designer() {
                         Object.keys(design.pages[pi]?.variants ?? {}).length <= 1
                       }
                       title="Delete page or variant"
-                      className="w-6 h-6 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-danger-soft hover:text-danger hover:border-danger-line disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
+                      className="w-8 h-8 rounded text-sm leading-none border border-line-strong bg-transparent text-muted cursor-pointer hover:bg-danger-soft hover:text-danger hover:border-danger-line disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted disabled:hover:border-line-strong"
                     >
                       ✕
                     </button>

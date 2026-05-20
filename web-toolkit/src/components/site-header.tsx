@@ -83,7 +83,7 @@ export function SiteHeader() {
                   <Link
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="block px-4 py-2 text-[13px] tracking-[0.04em] text-muted hover:text-foreground hover:bg-panel-2 no-underline"
+                    className="block px-4 py-3 text-[13px] tracking-[0.04em] text-muted hover:text-foreground hover:bg-panel-2 no-underline"
                   >
                     {link.label}
                   </Link>

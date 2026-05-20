@@ -78,7 +78,7 @@ export function Toolbar({ tool, onTool }: ToolbarProps) {
                 type="button"
                 onClick={() => onTool(t.tool)}
                 title={t.title}
-                className={`relative w-11 h-10 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
+                className={`relative w-11 h-11 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
                   isActive
                     ? "bg-active border-cta text-accent"
                     : "bg-transparent border-transparent text-[#b0b0b8] hover:bg-[#1f1f24] hover:text-white"
