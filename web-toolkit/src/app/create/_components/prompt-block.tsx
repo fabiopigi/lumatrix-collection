@@ -10,15 +10,28 @@
 
 import { useState } from "react";
 
+export interface PromptBlockLabels {
+  title: string;
+  subtitle: string; // appended after "<size> · "
+  download: string;
+  copy: string;
+  copied: string;
+  expand: string;
+  collapse: string;
+}
+
 interface Props {
   /** The portion of llm-app-prompt.md after the `--- LLM PROMPT BELOW ---`
    *  marker — i.e. what the user pastes into the LLM. */
   promptBody: string;
   /** The full source file, used for the download link. */
   fullSource: string;
+  /** Localised UI labels. The prompt body itself stays in its original
+   *  language — LLMs don't care which language they read instructions in. */
+  labels: PromptBlockLabels;
 }
 
-export function PromptBlock({ promptBody, fullSource }: Props) {
+export function PromptBlock({ promptBody, fullSource, labels }: Props) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -42,10 +55,10 @@ export function PromptBlock({ promptBody, fullSource }: Props) {
       <div className="flex items-center gap-3 px-4 py-3 border-b border-edge bg-panel-2">
         <div className="flex flex-col">
           <span className="text-[12px] font-semibold text-white">
-            LumenLab app-builder prompt
+            {labels.title}
           </span>
           <span className="text-[10px] text-muted/80">
-            {formatBytes(promptBody.length)} · paste into any LLM chat
+            {formatBytes(promptBody.length)} · {labels.subtitle}
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -54,14 +67,14 @@ export function PromptBlock({ promptBody, fullSource }: Props) {
             download="llm-app-prompt.md"
             className="text-[11px] px-3 py-1.5 rounded border border-edge bg-panel text-muted hover:text-foreground hover:border-accent cursor-pointer no-underline"
           >
-            Download .md
+            {labels.download}
           </a>
           <button
             type="button"
             onClick={handleCopy}
             className="text-[11px] px-3 py-1.5 rounded bg-accent text-black font-semibold cursor-pointer hover:bg-accent/90"
           >
-            {copied ? "Copied!" : "Copy prompt"}
+            {copied ? labels.copied : labels.copy}
           </button>
         </div>
       </div>
@@ -88,7 +101,7 @@ export function PromptBlock({ promptBody, fullSource }: Props) {
           onClick={() => setExpanded((v) => !v)}
           className="absolute left-1/2 -translate-x-1/2 bottom-2 text-[10px] uppercase tracking-[0.1em] px-3 py-1 rounded-full border border-edge bg-panel text-muted hover:text-accent hover:border-accent cursor-pointer"
         >
-          {expanded ? "Collapse" : "Expand preview"}
+          {expanded ? labels.collapse : labels.expand}
         </button>
       </div>
     </div>
