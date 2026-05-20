@@ -56,7 +56,10 @@ export function SidePanel(props: SidePanelProps) {
   };
 
   return (
-    <aside className="w-[340px] h-full bg-surface-1 border-l border-edge p-3.5 overflow-y-scroll shrink-0">
+    <aside
+      className="w-[340px] h-full bg-surface-1 border-l border-edge p-3.5 overflow-y-auto shrink-0"
+      style={{ scrollbarGutter: "stable" }}
+    >
       <Section title="Mode">
         <div className="toggle-row flex bg-sunken p-0.5 rounded-md border border-edge">
           <ToggleButton
