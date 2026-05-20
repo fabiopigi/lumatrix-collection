@@ -65,6 +65,7 @@ import {
   type PageMetaPatch,
 } from "./page-meta-modal";
 import { PixelGrid } from "./pixel-grid";
+import { PlayPreviewPanel } from "./play-preview-panel";
 import { SidePanel } from "./side-panel";
 import { Toolbar } from "./toolbar";
 import { VariantPicker } from "./variant-picker";
@@ -393,6 +394,7 @@ export function Designer() {
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [deletePromptFor, setDeletePromptFor] = useState<number | null>(null);
   const [metaModalFor, setMetaModalFor] = useState<number | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Page reorder drag state. `dragFromIdx` is the index being dragged;
   // `dragOverIdx` is the gap index where dropping would insert the page
@@ -1687,6 +1689,15 @@ export function Designer() {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
+  // Play preview is available once there's a sequence to play AND the active
+  // preset exists on every page (so we can show one consistent variant the
+  // whole way through). The panel itself is guarded at the mount site —
+  // when the condition is false the panel unmounts, and reappears if the
+  // condition holds again while `previewOpen` is still true.
+  const canPreview =
+    design.pages.length > 1 &&
+    design.pages.every((p) => p.variants[activePreset]);
+
   const headerSlot = useHeaderActionsSlot();
   const headerActions = (
     <>
@@ -1706,6 +1717,19 @@ export function Designer() {
       />
       <div className="w-px h-5 bg-edge mx-1" />
       <div className="flex gap-1.5">
+        <HeaderBtn
+          onClick={() => setPreviewOpen((v) => !v)}
+          disabled={!canPreview}
+          title={
+            canPreview
+              ? previewOpen
+                ? "Close play preview"
+                : "Play multi-page preview"
+              : "Need at least 2 pages all sharing the active variant"
+          }
+        >
+          {previewOpen ? "Hide preview" : "Play preview"}
+        </HeaderBtn>
         <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
           Clear
         </HeaderBtn>
@@ -2119,6 +2143,14 @@ export function Designer() {
           setDeletePromptFor(null);
         }}
       />
+      {previewOpen && canPreview && (
+        <PlayPreviewPanel
+          pages={design.pages}
+          presetId={activePreset}
+          config={config}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2131,17 +2163,20 @@ function HeaderBtn({
   children,
   onClick,
   title,
+  disabled,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   title?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34]"
+      disabled={disabled}
+      className="px-3 py-1.5 rounded text-xs cursor-pointer bg-[#22222a] border border-[#2f2f37] text-foreground hover:bg-[#2c2c34] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#22222a]"
     >
       {children}
     </button>
