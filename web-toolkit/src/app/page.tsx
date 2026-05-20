@@ -25,7 +25,7 @@ export default function Home() {
         <Tool
           href="/create"
           name="Create"
-          summary="Build your own LumenLab app without writing code — describe it, let an AI write it, test it in the browser."
+          summary="Build your own LumenLab app without writing code. Describe it, let an AI write it, test it in the browser."
         />
         <Tool
           href="/flash"

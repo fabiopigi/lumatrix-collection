@@ -89,7 +89,7 @@ function ConfigModalInner({ current, onClose, onSave }: ConfigModalProps) {
   return (
     <ModalShell onClose={onClose} label="Variant settings" width={560} className="max-h-[88vh] overflow-y-auto">
       <h2 className="m-0 mb-3 text-[13px] font-semibold">
-        Variant settings —{" "}
+        Variant settings:{" "}
         <span className="text-accent font-mono">
           {HARDWARE_PRESETS.find(
             (p) => p.width === current.width && p.height === current.height,
@@ -268,7 +268,7 @@ function CfgSection({
         {title}
         {hint && (
           <span className="ml-1 font-normal text-fg-faint normal-case tracking-normal text-[11px]">
-            — {hint}
+            · {hint}
           </span>
         )}
       </div>

@@ -96,7 +96,7 @@ function AddVariantModalInner({
     : sourcePreset;
   const shrinkNote =
     sourceHw && target && !sourceFits
-      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Scale/Center aren't available — Start blank is the only option for this target.`
+      ? `Source ${sourceLabel} doesn't fit in ${target.width}×${target.height}. Scale/Center aren't available; Start blank is the only option for this target.`
       : null;
 
   // When the source doesn't fit, scale/center can't carry the source pixels
@@ -119,7 +119,7 @@ function AddVariantModalInner({
   // dismisses it.
   if (result) {
     return (
-      <ModalShell onClose={onClose} label="Add variant — result" className="w-[480px]">
+      <ModalShell onClose={onClose} label="Add variant result" className="w-[480px]">
         <ResultView result={result} onDone={onClose} />
       </ModalShell>
     );
@@ -137,7 +137,7 @@ function AddVariantModalInner({
             <span className="font-mono text-fg-2">
               {page?.label ?? `Page ${pageIdx + 1}`}
             </span>
-            {" — source: "}
+            {" · source: "}
             <span className="font-mono text-fg-2">{sourceLabel}</span>
           </div>
         </div>
@@ -191,7 +191,7 @@ function AddVariantModalInner({
               checked={init === "blank"}
               onChange={() => setInit("blank")}
               title="Start blank"
-              hint="Create the variant as an empty canvas — ignore the source. Useful when scaling down or when you want to redesign for the new size from scratch."
+              hint="Create the variant as an empty canvas, ignoring the source. Useful when scaling down or when you want to redesign for the new size from scratch."
             />
           </Section>
 
@@ -216,7 +216,7 @@ function AddVariantModalInner({
                 <span className="block text-[10.5px] text-fg-faint">
                   Each page sources from its own{" "}
                   <span className="font-mono">{sourceLabel}</span> variant.
-                  Pages without one — or whose source doesn&apos;t fit — are
+                  Pages without one, or whose source doesn&apos;t fit, are
                   skipped and reported afterwards.
                 </span>
               </span>

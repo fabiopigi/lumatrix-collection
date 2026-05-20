@@ -200,7 +200,7 @@ export function UserAppsPanel({ apps, onChange, appError, onDismissError }: Prop
 
       <p className="text-[10px] text-muted/70 leading-[1.45] mt-2">
         Custom apps run in the same browser tab. A bug in your app can freeze
-        the simulator — reload the page to recover.
+        the simulator; reload the page to recover.
       </p>
 
       {editor && (

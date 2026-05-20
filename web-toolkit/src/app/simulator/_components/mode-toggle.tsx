@@ -29,7 +29,7 @@ export function ModeToggle({
         title={
           maskAvailable
             ? undefined
-            : "Letter mask is the LUMATRIX 8×8 word-clock layout — switch the display to 8×8 to enable."
+            : "Letter mask is the LUMATRIX 8×8 word-clock layout. Switch the display to 8×8 to enable."
         }
         onClick={() => mode !== "mask" && maskAvailable && onChange("mask")}
       >

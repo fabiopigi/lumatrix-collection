@@ -26,17 +26,17 @@ const T: Record<Lang, {
   en: {
     metaTitle: "LumenCreate · LumenLab",
     metaDesc:
-      "Build your own LumenLab app without writing code — design screens, hand the prompt to an LLM, test in the browser, then flash to your Pico.",
+      "Build your own LumenLab app without writing code. Design screens, hand the prompt to an LLM, test in the browser, then flash to your Pico.",
     tagline:
-      "Build your own LumenLab app without writing code. Describe what you want, let an AI write the code, try it in the browser, then flash it to your Pico — the whole loop runs on this site.",
+      "Build your own LumenLab app without writing code. Describe what you want, let an AI write the code, try it in the browser, then flash it to your Pico. The whole loop runs on this site.",
     howItWorks: "How it works",
     steps: [
       {
         title: "Sketch your screens (optional)",
         body: (L) => (
           <>
-            If your app has fixed visuals — a clock face, a game-over banner,
-            animation frames — paint them in{" "}
+            If your app has fixed visuals (a clock face, a game-over banner,
+            animation frames), paint them in{" "}
             <L href="/pixel-designer">LumenDesigner</L> and export the JSON.
             Skip this step if the visuals are fully algorithmic (random pixels,
             sliding bars, etc.).
@@ -72,7 +72,7 @@ const T: Record<Lang, {
         title: "Open a fresh AI chat and paste the prompt",
         body: () => (
           <>
-            Use any LLM — ChatGPT, Claude, Gemini, your favourite. Open a new
+            Use any LLM: ChatGPT, Claude, Gemini, your favourite. Open a new
             conversation and paste the LumenLab app-builder prompt below as your
             first message. Then attach the JSON from step 1 (if you made one)
             and your description from step 2.
@@ -102,7 +102,7 @@ const T: Record<Lang, {
             go: the JS, the Python, a TypeScript twin, the docs, and an
             integration guide. It also offers to package them as a{" "}
             <code className="font-mono text-foreground">&lt;name&gt;.zip</code>{" "}
-            you can email to a LumenLab maintainer — your app then ships in the
+            you can email to a LumenLab maintainer. Your app then ships in the
             next release for everyone to use.
           </>
         ),
@@ -110,7 +110,7 @@ const T: Record<Lang, {
     ],
     promptHeading: "The prompt",
     promptIntro:
-      "This is the instruction set the AI follows. Copy it, paste it as the first message in your AI chat, then send your description on the next message. You don't need to read it — it's for the AI.",
+      "This is the instruction set the AI follows. Copy it, paste it as the first message in your AI chat, then send your description on the next message. You don't need to read it; it's for the AI.",
     promptLoadError: (gh) => (
       <>
         Couldn&apos;t load the prompt. Reload the page or grab it from {gh}.
@@ -125,7 +125,7 @@ const T: Record<Lang, {
       },
       {
         label: "A few minutes",
-        body: "The fast path — clarify, try, ship — usually takes 10–20 minutes per app.",
+        body: "The fast path (clarify, try, ship) usually takes 10–20 minutes per app.",
       },
       {
         label: "A LUMATRIX (optional)",
@@ -149,17 +149,17 @@ const T: Record<Lang, {
   de: {
     metaTitle: "LumenCreate · LumenLab",
     metaDesc:
-      "Erstelle deine eigene LumenLab-App ohne Programmieren — gestalte Screens, übergib den Prompt an eine KI, teste im Browser und flashe dann auf deinen Pico.",
+      "Erstelle deine eigene LumenLab-App ohne Programmieren. Gestalte Screens, übergib den Prompt an eine KI, teste im Browser und flashe dann auf deinen Pico.",
     tagline:
-      "Erstelle deine eigene LumenLab-App ohne Programmieren. Beschreibe, was du möchtest, lass eine KI den Code schreiben, probiere ihn im Browser aus und flashe ihn dann auf deinen Pico — der ganze Ablauf läuft auf dieser Seite.",
+      "Erstelle deine eigene LumenLab-App ohne Programmieren. Beschreibe, was du möchtest, lass eine KI den Code schreiben, probiere ihn im Browser aus und flashe ihn dann auf deinen Pico. Der ganze Ablauf läuft auf dieser Seite.",
     howItWorks: "So funktioniert's",
     steps: [
       {
         title: "Skizziere deine Screens (optional)",
         body: (L) => (
           <>
-            Wenn deine App feste Bilder hat — ein Ziffernblatt, ein
-            Game-Over-Banner, Animations-Frames — male sie im{" "}
+            Wenn deine App feste Bilder hat (ein Ziffernblatt, ein
+            Game-Over-Banner, Animations-Frames), male sie im{" "}
             <L href="/pixel-designer">LumenDesigner</L> und exportiere das
             JSON. Überspring diesen Schritt, wenn die Visuals komplett
             algorithmisch sind (Zufallspixel, gleitende Balken usw.).
@@ -196,7 +196,7 @@ const T: Record<Lang, {
         title: "Öffne einen frischen KI-Chat und füge den Prompt ein",
         body: () => (
           <>
-            Verwende eine beliebige LLM — ChatGPT, Claude, Gemini, deine
+            Verwende eine beliebige LLM: ChatGPT, Claude, Gemini, deine
             Lieblings-KI. Starte eine neue Konversation und füge den
             LumenLab-App-Builder-Prompt unten als erste Nachricht ein. Hänge
             dann das JSON aus Schritt 1 (falls vorhanden) und deine
@@ -228,15 +228,15 @@ const T: Record<Lang, {
             Dateien auf einmal: das JS, das Python, einen TypeScript-Twin, die
             Doku und eine Integrationsanleitung. Sie bietet auch an, alles als{" "}
             <code className="font-mono text-foreground">&lt;name&gt;.zip</code>{" "}
-            zu packen, das du an einen LumenLab-Maintainer mailen kannst —
-            deine App erscheint dann im nächsten Release für alle.
+            zu packen, das du an einen LumenLab-Maintainer mailen kannst.
+            Deine App erscheint dann im nächsten Release für alle.
           </>
         ),
       },
     ],
     promptHeading: "Der Prompt",
     promptIntro:
-      "Das ist die Anleitung, der die KI folgt. Kopiere sie, füge sie als erste Nachricht in deinen KI-Chat ein und schicke dann deine Beschreibung als nächste Nachricht. Du musst sie nicht lesen — sie ist für die KI.",
+      "Das ist die Anleitung, der die KI folgt. Kopiere sie, füge sie als erste Nachricht in deinen KI-Chat ein und schicke dann deine Beschreibung als nächste Nachricht. Du musst sie nicht lesen; sie ist für die KI.",
     promptLoadError: (gh) => (
       <>
         Der Prompt konnte nicht geladen werden. Lade die Seite neu oder hol ihn
@@ -252,7 +252,7 @@ const T: Record<Lang, {
       },
       {
         label: "Ein paar Minuten",
-        body: "Der schnelle Weg — klären, ausprobieren, fertig — dauert meist 10–20 Minuten pro App.",
+        body: "Der schnelle Weg (klären, ausprobieren, fertig) dauert meist 10–20 Minuten pro App.",
       },
       {
         label: "Eine LUMATRIX (optional)",

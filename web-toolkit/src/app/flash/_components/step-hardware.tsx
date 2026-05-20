@@ -17,7 +17,7 @@ export function StepHardware({ presets, value, onChange, onContinue }: Props) {
       </h2>
       <p className="mt-1 text-[12px] text-muted leading-relaxed max-w-prose">
         The launcher adapts to whatever size you select. Classic 8×8 apps
-        still run — they&apos;re integer-scaled and centred on bigger panels.
+        still run, integer-scaled and centred on bigger panels.
       </p>
 
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">

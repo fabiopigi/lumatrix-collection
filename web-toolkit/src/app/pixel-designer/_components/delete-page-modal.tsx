@@ -44,7 +44,7 @@ function DeletePageModalInner({
             <span className="font-mono text-fg-2">
               #{pageIndex + 1} {pageLabel}
             </span>
-            {" — "}
+            {" · "}
             {variantCount} variant{variantCount === 1 ? "" : "s"}
           </div>
         </div>
@@ -64,7 +64,7 @@ function DeletePageModalInner({
           hint={
             canDeleteVariant
               ? `Removes the ${activePresetLabel} variant from this page. Other pages keep their ${activePresetLabel} variants; this page keeps its other variants.`
-              : "This is the page's only variant — deleting it would leave the page unrenderable. Use “Only this page” instead."
+              : "This is the page's only variant. Deleting it would leave the page unrenderable; use “Only this page” instead."
           }
           disabled={!canDeleteVariant}
           onClick={onDeleteVariant}

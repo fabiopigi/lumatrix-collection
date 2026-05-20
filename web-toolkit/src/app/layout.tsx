@@ -15,7 +15,7 @@ const bitcount = Bitcount_Grid_Double({
 export const metadata: Metadata = {
   title: "LumenLab",
   description:
-    "Pixel-art tools for LED matrices — design, animate, simulate, flash to your board.",
+    "Pixel-art tools for LED matrices: design, animate, simulate, flash to your board.",
 };
 
 export default function RootLayout({

@@ -110,7 +110,7 @@ function PageMetaModalInner({
 
       <Field
         label="Description"
-        hint="Free-form notes. JSON-only — never shown in the editor outside this modal."
+        hint="Free-form notes. JSON-only; never shown in the editor outside this modal."
       >
         <textarea
           value={description}

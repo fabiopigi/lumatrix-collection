@@ -37,7 +37,7 @@ export function DisplayPicker({ display, onChange }: DisplayPickerProps) {
       </select>
       <p className="text-[10px] text-muted/80 leading-[1.45]">
         Apps render to a virtual 8×8 buffer; larger displays show that source
-        scaled up and centred. Per-app responsive scaling is a follow-up — see
+        scaled up and centred. Per-app responsive scaling is a follow-up; see
         each app&apos;s doc.
       </p>
     </section>
