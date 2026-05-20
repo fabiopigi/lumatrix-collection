@@ -22,6 +22,7 @@ import {
   rectPoints,
 } from "@/lib/pixel-designer/geometry";
 import { computeLedIndex } from "@/lib/pixel-designer/led-index";
+import { importImageForHardware } from "@/lib/pixel-designer/image-import";
 import { parseImport } from "@/lib/pixel-designer/json-io";
 import {
   COLOR_MODES,
@@ -1595,6 +1596,49 @@ export function Designer() {
     pushHistory,
   ]);
 
+  // ============ image import ============
+
+  const handleImageImport = useCallback(
+    async (file: File) => {
+      const currentDesign = designRef.current;
+      const presetId = activePresetByPageRef.current[currentPageRef.current];
+      const hw = currentDesign.hardware[presetId];
+      if (!hw) {
+        setImportError("Active hardware variant is missing — cannot import.");
+        return;
+      }
+      let result;
+      try {
+        result = await importImageForHardware(file, hw.width, hw.height);
+      } catch (err) {
+        setImportError(`Image import error: ${(err as Error).message}`);
+        return;
+      }
+      const insertAt = currentPageRef.current + 1;
+      setDesign((prev) => {
+        const newPage = {
+          label: result.label,
+          variants: {
+            [presetId]: { pixels: result.pixels.slice() },
+          },
+        };
+        const nextPages = prev.pages.slice();
+        nextPages.splice(insertAt, 0, newPage);
+        queueMicrotask(() => pushHistory(undefined, insertAt));
+        return { ...prev, pages: nextPages };
+      });
+      setActivePresetByPage((prev) => {
+        const next = prev.slice();
+        next.splice(insertAt, 0, presetId);
+        return next;
+      });
+      setCurrentPage(insertAt);
+      setImportError(null);
+      setImportOpen(false);
+    },
+    [setDesign, setActivePresetByPage, setCurrentPage, pushHistory],
+  );
+
   // ============ config save ============
 
   const handleConfigSave = useCallback(
@@ -2020,6 +2064,7 @@ export function Designer() {
           if (importError) setImportError(null);
         }}
         onImport={handleImport}
+        onImageImport={handleImageImport}
         error={importError}
         onClose={() => {
           setImportOpen(false);
