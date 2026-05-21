@@ -8,6 +8,56 @@ If you'd rather hand-author 8×8 stamps as ASCII grids (no source PNG), skip to 
 
 ---
 
+## For an LLM driving this end-to-end
+
+If you're an LLM converting a sheet on behalf of a user, your job is **ask, don't guess**. The user knows the source format; you almost certainly don't. Get the answers below before running any script. Once you have them, the rest of this document is your reference.
+
+### Ask the user these questions
+
+Ask all of these in one batch before doing anything. If the user says "I don't know" for something visual, *then* fall back to looking at the image.
+
+1. **Source PNG path?** (e.g. `~/Downloads/smileys.png`)
+2. **Target set id?** (kebab-case, prefixed by size — e.g. `8x8-smileys`)
+3. **Target set display name?** (e.g. `Smileys (8×8)`)
+4. **Target cell size?** This is what the *LumenDesigner canvas* expects — `8`, `16`, or `32`. Match the LED hardware the user wants to stamp onto.
+5. **Source rendering scale (@Nx)?** Is each sprite drawn at the target cell size in source pixels, or upscaled? Ask:
+   - "Are the sprites in the source PNG drawn at native resolution (each source pixel = one LED pixel), or are they upscaled? If upscaled, how many source pixels per logical pixel?"
+   - Examples: `@1x` → 8×8 cells in source = 8×8 cells on the LED. `@4x` → 32×32 source cells = 8×8 on the LED.
+6. **Padding between cells?** (in source pixels — e.g. `0`, `1`, `12`)
+7. **Offset to first cell?** (`X,Y` in source pixels; usually `0,0` unless the sheet has a global border)
+8. **Background**: alpha-transparent, or a solid colour? If solid, what hex?
+9. **Colour mode**: is the set **monochrome** (every cell stamps in the active brush colour) or **colourful** (each cell keeps its own RGB)? Heuristic: photographic / multi-colour sprites → colourful; silhouettes / icons in one tone → monochrome.
+10. **Optional metadata**: licence, attribution name, attribution URL.
+
+### How each answer maps to a script flag
+
+| User answer | Flag on `repack-sprite-sheet.py` | Manifest field |
+|---|---|---|
+| Target cell size = `N` | `--out-cell-size N` | `"size": N` |
+| Source @1x at cell size N | `--in-cell-size N` | — |
+| Source @Mx at target N | `--in-cell-size <N*M>` `--out-cell-size N` | — |
+| Padding `P` | `--in-padding P` | — |
+| Offset `X,Y` | `--in-offset X,Y` | — |
+| Background colour `#HEX` | `--chroma-key '#HEX'` | — |
+| Background uses alpha already | (omit `--chroma-key`) | — |
+| Monochrome set | — | `"colorful": false` |
+| Colourful set | — | `"colorful": true` |
+| Licence | — | `"license": "…"` |
+| Attribution | — | `"attribution": "…"` |
+| Attribution URL | — | `"attributionUrl": "…"` |
+
+### The flow once you have answers
+
+1. **Run `repack-sprite-sheet.py`** with the flags above. It writes the clean `sheet.png`.
+2. **Look at the cleaned `sheet.png`** in row-major order. For each non-empty cell, decide a kebab-case `name` (`heart`, `coin`, `space-invader`, etc.). Skip empty cells silently — they don't need manifest entries.
+3. **Write `manifest.json`** using the schema below, listing the sprites in the order you want them to appear in the panel.
+4. **Register the set** — append the manifest URL to `COLORFUL_MANIFEST_URLS` in `web-toolkit/src/lib/pixel-designer/sprites.ts`.
+5. **Report back to the user** with the file paths, the set id, and how many sprites you named.
+
+If any answer leaves you unsure (e.g. the user said "I think the padding is 1px" but the script's output looks wrong), **stop and ask again** — don't keep tweaking flags blind. Tell the user what you ran and what you saw.
+
+---
+
 ## What the loader expects
 
 LumenDesigner reads each sprite set from two files:
@@ -137,136 +187,61 @@ If the pack has its own metadata (an XML / JSON describing cell positions, Textu
 
 You have 13 sprites and your grid is 4 columns × 4 rows = 16. Just leave the last 3 cells empty (any colour with alpha 0) and only list the 13 you want in the manifest. The loader doesn't care about empty cells — they're never named, never selected.
 
+### Recipe F — solid background instead of alpha
+
+The sheet uses a solid colour (often black, sometimes magenta `#ff00ff`) as the "transparent" background — no alpha channel. Convert the background to transparency before slicing with `--chroma-key`:
+
+```bash
+python3 web-toolkit/scripts/repack-sprite-sheet.py \
+  --input ./pack-on-black.png \
+  --output web-toolkit/public/sprites/8x8-smileys/sheet.png \
+  --in-cell-size 8 --in-padding 0 --in-offset 0,0 \
+  --chroma-key '#000000'
+```
+
+For sheets with JPG-style compression noise (the "transparent" colour isn't pixel-exact), add a small tolerance:
+
+```bash
+  --chroma-key '#000000' --chroma-tolerance 8
+```
+
+Tolerance is per-channel maximum difference — `8` means each of R, G, B must be within 8 of the key colour for the pixel to be treated as background. Good defaults: `0` for clean PNG exports, `4–16` for anything that's been through JPG / re-encoding.
+
+**Gotcha**: chroma-key matches *any* matching pixel, including ones inside your sprites. If the background colour is black and your sprites have black detail (outlines, pupils), those will become transparent too. Two fixes:
+
+1. **Author / source sheets where the background isn't a colour used in the art.** Magenta `#ff00ff` is the traditional choice for exactly this reason.
+2. **Tighten the tolerance to zero and add a small alpha bump** before chroma-key. If you're stuck with a black-background sheet whose sprites also use black, your best bet is to crop sprites individually (Recipe C) so each one is bordered by clearly-background pixels.
+
+### Recipe G — sprites rendered at @Nx
+
+A common scenario: the source PNG is the intended pixel art, but rendered larger so it's easier to view. An 8×8 sprite drawn at @4× takes up 32×32 source pixels — each "logical pixel" is a 4×4 block of identical colour.
+
+You don't need a special flag. Tell the script the *source* cell size (large) and the *output* cell size (small); the downscale path uses nearest-neighbour, which picks one pixel per N×N block — exactly the right reverse of a nearest-neighbour upscale.
+
+```bash
+python3 web-toolkit/scripts/repack-sprite-sheet.py \
+  --input ./art-at-4x.png \
+  --output web-toolkit/public/sprites/8x8-smileys/sheet.png \
+  --in-cell-size 32 \
+  --in-padding 12 \
+  --in-offset 0,0 \
+  --out-cell-size 8
+```
+
+**Detecting @Nx visually**: zoom into the image and look at adjacent pixels. If you see uniform N×N blocks of identical colour everywhere, the art is @N×. If pixels vary individually, it's @1×.
+
+**Important**: this assumes a *nearest-neighbour* upscale. If the upscale was bilinear / bicubic, the N×N blocks have gradients and our nearest-neighbour downsample will pick noisy corner samples. For those, ask the source author for the @1× version, or do a one-off Pillow snippet that averages each block (`Image.BOX` resampling) instead.
+
 ---
 
 ## The reusable scripts
 
-Drop these into `web-toolkit/scripts/`. They have no dependencies beyond Pillow (`pip install pillow`).
+Two Python scripts under `web-toolkit/scripts/`. Both require Pillow (`pip install pillow`).
 
-### `repack-sprite-sheet.py`
+- **[`repack-sprite-sheet.py`](../web-toolkit/scripts/repack-sprite-sheet.py)** — slices a uniform grid (with optional padding, offset, background-key, and downscale) and writes a contiguous no-padding sheet. The workhorse for Recipes B, F, G.
+- **[`pack-sprites.py`](../web-toolkit/scripts/pack-sprites.py)** — takes individual sprite PNGs (one per file) and packs them into a uniform sheet, with `fit` / `stretch` / `none` resize modes. The workhorse for Recipe C / D.
 
-Slices a padded grid into a contiguous no-padding grid, with optional resize.
-
-```python
-#!/usr/bin/env python3
-"""Slice a padded sprite sheet and re-pack it into LumenDesigner format.
-
-Example:
-  repack-sprite-sheet.py \\
-    --input  ./pack.png \\
-    --output ./sheet.png \\
-    --in-cell-size 16 --in-padding 1 --in-offset 0,0 \\
-    --out-cell-size 8
-"""
-import argparse
-from PIL import Image
-
-def parse_offset(s):
-    x, y = s.split(",")
-    return int(x), int(y)
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--input", required=True)
-    p.add_argument("--output", required=True)
-    p.add_argument("--in-cell-size", type=int, required=True)
-    p.add_argument("--in-padding", type=int, default=0,
-                   help="Pixels of gutter between adjacent cells.")
-    p.add_argument("--in-offset", type=parse_offset, default=(0, 0),
-                   help="Top-left of the first cell in the input, as X,Y.")
-    p.add_argument("--out-cell-size", type=int, default=None,
-                   help="Resize each cell to this size. Defaults to in-cell-size.")
-    p.add_argument("--columns", type=int, default=None,
-                   help="Override the inferred column count.")
-    args = p.parse_args()
-
-    src = Image.open(args.input).convert("RGBA")
-    sw, sh = src.size
-    cs = args.in_cell_size
-    pad = args.in_padding
-    ox, oy = args.in_offset
-    step = cs + pad
-    cols = args.columns or (sw - ox + pad) // step
-    rows = (sh - oy + pad) // step
-    out_cs = args.out_cell_size or cs
-
-    out = Image.new("RGBA", (cols * out_cs, rows * out_cs), (0, 0, 0, 0))
-    for r in range(rows):
-        for c in range(cols):
-            x = ox + c * step
-            y = oy + r * step
-            if x + cs > sw or y + cs > sh:
-                continue
-            cell = src.crop((x, y, x + cs, y + cs))
-            if out_cs != cs:
-                cell = cell.resize((out_cs, out_cs), Image.NEAREST)
-            out.paste(cell, (c * out_cs, r * out_cs))
-    out.save(args.output)
-    print(f"wrote {args.output} — {cols}×{rows} cells @ {out_cs}px ({out.size[0]}×{out.size[1]} px)")
-
-if __name__ == "__main__":
-    main()
-```
-
-### `pack-sprites.py`
-
-Packs a list of individual PNGs into one uniform sheet.
-
-```python
-#!/usr/bin/env python3
-"""Pack individual sprite PNGs into one LumenDesigner sheet.
-
-Example:
-  pack-sprites.py --inputs ./out/*.png --output ./sheet.png \\
-                  --cell-size 8 --columns 8 --resize fit
-"""
-import argparse, glob, os
-from PIL import Image
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--inputs", nargs="+", required=True,
-                   help="Glob(s) or paths to individual sprite PNGs.")
-    p.add_argument("--output", required=True)
-    p.add_argument("--cell-size", type=int, required=True)
-    p.add_argument("--columns", type=int, required=True)
-    p.add_argument("--resize", choices=["fit", "stretch", "none"], default="fit")
-    args = p.parse_args()
-
-    paths = []
-    for pattern in args.inputs:
-        paths.extend(sorted(glob.glob(pattern)) if any(ch in pattern for ch in "*?[") else [pattern])
-    if not paths:
-        raise SystemExit("no input files matched")
-
-    cs = args.cell_size
-    cols = args.columns
-    rows = (len(paths) + cols - 1) // cols
-    out = Image.new("RGBA", (cols * cs, rows * cs), (0, 0, 0, 0))
-
-    for i, path in enumerate(paths):
-        img = Image.open(path).convert("RGBA")
-        if args.resize == "stretch":
-            img = img.resize((cs, cs), Image.NEAREST)
-        elif args.resize == "fit":
-            # Preserve aspect; pad with transparency.
-            w, h = img.size
-            scale = min(cs / w, cs / h)
-            nw, nh = max(1, round(w * scale)), max(1, round(h * scale))
-            img = img.resize((nw, nh), Image.NEAREST)
-            canvas = Image.new("RGBA", (cs, cs), (0, 0, 0, 0))
-            canvas.paste(img, ((cs - nw) // 2, (cs - nh) // 2))
-            img = canvas
-        # resize=none assumes the source is already cs×cs
-        r, c = divmod(i, cols)
-        out.paste(img, (c * cs, r * cs))
-
-    out.save(args.output)
-    print(f"wrote {args.output} — {len(paths)} sprites in {cols}×{rows} grid @ {cs}px")
-
-if __name__ == "__main__":
-    main()
-```
+Run either with `--help` for the full flag list.
 
 ### Generate the manifest stub
 
@@ -369,30 +344,56 @@ Don't ship sheets whose licence forbids redistribution. Keep purchased packs out
 
 ---
 
-## Worked example
+## Worked examples
 
-Imagine you downloaded `emoji-pack.png`: a 256×256 RGBA image with 16×16 cells arranged in 16 columns × 16 rows, with **1 px** of transparent padding between every cell, starting at offset `(1, 1)`. You want an 8×8 set for the 8×8 LUMATRIX.
+### Easy: `foods.png` — native 8×8, alpha, no padding
+
+The trivial happy path. Source is already what we want.
+
+User answers:
+- target cell size: 8
+- source @Nx: @1
+- padding: 0
+- offset: 0,0
+- background: alpha
+- colour mode: colourful
 
 ```bash
-# 1. Repack: strip padding, downscale 16→8.
+# Source is already aligned — just copy + register, or run repack with
+# matching in/out sizes (idempotent).
 python3 web-toolkit/scripts/repack-sprite-sheet.py \
-  --input  ~/Downloads/emoji-pack.png \
-  --output web-toolkit/public/sprites/8x8-emoji/sheet.png \
-  --in-cell-size 16 \
-  --in-padding 1 \
-  --in-offset 1,1 \
-  --out-cell-size 8
-
-# 2. Write the manifest (copy the template above, fill in names by
-#    scrolling through the cleaned sheet in any image viewer).
-
-# 3. Register the set.
-#    edit web-toolkit/src/lib/pixel-designer/sprites.ts → append
-#    "/sprites/8x8-emoji/manifest.json" to COLORFUL_MANIFEST_URLS.
-
-# 4. Open the designer.
-cd web-toolkit && npm run dev
-# → http://localhost:3000/designer → Sprites panel → pick "Emoji (8×8)".
+  --input ~/Downloads/foods.png \
+  --output web-toolkit/public/sprites/8x8-foods/sheet.png \
+  --in-cell-size 8 --in-padding 0 --in-offset 0,0
 ```
 
-Done. Total elapsed time once you have the source PNG: ~5 minutes plus however long it takes to name the cells.
+Then write `manifest.json` (`"size": 8`, `"colorful": true`, one `{name, row, col}` per cell) and add the URL to `COLORFUL_MANIFEST_URLS`.
+
+### Harder: `smileys.png` — @4× on black background with 12 px gutters
+
+User answers:
+- target cell size: 8
+- source @Nx: @4 (so each logical 8×8 sprite is 32×32 source pixels)
+- padding: 12 px between adjacent 32×32 cells
+- offset: 0,0
+- background: solid black `#000000` (no alpha)
+- colour mode: colourful
+
+```bash
+python3 web-toolkit/scripts/repack-sprite-sheet.py \
+  --input ~/Downloads/smileys.png \
+  --output web-toolkit/public/sprites/8x8-smileys/sheet.png \
+  --in-cell-size 32 \
+  --in-padding 12 \
+  --in-offset 0,0 \
+  --out-cell-size 8 \
+  --chroma-key '#000000'
+```
+
+Then write `manifest.json`, append the URL to `COLORFUL_MANIFEST_URLS`, refresh the designer.
+
+**Sanity-check after running**: open the cleaned `sheet.png` in any image viewer. Each cell should be 8×8, the background should be transparent (checkerboard pattern in most viewers), and the sprites should look recognisable. If the sprites' own black pixels got eaten, see the gotcha in Recipe F. If cell boundaries look off, double-check `--in-cell-size`, `--in-padding`, `--in-offset` against the source by counting pixels.
+
+---
+
+Total elapsed time once you have the source PNG + the answers above: ~5 minutes, mostly spent naming cells.
