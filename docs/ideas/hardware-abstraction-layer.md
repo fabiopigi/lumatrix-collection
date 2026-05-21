@@ -105,35 +105,175 @@ class Switch:
     def value(self) -> int: ...             # alias, for backward-compat
 ```
 
-### Sensors (future)
+### Analog inputs
+
+ADC handling is one of the places MicroPython diverges most across ports — Pico's `machine.ADC` exposes `.read_u16()` (0..65535 normalised), older ESP32 firmware historically only had `.read()` (0..4095 raw), and newer ESP32 builds support both. The HAL normalises this so apps see one shape:
+
+```python
+class AnalogInput:
+    def __init__(self, pin, vref=3.3): ...
+    def read(self) -> int: ...              # 0..65535, MP normalised convention
+    def read_v(self) -> float: ...          # 0.0..vref volts
+    def fraction(self) -> float: ...        # 0.0..1.0 — what most apps actually want
+```
+
+`fraction()` is the friendly one — most analog use-cases want *"where is this in its range"* not raw counts. Built on top:
+
+- **`AnalogStick(x: AnalogInput, y: AnalogInput, button: Button|None, deadzone=0.05)`** — a 2-axis stick (KY-023 style) exposing `.position() -> (-1.0..+1.0, -1.0..+1.0)` plus its optional digital press. Apps that want analogue movement use this; apps wired to a digital 5-way joystick keep using the `joystick` dict. A board may even synthesise a digital `Button` out of an `AnalogStick` so the existing 5-button contract keeps working.
+- **`AnalogMic(input: AnalogInput)`** — `.level() -> 0..1` for level-meter visuals. FFT-style apps want raw samples and need a higher-rate `.samples(n)` method; that's a more invasive backing (tight read loop or DMA on capable ports).
+- **`AnalogLight(input: AnalogInput)`** — photoresistor (LDR) wired as a voltage divider. Cheap alternative to a smart light sensor; same shape, lower accuracy.
+- **`Potentiometer(input: AnalogInput)`** — user-tunable dial; apps that want a hardware brightness/speed knob read `.fraction()`.
+
+### I²C buses and drivers
+
+Many "smart" peripherals — IMU, ambient-light sensor, I/O expanders driving alternative joysticks — share one I²C bus: a single SDA/SCL pair, 3.3 V, GND. The HAL **owns the bus**; drivers receive it as a constructor arg and never build their own.
+
+```python
+class I2CBus:
+    def __init__(self, peripheral_id, sda_pin, scl_pin, freq=400_000): ...
+    def scan(self) -> list[int]: ...
+    def writeto(self, addr, buf): ...
+    def readfrom(self, addr, n): ...
+    def writeto_mem(self, addr, reg, buf): ...
+    def readfrom_mem(self, addr, reg, n): ...
+```
+
+Thin wrapper over `machine.I2C`. The `Board` constructs each bus once; everything wired to that bus takes the reference. This prevents the classic foot-gun of two drivers each instantiating their own `I2C` peripheral and fighting over the same pins.
+
+Drivers built on the bus implement the existing HAL contracts (`Button`, `Switch`, `IMU`, …) so apps don't notice the difference:
+
+```python
+# python/hal/drivers/sx1509.py — 16-channel I/O expander
+class SX1509:
+    def __init__(self, bus, addr=0x3E): ...
+    def button(self, channel, active_low=True) -> Button: ...   # ← satisfies the Button contract
+    def switch(self, channel) -> Switch: ...
+
+# python/hal/drivers/mpu6050.py — 6-axis IMU
+class MPU6050:
+    def __init__(self, bus, addr=0x68): ...
+    def read(self) -> tuple: ...    # (ax, ay, az, gx, gy, gz) — m/s², rad/s
+```
+
+The "joystick via I²C" case is then literally:
+
+```python
+# inside boards/hub75_32x32.py
+i2c = I2CBus(0, sda_pin=Pin(8), scl_pin=Pin(9))
+exp  = SX1509(i2c)
+joystick = {
+    "up":     exp.button(0),
+    "down":   exp.button(1),
+    "left":   exp.button(2),
+    "right":  exp.button(3),
+    "center": exp.button(4),
+    "slide":  exp.switch(5),
+}
+```
+
+Apps and `_screens.py` see the same shape they always have. The choice of GPIO-vs-I²C lives in one file.
+
+Likely starter driver set (added as boards need them, not all on day one):
+
+| Class | Driver | Use |
+|---|---|---|
+| `Button` / `Switch` source | `SX1509`, `PCF8574`, `seesaw.Seesaw` | I²C joystick / button add-on boards |
+| `IMU` | `MPU6050`, `LSM6DS3`, `BNO055` | Tilt control, shake detect, on-board sensor fusion (BNO) |
+| `AmbientLight` (`.lux()`) | `BH1750`, `TSL2591` | Auto-brightness, ambient apps |
+| (gesture) | `APDS9960` | Hand-wave input — natural future capability |
+
+**Address conflicts** are a hardware concern, not a software one — every driver takes `addr=` with a sensible default; the board author moves things around if two devices clash. The HAL doesn't pretend to solve that for you.
+
+### Sensors
+
+With buses in place, "Sensors" is a thin namespace, not a separate subsystem. Sensor contracts:
 
 ```python
 class IMU:
-    def read(self) -> tuple: ...            # (ax, ay, az, gx, gy, gz)
+    def read(self) -> tuple: ...        # (ax, ay, az, gx, gy, gz)
+    # def orientation(self) -> tuple: ...   # only on fused sensors like BNO055
 
 class Mic:
-    def level(self) -> float: ...           # 0..1 amplitude
-    # def samples(self, n) -> array: ...    # optional, for FFT-style apps
+    def level(self) -> float: ...       # 0..1 amplitude
+    # def samples(self, n): ...         # optional, for FFT visualisations
 
 class AmbientLight:
     def lux(self) -> float: ...
 ```
 
-Sensors are **opt-in** — adding them to `run()` would break the contract. Apps that want them do `from hal import sensors; sensors.imu` and degrade gracefully on boards without one (the module returns `None` or a stub).
+These are satisfied by either an I²C driver (`MPU6050`, `BH1750`) or an analogue backing (`AnalogMic`, `AnalogLight`). Apps don't care which.
+
+Sensors are **opt-in** — adding them to `run()` would break the contract. Apps that want them import them: `from hal import sensors; sensors.imu`. Boards without a given sensor expose `None` for that slot; apps either check (`if sensors.imu is None: return early`) or fail loudly at import time.
+
+### Network
+
+WiFi is a **capability**: the board may or may not have it. The default LumaTrix kit (plain Pico) has none; Pico W and ESP32 do. Apps that want WiFi degrade gracefully if it isn't there — `board.network` is `None`.
+
+```python
+class Network:
+    def connect(self, ssid, password, timeout_ms=10_000) -> bool: ...
+    def is_connected(self) -> bool: ...
+    def ip(self) -> str | None: ...
+    def rssi(self) -> int | None: ...
+    def disconnect(self): ...
+```
+
+Thin wrapper over `network.WLAN(network.STA_IF)`. Higher layers stack on, all opt-in:
+
+```python
+class NTPClock:
+    def sync(self, server="pool.ntp.org", tz_offset_s=0) -> bool: ...
+
+class HTTPClient:               # thin wrapper over urequests
+    def get(self, url, **kw) -> dict: ...
+    def post(self, url, json=None, **kw) -> dict: ...
+
+class MQTTClient:               # thin wrapper over umqtt.simple
+    def __init__(self, broker, port=1883, client_id=None): ...
+    def publish(self, topic, payload): ...
+    def subscribe(self, topic, callback): ...
+```
+
+**Credentials** live in `/config.py` (which the flash wizard already writes). The board reads them at boot and exposes them as `board.wifi_credentials`; apps don't read config files directly.
+
+**Blocking is the hard problem.** The whole codebase is built on a synchronous frame loop with a strict joystick-responsiveness rule (`docs/AUTHORING.md`: never `sleep_ms` for more than 50 ms between input checks). Network calls regularly take seconds. Two patterns to pick from:
+
+- **Upfront blocking with a setup screen.** The watch app does `Connecting to WiFi…` then `Syncing time…` once on entry, then runs locally for the rest of the session. Suitable for occasional setup, not for in-game polling.
+- **Background scheduler.** `main.py` spins up an `asyncio` task that maintains WiFi state and refreshes data on a timer; apps poll `is_connected()` / `latest_value()` synchronously, never block. This unlocks live-data displays (weather, transit, status pages) but adds an event-loop layer beneath the current synchronous app model — a real architectural choice, worth its own follow-up doc when it lands.
+
+The natural first WiFi user is the **watch app** — NTP sync once on entry to replace the manual clock-set workflow.
+
+### Other transports (sketch)
+
+Mentioned for completeness — same "Board owns the bus, drivers take a reference" pattern, doesn't need to ship in the first cut:
+
+- **SPI buses.** `SPIBus(peripheral_id, sck, mosi, miso)` owned by `Board`. Backs SPI displays (SSD1306 OLED, ST7735 TFT, ePaper), SD-card storage, some IMUs at higher data rates than I²C allows.
+- **UART / serial.** Already used by `apps/letters.py` for serial-driven text. A `SerialInput` wrapper would let the simulator fake serial bytes the same way it fakes joystick presses, closing the "serial-only on hardware" gap noted in AUTHORING.
+- **PWM / audio out.** Buzzer for sound effects, servo for kinetic art pieces. `PWMOutput(pin, freq, duty)` is the contract; a `Buzzer.beep(hz, ms)` helper sits on top.
+- **I²S audio in.** Digital MEMS mics (INMP441, SPH0645) are I²S, not I²C — distinct bus, but the same ownership pattern: `I2SBus(...)` on the board, `I2SMic(bus)` as the driver.
 
 ### Board
 
 ```python
 # python/hal/board.py
 class Board:
-    display: Display                        # the W×H physical display
-    legacy_display: Display                 # 8×8 wrapper for classic apps (== display when native)
+    display: Display
+    legacy_display: Display                 # 8×8 wrapper for classic apps
     joystick: dict[str, Button | Switch]    # up/down/left/right/center (+ slide)
-    sensors: dict[str, Any]                 # imu / mic / light / ... — present only if wired
-    info: dict                              # {"id": "lumatrix", "label": "LumaTrix 8×8", ...}
+
+    # Shared buses — drivers take references, never construct their own
+    i2c: dict[str, I2CBus]                  # e.g. {"main": I2CBus(0, ...)}
+    spi: dict[str, SPIBus]
+
+    # Capability namespaces — only populated when the board actually has these
+    sensors: dict[str, IMU | Mic | AmbientLight | None]
+    network: Network | None
+    wifi_credentials: tuple[str, str] | None
+
+    info: dict                              # {"id": "lumatrix", "label": "...", ...}
 ```
 
-`Board` is constructed once at boot. `main.py` becomes the only place that cares about which board it's running on.
+`Board` is constructed once at boot and is the **only** place that knows which physical hardware is wired up. Per-board files (`boards/lumatrix.py`, `boards/hub75_32x32.py`) read like a wiring diagram in Python.
 
 ## Sketch — file structure
 
@@ -150,20 +290,39 @@ python/
       hub75_32x32.py         ← ESP32-S3 + HUB75 + I²C joystick + IMU (future)
     displays/
       ws2812.py
-      hub75.py               ← stub today; needs a custom MP firmware build
+      hub75.py               ← needs a custom MP firmware build
       legacy_8x8.py          ← _LegacyBuffer, renamed
     inputs/
       gpio_button.py
-      i2c_button.py          ← SX1509 / PCF8574 / seesaw
       touch_button.py
       switch.py
-    sensors/
-      imu.py                 ← MPU-6050 / LSM6DS driver
-      mic.py                 ← I²S MEMS or analog
-      light.py               ← BH1750 / TSL2591
+      analog_stick.py        ← 2-axis stick over two AnalogInputs
+    analog/
+      adc.py                 ← AnalogInput — normalises Pico vs ESP32 ADC quirks
+      mic.py                 ← AnalogMic (.level() / .samples(n))
+      light.py               ← AnalogLight (LDR voltage-divider)
+    buses/
+      i2c.py                 ← I2CBus, shared by all I²C drivers
+      spi.py                 ← SPIBus, shared by SPI displays / SD card / SPI IMUs
+    network/
+      wlan.py                ← Network — capability; None on boards without WiFi
+      ntp.py                 ← NTPClock
+      http.py                ← HTTPClient
+      mqtt.py                ← MQTTClient
+    drivers/
+      sx1509.py              ← I²C IO expander → Button / Switch sources
+      pcf8574.py             ← cheaper IO expander, same contract
+      seesaw.py              ← Adafruit programmable expander
+      mpu6050.py             ← I²C IMU
+      lsm6ds.py              ← I²C IMU (newer)
+      bno055.py              ← I²C IMU with onboard sensor fusion
+      bh1750.py              ← I²C ambient light
+      tsl2591.py             ← I²C ambient light (higher dynamic range)
   apps/
     *.py                     ← unchanged contract; no machine/neopixel imports
 ```
+
+Drivers land as boards need them, not all on day one. The namespacing matters more than the inventory — `inputs/` is for things that satisfy the existing input contracts directly, `analog/` is for ADC-backed peripherals, `buses/` is for shared transports, `drivers/` is where vendor-specific I²C/SPI chip code lives.
 
 ## Sketch — what an app file looks like after
 
@@ -216,6 +375,14 @@ Designed so each step is mergeable on its own and never breaks an existing app:
 - **Brightness as a HAL concern?** Both ws2812 and HUB75 want dimming, but today every screen / app does its own `BRIGHTNESS = 0.25` hex-dim. Centralising it on `Display.set_brightness()` is a cleanup worth doing alongside the HAL, but it's not strictly required for the abstraction. Keep optional.
 - **Memory budget on the Pico.** Adding a thin class layer over every `Pin` and `NeoPixel` has a tiny cost. On a Pico W with MicroPython this is fine, but worth measuring once the migration pilot is in.
 - **What's the smallest "interesting" second board?** Probably `esp32_devkit.py` with the same peripherals on different GPIOs. Proves the seam without HUB75 / I²C joystick complexity. Then layer HUB75 + I²C in a later round.
+- **I²C bus ownership and lifecycle.** Two drivers wired to one bus both want a reference at construction time. The `Board` constructs the bus once and passes the reference — but what about device hot-plug, error recovery (an unplugged sensor wedging the bus), or boards with multiple buses (e.g. one for inputs at 100 kHz, one for fast sensors at 400 kHz)? Lean: `board.i2c` is a dict keyed by bus name, single instance per bus, no hot-plug; bus errors propagate to the driver and the driver decides whether to retry or surface `None`.
+- **ADC normalisation cost.** Pico has 12-bit ADC, ESP32 historically 12-bit with worse linearity and a per-channel calibration table. Promising 0..65535 from `read()` means the HAL upscales raw counts and loses no info — but it doesn't make the signal cleaner. Should `AnalogInput` apply any smoothing (running average, deadband) or leave that to apps? Lean: no smoothing in the HAL — apps that care can wrap, apps that don't get raw.
+- **Blocking network calls vs. the joystick-responsiveness rule.** AUTHORING.md forbids `sleep_ms` longer than 50 ms in input-sensitive code. NTP sync, HTTP requests, MQTT connect can all block multi-second. Either (a) only call them from a dedicated "setup screen" where input is paused; or (b) move to an `asyncio`-based runtime where network lives on a background task. (b) is a real architectural shift that probably wants its own doc — lean on (a) for the first WiFi-using app (the watch).
+- **WiFi credentials surface.** Today's `/config.py` is plain Python. WiFi credentials in plain text on the device's filesystem is fine for a hobby kit and the LumenFlash wizard already writes config that way — but worth flagging as a "we know" rather than designing security in from scratch. AP-mode captive portal for first-run credential entry is a future idea, not a HAL concern.
+- **Drivers folder location.** `python/hal/drivers/` keeps everything hardware-facing under one root. Alternative: a sibling `python/drivers/` (matches the `lib/` convention some MicroPython codebases use). Lean: keep under `hal/` because drivers exist only to satisfy HAL contracts; a thing that isn't part of the HAL doesn't live there.
+- **Capability discovery.** How does an app ask *"is there an IMU on this board?"* — `board.sensors.get("imu") is not None`, an explicit `board.has("imu")` predicate, or a `try/except ImportError` on `from hal import sensors`? Lean: dict-with-`None`-values is the simplest, matches how `joystick["slide"]` already works for the slide-switch-or-not case.
+- **Should `Network` and `Sensors` be importable directly, or only via `board`?** `board.network` is consistent with everything else and forces the capability check. `from hal import network` would be more ergonomic but encourages apps to assume WiFi exists. Lean: `board`-based access for both, even if it costs a line of boilerplate.
+- **Per-driver subpackage vs flat `drivers/`.** A flat folder works at 10 drivers; at 50 it's noise. Defer the question — flat now, group by category (`drivers/imu/`, `drivers/expander/`) once a category grows past three files.
 
 ## Notes
 
