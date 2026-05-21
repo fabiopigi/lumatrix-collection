@@ -1,6 +1,6 @@
 # Share design via URL
 
-**Status:** raw idea
+**Status:** shipped (PR #16)
 **Tags:** web-toolkit, lumen-designer, sharing, ux
 
 ## What

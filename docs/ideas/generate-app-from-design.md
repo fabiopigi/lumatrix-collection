@@ -1,6 +1,6 @@
 # Generate app (JS + PY) directly from a design
 
-**Status:** raw idea
+**Status:** shipped (PR #19)
 **Tags:** web-toolkit, lumen-designer, simulator, flash, codegen, ux
 
 ## What

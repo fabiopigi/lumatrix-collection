@@ -1,6 +1,6 @@
 # LED (realistic) render mode
 
-**Status:** raw idea
+**Status:** shipped (PR #18)
 **Tags:** web-toolkit, lumen-designer, simulator, rendering, visual
 
 ## What

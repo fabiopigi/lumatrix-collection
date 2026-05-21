@@ -1,6 +1,6 @@
 # Local design storage
 
-**Status:** raw idea
+**Status:** shipped (PR #15)
 **Tags:** web-toolkit, lumen-designer, ux, persistence
 
 ## What

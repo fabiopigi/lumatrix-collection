@@ -1,6 +1,6 @@
 # Mobile swipe controls for the simulator
 
-**Status:** raw idea
+**Status:** shipped (PR #17)
 **Tags:** web-toolkit, simulator, mobile, ux, input
 
 ## What
