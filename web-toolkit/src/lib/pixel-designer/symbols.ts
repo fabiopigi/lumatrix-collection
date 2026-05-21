@@ -23,16 +23,25 @@ export const CLASSIC_SPRITE_DATA: Array<{ name: string; rows: string[] }> = [
   { name: "note",     rows: ["..XX.", "..X.X", "..X..", "XXX..", "XX..."] },
 ];
 
-/** Resolve a sprite's filled cells to absolute points on the canvas grid.
+/** Resolve a sprite's filled cells to absolute points on the canvas grid,
+ *  **centred on (cx, cy)** so the cursor lands inside the sprite rather
+ *  than at its top-left corner. For even sizes the geometric centre falls
+ *  between cells; we round down (floor(size/2)) so the cursor lands one
+ *  cell up-and-left of true centre, which matches how most paint tools
+ *  position even-sized stamps.
+ *
  *  Each point may carry its own colour (for colourful sprites) or none
- *  (the stamp tool falls back to the active brush colour). */
+ *  (the stamp tool falls back to the active brush colour). Out-of-bounds
+ *  points are still returned; callers filter against the canvas size. */
 export function spritePointsAt(
   pixels: (string | null)[],
   size: number,
-  x0: number,
-  y0: number,
+  cx: number,
+  cy: number,
   colorful: boolean,
 ): Array<Point & { color?: string }> {
+  const ox = cx - Math.floor(size / 2);
+  const oy = cy - Math.floor(size / 2);
   const out: Array<Point & { color?: string }> = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -40,8 +49,8 @@ export function spritePointsAt(
       if (!c) continue;
       out.push(
         colorful
-          ? { x: x0 + x, y: y0 + y, color: c }
-          : { x: x0 + x, y: y0 + y },
+          ? { x: ox + x, y: oy + y, color: c }
+          : { x: ox + x, y: oy + y },
       );
     }
   }
