@@ -20,6 +20,7 @@ Each idea lives in its own file. Use [`_template.md`](_template.md) when adding 
 | [LED (realistic) render mode](led-render-mode.md) | Third render mode that mimics how the physical LUMATRIX looks | shipped (#18) | web-toolkit, lumen-designer, simulator, rendering |
 | [Generate app from design](generate-app-from-design.md) | Deterministic JS + PY codegen from animated designs — no LLM needed | shipped (#19) | web-toolkit, lumen-designer, simulator, flash, codegen |
 | [ESP32 as a flash target](esp32-flash-target.md) | Add ESP32 alongside the Pico, keep MicroPython, abstract pins per-board | raw idea | hardware, flash, micropython, esp32, portability |
+| [Hardware abstraction layer](hardware-abstraction-layer.md) | Formal HAL so ws2812/HUB75/GPIO/I²C/sensor variants drop in without rewriting app code | exploring | hardware, micropython, architecture, portability, display, input, sensors |
 | [Share design via URL](share-design-via-url.md) | Encode a design into a link so opening it loads the design — no server | shipped (#16) | web-toolkit, lumen-designer, sharing, ux |
 | [Sensor inputs on the LUMATRIX](sensor-inputs.md) | Solder a sensor to exposed GPIO pads; expose cleanly in apps + simulator | raw idea | hardware, micropython, simulator, apps, input |
 | [Custom ESP32 + HUB75 32×32 board](custom-led-panel-board.md) | Wild: finished-product LED panel — preflashed, sensored, 32×32, but open underneath | raw idea | wild, hardware, product, esp32, hub75, sensors, business |
