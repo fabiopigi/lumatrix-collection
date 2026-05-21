@@ -97,6 +97,7 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
         lastBufferRef.current = buffer;
         const direct = buffer.length === display.width * display.height * 3;
         const isMask = modeRef.current === "mask" && isLumatrix(display);
+        const isLed = modeRef.current === "led";
 
         for (let py = 0; py < display.height; py++) {
           for (let px = 0; px < display.width; px++) {
@@ -134,6 +135,7 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
             const color = `rgb(${boostByte(r)},${boostByte(g)},${boostByte(b)})`;
             cell.classList.toggle("lit", lit);
             cell.classList.toggle("mask-mode", isMask);
+            cell.classList.toggle("led-mode", isLed);
 
             const ltrEl = cell.firstElementChild as HTMLElement | null;
             if (!ltrEl) continue;
@@ -172,7 +174,14 @@ export const SimulatorGrid = forwardRef<SimGridHandle, SimulatorGridProps>(
               cell.classList.remove("mask-blank");
               ltrEl.style.color = "";
               if (lit) {
-                cell.style.background = color;
+                // LED mode: leave background to the CSS gradient — only set
+                // --c so the gradient picks up the LED colour. Pixel mode
+                // keeps the flat inline background it always had.
+                if (isLed) {
+                  cell.style.removeProperty("background");
+                } else {
+                  cell.style.background = color;
+                }
                 cell.style.setProperty("--c", color);
               } else {
                 cell.style.removeProperty("background");
