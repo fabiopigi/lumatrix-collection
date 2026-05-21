@@ -1,6 +1,6 @@
 # LumenLab
 
-A browser toolkit and a MicroPython app collection for the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) kit — a Raspberry Pi Pico driving an 8×8 NeoPixel matrix with a 5-way joystick and a slide switch.
+A browser toolkit and a MicroPython app collection for LED-matrix kits such as the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) (Raspberry Pi Pico + 8×8 NeoPixel + 5-way joystick + slide switch). The toolkit supports a range of matrix sizes via hardware presets; the Pico apps and Hardware reference below are LUMATRIX-shaped, with [ESP32 / other targets](docs/ideas/esp32-flash-target.md) on the backlog.
 
 The fastest way to try it: open **[lumenlab.fabs.au](https://lumenlab.fabs.au)**, paint a few pages in LumenDesigner, hit *Export → Generate app → Add to Simulator*. No Pico required.
 
