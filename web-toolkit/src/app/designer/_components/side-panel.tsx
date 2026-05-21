@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { SYMBOLS } from "@/lib/pixel-designer/symbols";
 import type {
   Annotation,
+  Config,
+  DesignPage,
   FontKey,
   Mode,
   Selection,
 } from "@/lib/pixel-designer/types";
+import { PANEL_DEFAULT_OPEN } from "@/lib/pixel-designer/panel-state";
 import { FontPreviewModal } from "./font-preview-modal";
+import { PreviewPanelBody } from "./preview-panel-body";
 
 const FONT_OPTIONS: Array<{ value: FontKey; label: string }> = [
   { value: "3x5", label: "3×5  ·  fixed-width" },
@@ -63,6 +67,18 @@ interface SidePanelProps {
   onAddAnnotation: (text: string) => void;
   onUpdateAnnotation: (id: string, text: string) => void;
   onDeleteAnnotation: (id: string) => void;
+
+  // Animation preview — the source data the Preview panel renders. When
+  // `previewablePages` is empty (or less than 2), the panel still renders
+  // its header so the layout stays stable, but the body shows a hint.
+  previewablePages: DesignPage[];
+  previewPresetId: string;
+  previewConfig: Config;
+
+  // Persistent collapsed/expanded state. Keys are stable panel ids
+  // (kebab-case). Missing keys fall back to each panel's `defaultOpen`.
+  openPanels: Record<string, boolean>;
+  onTogglePanel: (id: string) => void;
 }
 
 export function SidePanel(props: SidePanelProps) {
@@ -78,12 +94,25 @@ export function SidePanel(props: SidePanelProps) {
     }
   };
 
+  // Preview is "ready" when there's a sequence to play AND every page has a
+  // variant for the active preset (so the same view holds the whole way).
+  // The Section is mounted regardless so its position in the panel order
+  // (and the user's open/closed preference) stay stable.
+  const previewReady =
+    props.previewablePages.length > 1 &&
+    props.previewablePages.every(
+      (p) => p.variants[props.previewPresetId],
+    );
+
   return (
+    <PanelStateContext.Provider
+      value={{ open: props.openPanels, onToggle: props.onTogglePanel }}
+    >
     <aside
       className="w-[340px] h-full bg-surface-1 border-l border-edge p-3.5 overflow-y-auto shrink-0"
       style={{ scrollbarGutter: "stable" }}
     >
-      <Section title="Mode">
+      <Section id="mode" title="Mode">
         <div className="toggle-row flex bg-sunken p-0.5 rounded-md border border-edge">
           <ToggleButton
             on={props.mode === "pixel"}
@@ -118,7 +147,22 @@ export function SidePanel(props: SidePanelProps) {
         </Tip>
       </Section>
 
-      <Section title="Color">
+      <Section id="preview" title="Preview" hint="play multi-page animation">
+        {previewReady ? (
+          <PreviewPanelBody
+            pages={props.previewablePages}
+            presetId={props.previewPresetId}
+            config={props.previewConfig}
+          />
+        ) : (
+          <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
+            Need at least 2 pages all sharing the active variant. Add a page or
+            an extra variant to start previewing.
+          </div>
+        )}
+      </Section>
+
+      <Section id="color" title="Color">
         <div className="flex items-center gap-2 mb-2">
           <label
             className="relative w-7 h-7 rounded-md border border-white/10 cursor-pointer block overflow-hidden"
@@ -183,7 +227,7 @@ export function SidePanel(props: SidePanelProps) {
         )}
       </Section>
 
-      <Section title="Text" hint="type then click on grid">
+      <Section id="text" title="Text" hint="type then click on grid">
         <div className="flex items-center gap-1.5 mb-1.5">
           <select
             value={props.font}
@@ -228,7 +272,7 @@ export function SidePanel(props: SidePanelProps) {
         />
       )}
 
-      <Section title="Symbols" hint="click then click grid">
+      <Section id="symbols" title="Symbols" hint="click then click grid">
         <div className="flex flex-wrap gap-[5px]">
           {Object.entries(SYMBOLS).map(([key, rows]) => (
             <button
@@ -258,7 +302,7 @@ export function SidePanel(props: SidePanelProps) {
         onDelete={props.onDeleteAnnotation}
       />
 
-      <Section title="Shortcuts">
+      <Section id="shortcuts" title="Shortcuts">
         <Tip>
           <Kbd>P</Kbd> pencil &nbsp; <Kbd>E</Kbd> eraser &nbsp; <Kbd>F</Kbd>{" "}
           fill &nbsp; <Kbd>I</Kbd> eyedrop
@@ -276,29 +320,68 @@ export function SidePanel(props: SidePanelProps) {
         </Tip>
       </Section>
     </aside>
+    </PanelStateContext.Provider>
   );
 }
 
+/** Context wiring the collapsed/expanded state of every Section in the
+ *  side-panel to a single source of truth held by `Designer`. The map is
+ *  the persisted localStorage map; missing entries fall back to each
+ *  Section's `defaultOpen` prop. */
+interface PanelStateCtx {
+  open: Record<string, boolean>;
+  onToggle: (id: string) => void;
+}
+const PanelStateContext = createContext<PanelStateCtx | null>(null);
+
 function Section({
+  id,
   title,
   hint,
   children,
 }: {
+  /** Stable kebab-case id; used as the localStorage key for persisting the
+   *  collapsed/expanded state. */
+  id: string;
   title: string;
   hint?: string;
   children: React.ReactNode;
 }) {
+  const ctx = useContext(PanelStateContext);
+  const fallback = PANEL_DEFAULT_OPEN[id] ?? true;
+  const open = ctx ? (ctx.open[id] ?? fallback) : fallback;
+  const headerId = `panel-${id}-header`;
+  const bodyId = `panel-${id}-body`;
   return (
-    <div className="mb-[18px]">
-      <div className="text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-2 font-semibold flex items-center gap-2">
-        {title}
+    <div className={open ? "mb-[18px]" : "mb-1.5"}>
+      <button
+        id={headerId}
+        type="button"
+        onClick={() => ctx?.onToggle(id)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        className="w-full flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-fg-faint mb-2 font-semibold cursor-pointer hover:text-foreground transition-colors text-left bg-transparent border-0 p-0 select-none"
+      >
+        <span
+          aria-hidden
+          className={`inline-block text-[9px] transition-transform duration-150 ${
+            open ? "rotate-90" : "rotate-0"
+          }`}
+        >
+          ▶
+        </span>
+        <span>{title}</span>
         {hint && (
           <span className="font-normal text-fg-faint normal-case tracking-normal text-[10px]">
             {hint}
           </span>
         )}
-      </div>
-      {children}
+      </button>
+      {open && (
+        <div id={bodyId} role="region" aria-labelledby={headerId}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -500,7 +583,7 @@ function AnnotationsSection({
     setDraft("");
   };
   return (
-    <Section title="Annotations" hint="label regions of the design">
+    <Section id="annotations" title="Annotations" hint="label regions of the design">
       <label className="flex items-center gap-2 mb-2 cursor-pointer select-none">
         <input
           type="checkbox"

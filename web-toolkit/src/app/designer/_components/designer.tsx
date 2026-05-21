@@ -96,7 +96,12 @@ import {
   type PageMetaPatch,
 } from "./page-meta-modal";
 import { PixelGrid } from "./pixel-grid";
-import { PlayPreviewPanel } from "./play-preview-panel";
+import {
+  loadPanelState,
+  PANEL_DEFAULT_OPEN,
+  type PanelState,
+  setPanelOpen,
+} from "@/lib/pixel-designer/panel-state";
 import { PaletteNameModal } from "./palette-name-modal";
 import { SidePanel, type PaletteSourceKey, type PaletteSourceOption } from "./side-panel";
 import { Toolbar } from "./toolbar";
@@ -429,7 +434,24 @@ export function Designer() {
   // Sidepanel collapses into a drawer below `lg`. State is harmless at lg+
   // because the drawer's positioning classes become inert at that breakpoint.
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Collapsed/expanded state for the side-panel sections. Persisted to
+  // localStorage so refreshing keeps the layout the user shaped.
+  const [panelState, setPanelStateBase] = useState<PanelState>({
+    schemaVersion: 1,
+    open: {},
+  });
+  const togglePanel = useCallback((id: string) => {
+    setPanelStateBase((prev) => {
+      const current = prev.open[id];
+      // Flip — if there's no entry yet, "current" is undefined; the section's
+      // own defaultOpen drives the initial render, so a missing entry means
+      // "matches default" and clicking should write the inverse.
+      const fallback = PANEL_DEFAULT_OPEN[id] ?? true;
+      const effective = typeof current === "boolean" ? current : fallback;
+      return setPanelOpen(prev, id, !effective);
+    });
+  }, []);
 
   // Page reorder drag state. `dragFromIdx` is the index being dragged;
   // `dragOverIdx` is the gap index where dropping would insert the page
@@ -670,6 +692,14 @@ export function Designer() {
     paletteLibraryRef.current = lib;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     _setPaletteLibraryBase(lib);
+  }, []);
+
+  // One-shot hydration of the collapsed/expanded panel state. Loaded after
+  // mount so SSR doesn't try to read localStorage; until this fires, every
+  // section uses its built-in default. The flicker is invisible in practice.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPanelStateBase(loadPanelState());
   }, []);
 
   // ============ autosave to the library ============
@@ -2026,15 +2056,6 @@ export function Designer() {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  // Play preview is available once there's a sequence to play AND the active
-  // preset exists on every page (so we can show one consistent variant the
-  // whole way through). The panel itself is guarded at the mount site —
-  // when the condition is false the panel unmounts, and reappears if the
-  // condition holds again while `previewOpen` is still true.
-  const canPreview =
-    design.pages.length > 1 &&
-    design.pages.every((p) => p.variants[activePreset]);
-
   const headerSlot = useHeaderActionsSlot();
   const currentRecord = library ? getCurrent(library) : null;
   const onScratch = library ? libIsScratch(library) : true;
@@ -2071,19 +2092,6 @@ export function Designer() {
       />
       <div className="w-px h-5 bg-edge mx-1" />
       <div className="flex gap-1.5">
-        <HeaderBtn
-          onClick={() => setPreviewOpen((v) => !v)}
-          disabled={!canPreview}
-          title={
-            canPreview
-              ? previewOpen
-                ? "Close play preview"
-                : "Play multi-page preview"
-              : "Need at least 2 pages all sharing the active variant"
-          }
-        >
-          {previewOpen ? "Hide preview" : "Play preview"}
-        </HeaderBtn>
         <HeaderBtn onClick={handleClear} title="Clear all (⌘⌫)">
           Clear
         </HeaderBtn>
@@ -2428,6 +2436,11 @@ export function Designer() {
             onAddAnnotation={addAnnotationFromSelection}
             onUpdateAnnotation={updateAnnotationText}
             onDeleteAnnotation={deleteAnnotation}
+            previewablePages={design.pages}
+            previewPresetId={activePreset}
+            previewConfig={config}
+            openPanels={panelState.open}
+            onTogglePanel={togglePanel}
           />
         </div>
       </div>
@@ -2547,14 +2560,6 @@ export function Designer() {
           setDeletePromptFor(null);
         }}
       />
-      {previewOpen && canPreview && (
-        <PlayPreviewPanel
-          pages={design.pages}
-          presetId={activePreset}
-          config={config}
-          onClose={() => setPreviewOpen(false)}
-        />
-      )}
       <DesignNameModal
         open={saveAsOpen}
         title="Save as"
