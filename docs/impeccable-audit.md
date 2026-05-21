@@ -49,7 +49,7 @@ Three specific shared-law violations break through:
 
 #### [P1] Modals are not announced as dialogs
 
-- **Location:** `web-toolkit/src/app/pixel-designer/_components/modal-shell.tsx` (used by every designer modal + flash-wizard's ErrorPanel-shaped dialogs)
+- **Location:** `web-toolkit/src/app/designer/_components/modal-shell.tsx` (used by every designer modal + flash-wizard's ErrorPanel-shaped dialogs)
 - **Category:** Accessibility
 - **Impact:** No `role="dialog"`, no `aria-modal="true"`, no focus trap, no focus return on close. Screen-reader users get no announcement; keyboard users can tab out into the background page.
 - **WCAG:** 4.1.2 (A), 2.4.3 (A)
@@ -58,7 +58,7 @@ Three specific shared-law violations break through:
 
 #### [P1] Simulator and Designer are desktop-only by accident
 
-- **Location:** `web-toolkit/src/app/simulator/_components/simulator.tsx:259-331` and `web-toolkit/src/app/pixel-designer/_components/designer.tsx:1636-1828`. `grep` for `sm:|md:|lg:|xl:` in either tree returns zero matches.
+- **Location:** `web-toolkit/src/app/simulator/_components/simulator.tsx:259-331` and `web-toolkit/src/app/designer/_components/designer.tsx:1636-1828`. `grep` for `sm:|md:|lg:|xl:` in either tree returns zero matches.
 - **Category:** Responsive
 - **Impact:** At ≤900 px the Designer's `w-14` toolbar + scrolling canvas + `w-[340px]` sidepanel collide; the Simulator's `flex items-start gap-8` with three children and a fixed `w-48` rail overflows. The joystick grid is hard-coded `grid-template-columns: repeat(3, 56px)`.
 - **Fix:** If desktop-only is the intent (Web Serial is Chromium-desktop anyway), at least gate with a "Use a desktop browser" notice ≤768 px. Otherwise: stack the Simulator panels vertically below `md`, collapse the Designer sidepanel into a sheet / drawer below `lg`, switch the joystick to `min(56px, calc((100vw - 4rem) / 5))`.

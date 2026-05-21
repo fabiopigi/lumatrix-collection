@@ -43,7 +43,7 @@ Variable, function, and constant names. Pure refactor if you rename them — no 
 | Identifier | File / line | Use |
 |---|---|---|
 | `LUMATRIX_MASK` | `web-toolkit/src/lib/pixel-designer/config.ts:3,22` | Default 8×8 word-clock letter mask. |
-| `LUMATRIX_MASK` | `web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:4,221` | Imported + used by the "Use LUMATRIX preset" button. |
+| `LUMATRIX_MASK` | `web-toolkit/src/app/designer/_components/config-modal.tsx:4,221` | Imported + used by the "Use LUMATRIX preset" button. |
 | `isLumatrix(cfg)` | `web-toolkit/src/lib/simulator/display-config.ts:98` | Predicate: is the configured display the native 8×8? |
 | `isLumatrix` | `web-toolkit/src/app/simulator/_components/simulator-grid.tsx:15,82` | Drives mask-mode rendering. |
 | `isLumatrix` | `web-toolkit/src/app/simulator/_components/simulator.tsx:7,50` | Gates mask-mode availability. |
@@ -57,8 +57,8 @@ These describe the LUMATRIX kit. Keep as-is unless you're rebranding the project
 
 | File / line | Use |
 |---|---|
-| `web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:224` | Button label "Use LUMATRIX preset". |
-| `web-toolkit/src/app/pixel-designer/_components/config-modal.tsx:242` | Button label "Reset to LUMATRIX defaults". |
+| `web-toolkit/src/app/designer/_components/config-modal.tsx:224` | Button label "Use LUMATRIX preset". |
+| `web-toolkit/src/app/designer/_components/config-modal.tsx:242` | Button label "Reset to LUMATRIX defaults". |
 | `web-toolkit/src/app/simulator/_components/mode-toggle.tsx:32` | Tooltip explaining mask mode is the LUMATRIX 8×8 word-clock layout. |
 | `shared/hardware-presets.json:5` | Preset label `"8×8 (LumaTrix)"` shown in dropdowns. |
 

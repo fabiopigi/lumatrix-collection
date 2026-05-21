@@ -1,6 +1,6 @@
 # LLM-ready instructions — build a LumenLab app without writing code
 
-Use this file to get a working LUMATRIX app out of an LLM (ChatGPT, Claude, Gemini, …) even if you don't program. You design the screens visually in [Pixel Designer](https://lumenlab.fabs.au/pixel-designer/), describe what the app should do, and the LLM walks you through a paced conversation that ends with everything you need to play, flash, and graduate the app.
+Use this file to get a working LUMATRIX app out of an LLM (ChatGPT, Claude, Gemini, …) even if you don't program. You design the screens visually in [Pixel Designer](https://lumen.fabs.au/designer/), describe what the app should do, and the LLM walks you through a paced conversation that ends with everything you need to play, flash, and graduate the app.
 
 ## How to use this file
 
@@ -14,7 +14,7 @@ Use this file to get a working LUMATRIX app out of an LLM (ChatGPT, Claude, Gemi
      - *"Cycle through these four pages every 2 seconds. Pressing left/right skips to the previous/next page."*
 4. The LLM walks you through four stages. **At every stage it ends with a question — answer it and keep going.**
    - **Stage 1 — Clarify.** The LLM may ask up to 3 short questions (app name, controls, win/lose, etc.). Answer them.
-   - **Stage 2 — Try it locally.** The LLM emits **`<name>.js`** and **`<name>.py`** plus 4–6 lines on how to load each into [LumenSimulator](https://lumenlab.fabs.au/simulator/) and [LumenFlash](https://lumenlab.fabs.au/flash/). Try them.
+   - **Stage 2 — Try it locally.** The LLM emits **`<name>.js`** and **`<name>.py`** plus 4–6 lines on how to load each into [LumenSimulator](https://lumen.fabs.au/simulator/) and [LumenFlash](https://lumen.fabs.au/flash/). Try them.
    - **Stage 3 — Iterate.** Reply with `"works"`, `"change X"`, or `"add Y"`. The LLM updates the `.js` and `.py` until you're happy.
    - **Stage 4 — Graduate.** When you say it's ready, the LLM emits **all five files** — `.js`, `.py`, `.ts`, `.md`, and an `INSTRUCTIONS.md` for your LumenLab maintainer — and offers to package them as a `<name>.zip` you can download in one click. Just reply with `zip` to get the archive, then email it.
 
@@ -53,12 +53,12 @@ If the description already covers everything you need, skip straight to stage 2.
 Produce **only `<name>.js` and `<name>.py`** in one message, plus a short *How to test it* block of 4–6 lines:
 
 > **Try it in the simulator** (no flashing required):
-> 1. Open <https://lumenlab.fabs.au/simulator/>.
+> 1. Open <https://lumen.fabs.au/simulator/>.
 > 2. In the *Custom apps* panel → *Add custom app* → paste `<name>.js` → Save.
 > 3. Select `<NAME>` from the on-display launcher menu or the quick-launch rail.
 >
 > **Flash it to the Pico** (when the simulator looks right):
-> 1. Open <https://lumenlab.fabs.au/flash/>.
+> 1. Open <https://lumen.fabs.au/flash/>.
 > 2. In the *Apps* step → *Add custom .py* → paste `<name>.py` → Continue → Flash.
 
 Do **not** emit the `.ts`, the `.md`, or the maintainer instructions in this stage. They're stage-4 outputs.

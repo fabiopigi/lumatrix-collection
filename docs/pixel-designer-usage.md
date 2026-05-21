@@ -2,7 +2,7 @@
 
 A pixel-art designer for LED matrix displays, originally written for the ZHAW **LUMATRIX** 8×8 NeoPixel kit but configurable for any matrix size, color mode, and LED-chain layout.
 
-Lives in `web-toolkit/src/app/pixel-designer/` as **LumenDesigner**, a route in the LumenLab Next.js app. Run `cd web-toolkit && npm run dev` and visit [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer).
+Lives in `web-toolkit/src/app/designer/` as **LumenDesigner**, a route in the LumenLab Next.js app. Run `cd web-toolkit && npm run dev` and visit [http://localhost:3000/designer](http://localhost:3000/designer).
 
 ![Pixel Designer — main view with two pages](docs/images/pixel-designer-basic.png)
 
@@ -32,7 +32,7 @@ Lives in `web-toolkit/src/app/pixel-designer/` as **LumenDesigner**, a route in 
 ## Quick start
 
 1. Start the LumenLab dev server: `cd web-toolkit && npm run dev`.
-2. Open [http://localhost:3000/pixel-designer](http://localhost:3000/pixel-designer) in a current Chrome, Safari, or Firefox.
+2. Open [http://localhost:3000/designer](http://localhost:3000/designer) in a current Chrome, Safari, or Firefox.
 3. Pick a color from the palette on the right.
 4. Click and drag on the grid to paint pixels.
 5. Hit **Export** in the side panel to dump JSON, or **PNG** in the header for an image.
@@ -514,7 +514,7 @@ The Text tool stamps on **click**. Type in the field → hover the grid to see a
 LumaMatrix/
 ├── web-toolkit/                # LumenLab Next.js app
 │   └── src/
-│       ├── app/pixel-designer/ # LumenDesigner route (this tool)
+│       ├── app/designer/       # LumenDesigner route (this tool)
 │       ├── app/simulator/      # LumenSimulator route
 │       └── lib/pixel-designer/ # designer libs (palette, geometry, fonts, …)
 ├── shared/

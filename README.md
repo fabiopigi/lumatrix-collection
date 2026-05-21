@@ -2,7 +2,7 @@
 
 A browser toolkit and a MicroPython app collection for LED-matrix kits such as the [ZHAW LUMATRIX](https://lumatrix.zhaw.ch) (Raspberry Pi Pico + 8×8 NeoPixel + 5-way joystick + slide switch). The toolkit supports a range of matrix sizes via hardware presets; the Pico apps and Hardware reference below are LUMATRIX-shaped, with [ESP32 / other targets](docs/ideas/esp32-flash-target.md) on the backlog.
 
-The fastest way to try it: open **[lumenlab.fabs.au](https://lumenlab.fabs.au)**, paint a few pages in LumenDesigner, hit *Export → Generate app → Add to Simulator*. No Pico required.
+The fastest way to try it: open **[lumen.fabs.au](https://lumen.fabs.au)**, paint a few pages in LumenDesigner, hit *Export → Generate app → Add to Simulator*. No Pico required.
 
 ![device](https://lumatrix.zhaw.ch)
 
@@ -12,10 +12,10 @@ Four browser apps live under `web-toolkit/` (Next.js). Run `cd web-toolkit && np
 
 | Tool | What it does |
 | --- | --- |
-| **[LumenSimulator](https://lumenlab.fabs.au/simulator)** | Boot the launcher and run apps in your browser. Virtual joystick, keyboard shortcuts, mobile swipe gestures. Three render modes: flat pixels, realistic LEDs, or the word-clock letter mask. Drop in your own JS apps. |
-| **[LumenDesigner](https://lumenlab.fabs.au/pixel-designer)** | Paint pixels, build multi-frame animations with per-frame timing and fade-in, save designs to a named library, share via a hash-fragment URL, export JSON / PNG, and generate runnable apps (JS + Python) from frame loops. |
-| **[LumenCreate](https://lumenlab.fabs.au/create)** | Two paths to your own app, tabbed. *Pure animation*: Designer → Export → Generate, no code. *Interactive app*: hand the bundled LLM prompt to an AI chat, attach your design + a description, iterate in the simulator. |
-| **[LumenFlash](https://lumenlab.fabs.au/flash)** | Browser-based Pico installer over Web Serial. Pick hardware + apps, plug your Pico into USB, click Flash. Custom Python apps (from LumenCreate or your own) slot in next to the built-ins. |
+| **[LumenSimulator](https://lumen.fabs.au/simulator)** | Boot the launcher and run apps in your browser. Virtual joystick, keyboard shortcuts, mobile swipe gestures. Three render modes: flat pixels, realistic LEDs, or the word-clock letter mask. Drop in your own JS apps. |
+| **[LumenDesigner](https://lumen.fabs.au/designer)** | Paint pixels, build multi-frame animations with per-frame timing and fade-in, save designs to a named library, share via a hash-fragment URL, export JSON / PNG, and generate runnable apps (JS + Python) from frame loops. |
+| **[LumenCreate](https://lumen.fabs.au/create)** | Two paths to your own app, tabbed. *Pure animation*: Designer → Export → Generate, no code. *Interactive app*: hand the bundled LLM prompt to an AI chat, attach your design + a description, iterate in the simulator. |
+| **[LumenFlash](https://lumen.fabs.au/flash)** | Browser-based Pico installer over Web Serial. Pick hardware + apps, plug your Pico into USB, click Flash. Custom Python apps (from LumenCreate or your own) slot in next to the built-ins. |
 
 ## Pico apps
 
@@ -39,7 +39,7 @@ Four browser apps live under `web-toolkit/` (Next.js). Run `cd web-toolkit && np
 
 ## Getting an app onto the device
 
-**Easiest (browser-only):** open [LumenFlash](https://lumenlab.fabs.au/flash), plug your Pico into USB, pick the apps you want, click Flash. Requires MicroPython firmware already on the Pico and a Chromium-based browser (Web Serial). Custom apps you've generated from LumenDesigner or written via LumenCreate appear in the same list alongside the built-ins.
+**Easiest (browser-only):** open [LumenFlash](https://lumen.fabs.au/flash), plug your Pico into USB, pick the apps you want, click Flash. Requires MicroPython firmware already on the Pico and a Chromium-based browser (Web Serial). Custom apps you've generated from LumenDesigner or written via LumenCreate appear in the same list alongside the built-ins.
 
 **Manual (Thonny or similar):**
 
@@ -82,9 +82,9 @@ LumaMatrix/
 
 Three paths, in increasing order of effort:
 
-**1. Pure frame-loop animation — no code.** Design pages in [LumenDesigner](https://lumenlab.fabs.au/pixel-designer), set per-page duration and optional fade-in via the ⓘ button, then hit *Export → Generate app*. The generator emits both the JS (for the simulator) and the Python (for the Pico), and one click installs them into LumenSimulator or LumenFlash. See [LumenCreate's *Pure animation* tab](https://lumenlab.fabs.au/create?tab=animation) for the walkthrough.
+**1. Pure frame-loop animation — no code.** Design pages in [LumenDesigner](https://lumen.fabs.au/designer), set per-page duration and optional fade-in via the ⓘ button, then hit *Export → Generate app*. The generator emits both the JS (for the simulator) and the Python (for the Pico), and one click installs them into LumenSimulator or LumenFlash. See [LumenCreate's *Pure animation* tab](https://lumen.fabs.au/create?tab=animation) for the walkthrough.
 
-**2. Interactive app (input, state, game logic) — LLM-assisted.** Use the [*Interactive app* tab](https://lumenlab.fabs.au/create?tab=interactive). Hand the bundled prompt to any modern LLM, attach a JSON export of your design (optional) and a one-paragraph description, iterate until happy. The AI emits both JS and Python files matching the same contracts the built-ins use.
+**2. Interactive app (input, state, game logic) — LLM-assisted.** Use the [*Interactive app* tab](https://lumen.fabs.au/create?tab=interactive). Hand the bundled prompt to any modern LLM, attach a JSON export of your design (optional) and a one-paragraph description, iterate until happy. The AI emits both JS and Python files matching the same contracts the built-ins use.
 
 **3. By hand.** [docs/AUTHORING.md](docs/AUTHORING.md) covers the 3-screen lifecycle (loading → app → game-over), shared modules, coordinate systems, joystick input patterns, scoring methodology, and per-app documentation requirements. Copy the closest existing app's `.py` and `.md` files as a starting point.
 

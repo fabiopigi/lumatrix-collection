@@ -8,7 +8,7 @@ import { useRegisterHeaderActionsSlot } from "@/components/header-actions-slot";
 const NAV_LINKS = [
   { href: "/", label: "LumenLab" },
   { href: "/simulator", label: "LumenSimulator" },
-  { href: "/pixel-designer", label: "LumenDesigner" },
+  { href: "/designer", label: "LumenDesigner" },
   { href: "/create", label: "LumenCreate" },
   { href: "/flash", label: "LumenFlash" },
 ];
@@ -16,7 +16,7 @@ const NAV_LINKS = [
 function titleSuffixForPath(pathname: string | null): string {
   if (!pathname) return "Lab";
   if (pathname.startsWith("/create")) return "Create";
-  if (pathname.startsWith("/pixel-designer")) return "Designer";
+  if (pathname.startsWith("/designer")) return "Designer";
   if (pathname.startsWith("/simulator")) return "Simulator";
   if (pathname.startsWith("/flash")) return "Flash";
   return "Lab";

@@ -24,7 +24,7 @@ The numbers work out easily:
 
 Likely shape:
 
-- A `#d=<payload>` fragment on a deep-link route (e.g. `/pixel-designer#d=…`) — the `#` keeps the payload client-side and out of server logs.
+- A `#d=<payload>` fragment on a deep-link route (e.g. `/designer#d=…`) — the `#` keeps the payload client-side and out of server logs.
 - "Copy share link" button in the designer. Opens to the design preloaded; recipient can fork into their library if [[local-design-storage]] exists.
 - Version byte at the start of the payload so future format changes don't break old links.
 - **Fallback for huge designs:** if the encoded payload exceeds a threshold (say 6 KB), offer a "short code" that resolves to a static JSON in the repo / CDN. Out of scope for v1 — the URL-only path covers the vast majority.

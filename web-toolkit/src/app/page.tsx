@@ -56,7 +56,7 @@ export default function Home() {
           summary="Boot the launcher and run apps in your browser with a virtual joystick and slide switch."
         />
         <Tool
-          href="/pixel-designer"
+          href="/designer"
           name="Designer"
           summary="Paint pixels, draw shapes, stamp symbols and text, export to JSON or PNG."
         />

@@ -68,7 +68,7 @@ const T: Record<Lang, Translations> = {
             title: "Design your frames",
             body: (L) => (
               <>
-                Open <L href="/pixel-designer">LumenDesigner</L>. Each page
+                Open <L href="/designer">LumenDesigner</L>. Each page
                 becomes one frame of the animation. Add as many pages as you
                 need; reorder them by dragging the row handle.
               </>
@@ -146,7 +146,7 @@ const T: Record<Lang, Translations> = {
               <>
                 If your app has fixed visuals (a clock face, a game-over
                 banner, animation frames), paint them in{" "}
-                <L href="/pixel-designer">LumenDesigner</L> and export the
+                <L href="/designer">LumenDesigner</L> and export the
                 JSON. Skip this step if the visuals are fully algorithmic
                 (random pixels, sliding bars, etc.).
               </>
@@ -278,7 +278,7 @@ const T: Record<Lang, Translations> = {
             title: "Gestalte deine Frames",
             body: (L) => (
               <>
-                Öffne <L href="/pixel-designer">LumenDesigner</L>. Jede Seite
+                Öffne <L href="/designer">LumenDesigner</L>. Jede Seite
                 wird zu einem Frame der Animation. Füge so viele Seiten hinzu,
                 wie du brauchst, und sortiere sie über den Ziehgriff in der
                 Zeile um.
@@ -359,7 +359,7 @@ const T: Record<Lang, Translations> = {
               <>
                 Wenn deine App feste Bilder hat (ein Ziffernblatt, ein
                 Game-Over-Banner, Animations-Frames), male sie im{" "}
-                <L href="/pixel-designer">LumenDesigner</L> und exportiere
+                <L href="/designer">LumenDesigner</L> und exportiere
                 das JSON. Überspring diesen Schritt, wenn die Visuals
                 komplett algorithmisch sind (Zufallspixel, gleitende Balken
                 usw.).
