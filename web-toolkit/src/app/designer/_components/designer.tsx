@@ -45,7 +45,17 @@ import {
   COLOR_MODES,
   getDefaultColor,
   getPalette,
+  usedOnCanvasColors,
 } from "@/lib/pixel-designer/palette";
+import {
+  deletePalette as deletePaletteRecord,
+  listPalettes,
+  loadPaletteLibrary,
+  nextUntitledName as nextUntitledPaletteName,
+  type PaletteLibrary,
+  renamePalette as renamePaletteRecord,
+  savePalette as savePaletteRecord,
+} from "@/lib/pixel-designer/palette-library";
 import { symbolPoints } from "@/lib/pixel-designer/symbols";
 import type {
   Annotation,
@@ -87,7 +97,8 @@ import {
 } from "./page-meta-modal";
 import { PixelGrid } from "./pixel-grid";
 import { PlayPreviewPanel } from "./play-preview-panel";
-import { SidePanel } from "./side-panel";
+import { PaletteNameModal } from "./palette-name-modal";
+import { SidePanel, type PaletteSourceKey, type PaletteSourceOption } from "./side-panel";
 import { Toolbar } from "./toolbar";
 import { VariantPicker } from "./variant-picker";
 import { VariantsStrip } from "./variants-strip";
@@ -462,6 +473,32 @@ export function Designer() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteDesignOpen, setDeleteDesignOpen] = useState(false);
 
+  // Custom palette library — separate localStorage blob from the design
+  // library. Mirrors `library` above: state for reactive UI plus a ref so
+  // synchronous handlers can read the latest value.
+  const [paletteLibrary, _setPaletteLibraryBase] =
+    useState<PaletteLibrary | null>(null);
+  const paletteLibraryRef = useRef<PaletteLibrary | null>(null);
+  const setPaletteLibrary = useCallback(
+    (updater: PaletteLibrary | ((prev: PaletteLibrary) => PaletteLibrary)) => {
+      _setPaletteLibraryBase((prev) => {
+        if (!prev) return prev;
+        const next =
+          typeof updater === "function"
+            ? (updater as (p: PaletteLibrary) => PaletteLibrary)(prev)
+            : updater;
+        paletteLibraryRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+  const [paletteSource, setPaletteSource] =
+    useState<PaletteSourceKey>("default");
+  const [savePaletteOpen, setSavePaletteOpen] = useState(false);
+  const [renamePaletteOpen, setRenamePaletteOpen] = useState(false);
+  const [deletePaletteOpen, setDeletePaletteOpen] = useState(false);
+
   const isDownRef = useRef(false);
   const dragModeRef = useRef<DragMode>(null);
   const dragStartRef = useRef<Point | null>(null);
@@ -486,7 +523,42 @@ export function Designer() {
   );
   const step = cellSize + CELL_GAP;
 
-  const palette = useMemo(() => getPalette(config.colorMode), [config.colorMode]);
+  const defaultPalette = useMemo(
+    () => getPalette(config.colorMode),
+    [config.colorMode],
+  );
+  const usedPalette = useMemo(() => usedOnCanvasColors(design), [design]);
+  const customPalettes = useMemo(
+    () => (paletteLibrary ? listPalettes(paletteLibrary) : []),
+    [paletteLibrary],
+  );
+  const activeCustomPalette = useMemo(() => {
+    if (!paletteSource.startsWith("custom:")) return null;
+    const id = paletteSource.slice("custom:".length);
+    return paletteLibrary?.palettes[id] ?? null;
+  }, [paletteSource, paletteLibrary]);
+  // Resolve the swatches the side-panel should render. If the source is a
+  // custom palette that's since been deleted, fall back to default rather
+  // than rendering an empty / stale grid.
+  const palette = useMemo<string[]>(() => {
+    if (paletteSource === "default") return defaultPalette;
+    if (paletteSource === "used") return usedPalette;
+    return activeCustomPalette?.colors ?? defaultPalette;
+  }, [paletteSource, defaultPalette, usedPalette, activeCustomPalette]);
+  const paletteOptions = useMemo<PaletteSourceOption[]>(() => {
+    const opts: PaletteSourceOption[] = [
+      { value: "default", label: "Default", group: "builtin" },
+      { value: "used", label: "Used on canvas", group: "builtin" },
+    ];
+    for (const p of customPalettes) {
+      opts.push({
+        value: `custom:${p.id}` as PaletteSourceKey,
+        label: p.name,
+        group: "custom",
+      });
+    }
+    return opts;
+  }, [customPalettes]);
   const maskAvailable = useMemo(() => isMaskAvailable(config), [config]);
 
   const activePresetLabel = useMemo(() => {
@@ -589,6 +661,15 @@ export function Designer() {
     setHistoryIndex(0);
     /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // One-shot hydration of the custom palette library. Separate localStorage
+  // key, so it's loaded independently of the design library.
+  useEffect(() => {
+    const lib = loadPaletteLibrary();
+    paletteLibraryRef.current = lib;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    _setPaletteLibraryBase(lib);
   }, []);
 
   // ============ autosave to the library ============
@@ -1900,6 +1981,44 @@ export function Designer() {
     [adoptDesign],
   );
 
+  // ============ palette library handlers ============
+
+  const handleSavePalette = useCallback(
+    (name: string) => {
+      if (!paletteLibraryRef.current) return;
+      const { library: nextLib, id } = savePaletteRecord(
+        paletteLibraryRef.current,
+        name,
+        palette,
+      );
+      paletteLibraryRef.current = nextLib;
+      _setPaletteLibraryBase(nextLib);
+      setPaletteSource(`custom:${id}`);
+      setSavePaletteOpen(false);
+    },
+    [palette],
+  );
+
+  const handleRenamePalette = useCallback(
+    (name: string) => {
+      if (!paletteLibraryRef.current) return;
+      if (!paletteSource.startsWith("custom:")) return;
+      const id = paletteSource.slice("custom:".length);
+      setPaletteLibrary((lib) => renamePaletteRecord(lib, id, name));
+      setRenamePaletteOpen(false);
+    },
+    [paletteSource, setPaletteLibrary],
+  );
+
+  const handleDeletePalette = useCallback(() => {
+    if (!paletteLibraryRef.current) return;
+    if (!paletteSource.startsWith("custom:")) return;
+    const id = paletteSource.slice("custom:".length);
+    setPaletteLibrary((lib) => deletePaletteRecord(lib, id));
+    setPaletteSource("default");
+    setDeletePaletteOpen(false);
+  }, [paletteSource, setPaletteLibrary]);
+
   // ============ derived UI ============
 
   const stCell = hover ? `${hover.x},${hover.y}` : "—";
@@ -2283,6 +2402,12 @@ export function Designer() {
             onMode={setMode}
             color={color}
             palette={palette}
+            paletteSource={paletteSource}
+            paletteOptions={paletteOptions}
+            onPaletteSource={setPaletteSource}
+            onSavePalette={() => setSavePaletteOpen(true)}
+            onRenamePalette={() => setRenamePaletteOpen(true)}
+            onDeletePalette={() => setDeletePaletteOpen(true)}
             onColor={setColor}
             font={font}
             text={text}
@@ -2467,6 +2592,31 @@ export function Designer() {
           onConfirm={handleDeleteDesign}
         />
       )}
+      <PaletteNameModal
+        open={savePaletteOpen}
+        title="Save palette as"
+        initialValue={
+          paletteLibrary ? nextUntitledPaletteName(paletteLibrary) : "Untitled palette"
+        }
+        confirmLabel="Save"
+        onClose={() => setSavePaletteOpen(false)}
+        onConfirm={handleSavePalette}
+      />
+      <PaletteNameModal
+        open={renamePaletteOpen}
+        title="Rename palette"
+        initialValue={activeCustomPalette?.name ?? ""}
+        confirmLabel="Rename"
+        onClose={() => setRenamePaletteOpen(false)}
+        onConfirm={handleRenamePalette}
+      />
+      {deletePaletteOpen && activeCustomPalette && (
+        <DeletePaletteConfirm
+          name={activeCustomPalette.name}
+          onCancel={() => setDeletePaletteOpen(false)}
+          onConfirm={handleDeletePalette}
+        />
+      )}
     </div>
   );
 }
@@ -2488,6 +2638,44 @@ function DeleteDesignConfirm({
         <span className="font-mono text-fg-2">&ldquo;{name}&rdquo;</span> from
         your library. You&apos;ll land on the scratch canvas. This can&apos;t
         be undone.
+      </p>
+      <div className="flex justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="px-3 py-1.5 rounded text-xs cursor-pointer bg-danger-soft border border-danger-line text-danger font-semibold hover:bg-danger-soft hover:border-danger"
+        >
+          Delete
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function DeletePaletteConfirm({
+  name,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ModalShell onClose={onCancel} label="Delete palette" width={400}>
+      <h2 className="m-0 mb-2 text-[13px] font-semibold">Delete palette?</h2>
+      <p className="text-[12px] text-muted leading-relaxed mb-4">
+        Removes{" "}
+        <span className="font-mono text-fg-2">&ldquo;{name}&rdquo;</span> from
+        your palette library. The swatch grid will switch back to the default
+        palette. This can&apos;t be undone.
       </p>
       <div className="flex justify-end gap-1.5">
         <button

@@ -1,4 +1,4 @@
-import type { ColorMode } from "./types";
+import type { ColorMode, Design } from "./types";
 
 export function ramp(hex: string, steps = 16): string[] {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -80,4 +80,24 @@ export function getPalette(mode: ColorMode): string[] {
 
 export function getDefaultColor(mode: ColorMode): string {
   return COLOR_MODES[mode]?.default ?? "#ff4000";
+}
+
+/** Collect every distinct non-empty pixel colour across the whole design —
+ *  all pages × all variants — and return them most-frequent first. The
+ *  designer surfaces this as the "Used on canvas" palette source so the
+ *  swatch grid mirrors what's already on the artwork. */
+export function usedOnCanvasColors(design: Design): string[] {
+  const counts = new Map<string, number>();
+  for (const page of design.pages) {
+    for (const variant of Object.values(page.variants)) {
+      for (const c of variant.pixels) {
+        if (!c) continue;
+        const k = c.toLowerCase();
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([c]) => c);
 }

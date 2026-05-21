@@ -16,6 +16,19 @@ const FONT_OPTIONS: Array<{ value: FontKey; label: string }> = [
   { value: "7x9", label: "7×9  ·  proportional (Jersey 10)" },
 ];
 
+/** Encoding of which palette source feeds the swatch grid:
+ *  - "default": the per-color-mode built-in palette
+ *  - "used":    the auto-derived "colours already painted on the canvas"
+ *  - "custom:<id>": one of the user's saved palettes, identified by id */
+export type PaletteSourceKey = "default" | "used" | `custom:${string}`;
+
+export interface PaletteSourceOption {
+  /** Value used in the <select>. Matches PaletteSourceKey. */
+  value: PaletteSourceKey;
+  label: string;
+  group: "builtin" | "custom";
+}
+
 interface SidePanelProps {
   mode: Mode;
   maskAvailable: boolean;
@@ -23,6 +36,16 @@ interface SidePanelProps {
 
   color: string;
   palette: string[];
+  paletteSource: PaletteSourceKey;
+  paletteOptions: PaletteSourceOption[];
+  onPaletteSource: (source: PaletteSourceKey) => void;
+  /** Save the *visible* swatches as a new named custom palette. Parent opens
+   *  the name-input modal. Always enabled. */
+  onSavePalette: () => void;
+  /** Rename the active palette. Parent only wires this when source is custom. */
+  onRenamePalette: () => void;
+  /** Delete the active palette. Parent only wires this when source is custom. */
+  onDeletePalette: () => void;
   onColor: (c: string) => void;
 
   font: FontKey;
@@ -122,25 +145,42 @@ export function SidePanel(props: SidePanelProps) {
             className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1.5 rounded font-mono text-xs uppercase outline-none focus:border-cta focus:bg-input-focus select-text"
           />
         </div>
-        <div className="grid grid-cols-8 gap-1">
-          {props.palette.map((c) => {
-            const selected = c.toLowerCase() === props.color.toLowerCase();
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => props.onColor(c)}
-                title={c.toUpperCase()}
-                style={{ background: c }}
-                className={`aspect-square rounded-md border cursor-pointer transition-transform hover:scale-110 ${
-                  selected
-                    ? "border-accent shadow-[0_0_0_2px_#6cf,0_0_8px_rgba(108,204,255,0.4)]"
-                    : "border-white/[0.06]"
-                }`}
-              />
-            );
-          })}
-        </div>
+        <PaletteSourcePicker
+          source={props.paletteSource}
+          options={props.paletteOptions}
+          onSource={props.onPaletteSource}
+          paletteSize={props.palette.length}
+          onSave={props.onSavePalette}
+          onRename={props.onRenamePalette}
+          onDelete={props.onDeletePalette}
+        />
+        {props.palette.length === 0 ? (
+          <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
+            {props.paletteSource === "used"
+              ? "No colours on the canvas yet — paint something to populate this palette."
+              : "This palette is empty."}
+          </div>
+        ) : (
+          <div className="grid grid-cols-8 gap-1">
+            {props.palette.map((c, i) => {
+              const selected = c.toLowerCase() === props.color.toLowerCase();
+              return (
+                <button
+                  key={`${c}-${i}`}
+                  type="button"
+                  onClick={() => props.onColor(c)}
+                  title={c.toUpperCase()}
+                  style={{ background: c }}
+                  className={`aspect-square rounded-md border cursor-pointer transition-transform hover:scale-110 ${
+                    selected
+                      ? "border-accent shadow-[0_0_0_2px_#6cf,0_0_8px_rgba(108,204,255,0.4)]"
+                      : "border-white/[0.06]"
+                  }`}
+                />
+              );
+            })}
+          </div>
+        )}
       </Section>
 
       <Section title="Text" hint="type then click on grid">
@@ -329,6 +369,109 @@ function SymbolSvg({ rows }: { rows: string[] }) {
 
 function normalizeHex(c: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#ff0000";
+}
+
+function PaletteSourcePicker({
+  source,
+  options,
+  onSource,
+  paletteSize,
+  onSave,
+  onRename,
+  onDelete,
+}: {
+  source: PaletteSourceKey;
+  options: PaletteSourceOption[];
+  onSource: (s: PaletteSourceKey) => void;
+  paletteSize: number;
+  onSave: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const isCustom = source.startsWith("custom:");
+  // "Save" is meaningful when there are swatches to capture. The default
+  // palette is technically fixed, but users can still pin it under a name
+  // as a starting point, so we allow it; only disable when there's nothing
+  // to save (e.g. empty "used on canvas").
+  const canSave = paletteSize > 0;
+  const builtin = options.filter((o) => o.group === "builtin");
+  const custom = options.filter((o) => o.group === "custom");
+  return (
+    <div className="flex items-stretch gap-1 mb-2">
+      <select
+        aria-label="Palette source"
+        value={source}
+        onChange={(e) => onSource(e.target.value as PaletteSourceKey)}
+        className="flex-1 min-w-0 bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus cursor-pointer"
+      >
+        {builtin.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+        {custom.length > 0 && (
+          <optgroup label="Custom">
+            {custom.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+      <PaletteActionBtn
+        title="Save current palette as…"
+        onClick={onSave}
+        disabled={!canSave}
+      >
+        Save
+      </PaletteActionBtn>
+      <PaletteActionBtn
+        title={isCustom ? "Rename this palette" : "Only custom palettes can be renamed"}
+        onClick={onRename}
+        disabled={!isCustom}
+      >
+        Rename
+      </PaletteActionBtn>
+      <PaletteActionBtn
+        title={isCustom ? "Delete this palette" : "Only custom palettes can be deleted"}
+        onClick={onDelete}
+        disabled={!isCustom}
+        danger
+      >
+        ✕
+      </PaletteActionBtn>
+    </div>
+  );
+}
+
+function PaletteActionBtn({
+  children,
+  onClick,
+  title,
+  disabled,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  const dangerCls = danger
+    ? "hover:bg-danger-soft hover:text-danger hover:border-danger-line"
+    : "hover:bg-raised-hover";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className={`px-2 py-1.5 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground disabled:opacity-30 disabled:cursor-not-allowed shrink-0 ${dangerCls}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function AnnotationsSection({
