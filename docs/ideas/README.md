@@ -25,6 +25,7 @@ Each idea lives in its own file. Use [`_template.md`](_template.md) when adding 
 | [Custom ESP32 + HUB75 32×32 board](custom-led-panel-board.md) | Wild: finished-product LED panel — preflashed, sensored, 32×32, but open underneath | raw idea | wild, hardware, product, esp32, hub75, sensors, business |
 | [Mobile swipe controls](mobile-swipe-controls.md) | On touch devices, swipes drive the existing JoyButton interface | shipped (#17) | web-toolkit, simulator, mobile, ux, input |
 | [Letter mask generator](letter-mask-generator.md) | Separate tool that solves the mask layout from required phrases; SVG export for fabrication | raw idea | web-toolkit, letter-mask, wordclock, generator, svg, fabrication |
+| [Color palettes for the designer](color-palettes.md) | Dropdown to switch between default, imported, "used on canvas", and saved custom palettes | raw idea | web-toolkit, lumen-designer, ux, palette, persistence |
 
 <!-- When adding an idea:
 1. Copy _template.md to <slug>.md
