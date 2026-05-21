@@ -60,6 +60,7 @@ interface SpriteSetManifest {
  *  to make the set show up in the panel — no other wiring required. */
 const COLORFUL_MANIFEST_URLS: string[] = [
   "/sprites/8x8-demo/manifest.json",
+  "/sprites/8x8-food/manifest.json",
 ];
 
 /** Encoded "set:sprite" id used in the editor's selected-symbol state.
