@@ -99,8 +99,6 @@ export function SiteHeader() {
           ref={registerSlot}
           className="flex items-center gap-1.5 min-w-0"
         />
-
-        <div className="flex-1" />
       </div>
     </header>
   );
