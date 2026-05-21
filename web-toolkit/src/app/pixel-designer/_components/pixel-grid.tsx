@@ -38,6 +38,7 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
     ref,
   ) {
     const isMask = mode === "mask";
+    const isLed = mode === "led";
     const step = cellSize + CELL_GAP;
 
     const previewMap = new Map<number, { color: string; ghost: boolean }>();
@@ -95,6 +96,7 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
         const letter = isMask ? getCellLetter(config, x, y) : "";
         const classes = ["pd-cell"];
         if (isMask) classes.push("mask-mode");
+        if (isLed) classes.push("led-mode");
         if (color) classes.push("lit");
         if (isPreview) classes.push("preview");
         if (isGhost) classes.push("ghost");
@@ -103,7 +105,10 @@ export const PixelGrid = forwardRef<HTMLDivElement, PixelGridProps>(
         const style: React.CSSProperties & Record<string, string | undefined> = {};
         if (color) {
           style["--c"] = color;
-          if (!isMask) style.background = color;
+          // LED + mask modes drive the cell appearance entirely from CSS
+          // (stacked radial gradients / letter cutouts) using --c; only
+          // pixel mode wants a flat inline background.
+          if (!isMask && !isLed) style.background = color;
         }
         if (isGhost && ghostColor) {
           style["--gc"] = ghostColor;

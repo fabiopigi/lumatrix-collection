@@ -24,6 +24,13 @@ export function ModeToggle({
         Pixel
       </ModeButton>
       <ModeButton
+        on={mode === "led"}
+        onClick={() => mode !== "led" && onChange("led")}
+        title="LED mode mimics how the physical LUMATRIX looks — bright chip in the middle of each cell with the colour radiating outward."
+      >
+        LED
+      </ModeButton>
+      <ModeButton
         on={mode === "mask"}
         disabled={!maskAvailable}
         title={

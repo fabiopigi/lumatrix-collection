@@ -303,6 +303,71 @@ body {
   color: #18181d;
 }
 
+/* ------------------------------------------------------------
+   LED (realistic) render mode
+
+   Mimics the physical LUMATRIX: bright near-white LED chip in the
+   middle of each cell, color body radiating outward, darker corners
+   (the diffuser eats brightness at the edges), faint bloom into the
+   surrounding board. Cells use --c set per-cell by the render path
+   in pixel mode but DO NOT have an inline `background` — these
+   gradients drive the look instead.
+   ------------------------------------------------------------ */
+
+.sim-cell.led-mode,
+.pd-cell.led-mode {
+  background: #08080a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+/* LED chip + diffuser body. The first layer is a tight white hotspot
+   (the LED itself); the second is the saturated color body that
+   color-mixes down to a near-black at the cell corners. */
+.sim-cell.led-mode.lit {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0) 22%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      var(--c) 0%,
+      var(--c) 30%,
+      color-mix(in srgb, var(--c) 25%, #000) 100%
+    );
+  box-shadow:
+    0 0 18px var(--c),
+    0 0 6px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.pd-cell.led-mode.lit {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0) 22%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      var(--c) 0%,
+      var(--c) 32%,
+      color-mix(in srgb, var(--c) 25%, #000) 100%
+    );
+  box-shadow:
+    0 0 14px var(--c),
+    0 0 4px var(--c),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* LED mode shows the LED face, not the word-clock cutout — so any
+   letter the render path leaves in the cell stays invisible. */
+.sim-cell.led-mode .sim-letter,
+.pd-cell.led-mode .pd-letter {
+  display: none;
+}
+
 /* ============================================================
    LumenFlash — success celebration
    ============================================================ */

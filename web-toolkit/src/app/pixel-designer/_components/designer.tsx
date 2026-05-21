@@ -1482,7 +1482,13 @@ export function Designer() {
       else if (k === "s") handleSetTool("select");
       else if (k === "t") handleSetTool("text");
       else if (k === "m")
-        setMode((m) => (m === "pixel" && maskAvailable ? "mask" : "pixel"));
+        setMode((m) => {
+          // Cycle pixel → led → mask (when available) → pixel. With mask
+          // unavailable (display isn't 8×8) the cycle reduces to pixel ↔ led.
+          if (m === "pixel") return "led";
+          if (m === "led") return maskAvailable ? "mask" : "pixel";
+          return "pixel";
+        });
       else if (k === "x") setColor("#000000");
     };
     window.addEventListener("keydown", onKey);

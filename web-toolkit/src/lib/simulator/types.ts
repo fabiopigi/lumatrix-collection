@@ -1,6 +1,6 @@
 export type RGB = readonly [number, number, number];
 
-export type DisplayMode = "pixel" | "mask";
+export type DisplayMode = "pixel" | "mask" | "led";
 
 export type JoyButton = "up" | "down" | "left" | "right" | "center";
 

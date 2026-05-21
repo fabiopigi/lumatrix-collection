@@ -69,6 +69,13 @@ export function SidePanel(props: SidePanelProps) {
             Pixel
           </ToggleButton>
           <ToggleButton
+            on={props.mode === "led"}
+            onClick={() => props.onMode("led")}
+            title="LED mode mimics how the physical LUMATRIX looks — bright chip in the middle of each cell with the colour radiating outward."
+          >
+            LED
+          </ToggleButton>
+          <ToggleButton
             on={props.mode === "mask"}
             onClick={() => props.maskAvailable && props.onMode("mask")}
             disabled={!props.maskAvailable}
@@ -82,9 +89,9 @@ export function SidePanel(props: SidePanelProps) {
           </ToggleButton>
         </div>
         <Tip>
-          Mask mode renders each LED as its assigned letter glyph (defined in ⚙
-          Config → Letter mask). Blank cells show as a centered dot. Drawing
-          still works per pixel.
+          LED mode previews how the physical board looks; Mask mode renders
+          each LED as its assigned letter glyph (define one in ⚙ Config →
+          Letter mask). Drawing still works per pixel in every mode.
         </Tip>
       </Section>
 
