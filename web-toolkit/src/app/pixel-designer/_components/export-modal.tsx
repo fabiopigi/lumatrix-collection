@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { activeConfig } from "@/lib/pixel-designer/config";
+import { generateApp, slugifyModuleName } from "@/lib/pixel-designer/codegen";
 import {
   buildExportJSON,
   buildPresetExportJSON,
@@ -17,11 +18,26 @@ import {
 } from "@/lib/pixel-designer/share-link";
 import type { Design, Mode } from "@/lib/pixel-designer/types";
 import { HARDWARE_PRESETS, presetIdsInOrder } from "@/lib/hardware-presets";
+import {
+  readCustomPicoApps,
+  slugifyAppId,
+  writeCustomPicoApps,
+  type CustomPicoApp,
+} from "@/lib/pico/custom-apps";
+import {
+  generateUserAppId,
+  readUserApps,
+  writeUserApps,
+  type UserAppSource,
+} from "@/lib/simulator/user-apps";
 import { ModalShell } from "./modal-shell";
 
 interface ExportModalProps {
   open: boolean;
   design: Design;
+  /** Current design's name from the library — used as the default app name
+   *  in the Generate app section. "Scratch" / "Untitled" come through as-is. */
+  designName: string;
   activePage: number;
   activePreset: string;
   mode: Mode;
@@ -35,6 +51,7 @@ export function ExportModal(props: ExportModalProps) {
 
 function ExportModalInner({
   design,
+  designName,
   activePage,
   activePreset,
   mode,
@@ -194,6 +211,20 @@ function ExportModalInner({
           ×
         </button>
       </div>
+
+      <Section title="Generate app">
+        <GenerateAppRow
+          design={design}
+          designName={designName}
+          activePreset={activePreset}
+        />
+        <div className="text-[10.5px] text-fg-faint mt-1 px-1 leading-[1.4]">
+          Turns the pages (one frame each, in order) into a runnable
+          animation. Add to the simulator to try it, or to the flash wizard
+          for the Pico. For game logic or input handling, use Create
+          (LLM-assisted) instead.
+        </div>
+      </Section>
 
       <Section title="Share link">
         <ShareLinkRow design={design} />
@@ -380,6 +411,172 @@ function Row({
 function downloadJSON(obj: unknown, filename: string) {
   const json = JSON.stringify(obj, null, 2);
   const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function GenerateAppRow({
+  design,
+  designName,
+  activePreset,
+}: {
+  design: Design;
+  designName: string;
+  activePreset: string;
+}) {
+  const [name, setName] = useState(designName);
+  const [status, setStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "ok"; message: string }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  // Re-prime the name input whenever the source design changes (e.g. the
+  // user opens Export, then renames their design and reopens). The library
+  // already sanitises names so we don't need to here.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setName(designName);
+    setStatus({ kind: "idle" });
+  }, [designName]);
+
+  const tryGenerate = () => {
+    try {
+      return generateApp(design, activePreset, name);
+    } catch (err) {
+      setStatus({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  };
+
+  const handleAddToSimulator = () => {
+    const gen = tryGenerate();
+    if (!gen) return;
+    const list = readUserApps();
+    const now = Date.now();
+    const entry: UserAppSource = {
+      id: generateUserAppId(gen.name),
+      code: gen.js,
+      label: gen.name,
+      createdAt: now,
+      updatedAt: now,
+    };
+    writeUserApps([...list, entry]);
+    setStatus({
+      kind: "ok",
+      message: `Added "${gen.name}" to the simulator (${gen.frameCount} frame${gen.frameCount === 1 ? "" : "s"}).`,
+    });
+  };
+
+  const handleAddToFlash = () => {
+    const gen = tryGenerate();
+    if (!gen) return;
+    const list = readCustomPicoApps();
+    // Avoid id collisions with built-ins and other custom apps.
+    const baseId = slugifyAppId(gen.appId);
+    const taken = new Set(list.map((a) => a.id));
+    let id = baseId;
+    let n = 2;
+    while (taken.has(id)) id = `${baseId}_${n++}`;
+    const entry: CustomPicoApp = {
+      id,
+      name: gen.name,
+      contents: gen.py,
+    };
+    writeCustomPicoApps([...list, entry]);
+    setStatus({
+      kind: "ok",
+      message: `Added "${gen.name}" to the flash wizard.`,
+    });
+  };
+
+  const handleDownloadPy = () => {
+    const gen = tryGenerate();
+    if (!gen) return;
+    downloadText(gen.py, `${gen.appId}.py`, "text/x-python");
+    setStatus({
+      kind: "ok",
+      message: `Downloaded ${gen.appId}.py.`,
+    });
+  };
+
+  const canGenerate = useMemo(
+    () =>
+      design.pages.some((p) => p.variants[activePreset] !== undefined) &&
+      name.trim().length > 0,
+    [design, activePreset, name],
+  );
+
+  return (
+    <div className="flex flex-col gap-2 px-2.5 py-2 rounded border border-line-mute bg-sunken/30">
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor="generate-app-name"
+          className="text-[11px] text-fg-faint shrink-0"
+        >
+          Name
+        </label>
+        <input
+          id="generate-app-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Untitled animation"
+          maxLength={48}
+          className="flex-1 bg-sunken border border-edge text-foreground px-2 py-1 rounded text-xs outline-none focus:border-cta focus:bg-input-focus select-text"
+        />
+        <span
+          className="text-[10px] font-mono text-fg-faint shrink-0"
+          title="Module id used on the device + as the user-app slug"
+        >
+          {slugifyModuleName(name) || "—"}.py
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={handleAddToSimulator}
+          disabled={!canGenerate}
+          className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-cta text-cta-fg border border-cta font-semibold hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-cta"
+        >
+          Add to Simulator
+        </button>
+        <button
+          type="button"
+          onClick={handleAddToFlash}
+          disabled={!canGenerate}
+          className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raised"
+        >
+          Add to Flash
+        </button>
+        <button
+          type="button"
+          onClick={handleDownloadPy}
+          disabled={!canGenerate}
+          className="px-2.5 py-1 rounded text-[11px] cursor-pointer bg-raised border border-line-strong text-foreground hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raised"
+        >
+          Download .py
+        </button>
+      </div>
+      {status.kind === "ok" && (
+        <div className="text-[10.5px] text-accent">{status.message}</div>
+      )}
+      {status.kind === "error" && (
+        <div className="text-[10.5px] text-danger">{status.message}</div>
+      )}
+    </div>
+  );
+}
+
+function downloadText(text: string, filename: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

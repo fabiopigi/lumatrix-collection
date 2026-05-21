@@ -2348,6 +2348,7 @@ export function Designer() {
       <ExportModal
         open={exportOpen}
         design={design}
+        designName={currentRecord?.name ?? "Untitled animation"}
         activePage={currentPage}
         activePreset={activePreset}
         mode={mode}
