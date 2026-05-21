@@ -26,7 +26,8 @@ Each idea lives in its own file. Use [`_template.md`](_template.md) when adding 
 | [Mobile swipe controls](mobile-swipe-controls.md) | On touch devices, swipes drive the existing JoyButton interface | shipped (#17) | web-toolkit, simulator, mobile, ux, input |
 | [Letter mask generator](letter-mask-generator.md) | Separate tool that solves the mask layout from required phrases; SVG export for fabrication | raw idea | web-toolkit, letter-mask, wordclock, generator, svg, fabrication |
 | [Color palettes for the designer](color-palettes.md) | Dropdown to switch between default, "used on canvas", and saved custom palettes | shipped (#22) | web-toolkit, lumen-designer, ux, palette, persistence |
-| [Collapsible side panels](collapsible-side-panels.md) | Make the sidebar sections collapsible and move the play preview into one of them | raw idea | web-toolkit, lumen-designer, ux, sidebar, layout |
+| [Collapsible side panels](collapsible-side-panels.md) | Make the sidebar sections collapsible and move the play preview into one of them | shipped (#23) | web-toolkit, lumen-designer, ux, sidebar, layout |
+| [Sprite library](sprite-library.md) | Multiple sprite sets — monotone / colourful, 8×8 / 16×16 / 32×32, themed packs with attribution | raw idea | web-toolkit, lumen-designer, sprites, symbols, assets, attribution |
 
 <!-- When adding an idea:
 1. Copy _template.md to <slug>.md
