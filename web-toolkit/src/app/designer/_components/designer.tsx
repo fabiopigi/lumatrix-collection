@@ -56,7 +56,13 @@ import {
   renamePalette as renamePaletteRecord,
   savePalette as savePaletteRecord,
 } from "@/lib/pixel-designer/palette-library";
-import { symbolPoints } from "@/lib/pixel-designer/symbols";
+import { spritePointsAt } from "@/lib/pixel-designer/symbols";
+import {
+  loadAllSpriteSets,
+  type SpriteKey,
+  type SpriteSet,
+  spritePixelsByKey,
+} from "@/lib/pixel-designer/sprites";
 import type {
   Annotation,
   Config,
@@ -415,7 +421,11 @@ export function Designer() {
   const [mode, setMode] = useState<Mode>("pixel");
   const [font, setFont] = useState<FontKey>("3x5");
   const [text, setText] = useState("");
-  const [symbol, setSymbol] = useState<string | null>(null);
+  // `symbol` is now a sprite key in the form "<setId>:<spriteName>" (see
+  // sprites.ts `formatSpriteKey`). Kept as a single string so existing
+  // serialisation / preview state plumbing doesn't change.
+  const [symbol, setSymbol] = useState<SpriteKey | null>(null);
+  const [spriteSets, setSpriteSets] = useState<SpriteSet[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
@@ -700,6 +710,20 @@ export function Designer() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPanelStateBase(loadPanelState());
+  }, []);
+
+  // Resolve all sprite sets — the inline mono "Classic" set is synchronous,
+  // any PNG-backed sets decode async. Once loaded, the Sprites panel switches
+  // from the placeholder to the real grids. Cached at module scope (in
+  // sprites.ts), so navigating between pages doesn't re-decode.
+  useEffect(() => {
+    let cancelled = false;
+    loadAllSpriteSets().then((sets) => {
+      if (!cancelled) setSpriteSets(sets);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ============ autosave to the library ============
@@ -1179,15 +1203,25 @@ export function Designer() {
   const previewStamp = useCallback(
     (c: Point): Preview | null => {
       if (!symbol) return null;
+      const resolved = spritePixelsByKey(spriteSets, symbol);
+      if (!resolved) return null;
+      const points = spritePointsAt(
+        resolved.pixels,
+        resolved.size,
+        c.x,
+        c.y,
+        resolved.colorful,
+      );
       return {
-        points: symbolPoints(symbol, c.x, c.y).map((p) => ({
-          ...p,
-          color,
+        points: points.map((p) => ({
+          x: p.x,
+          y: p.y,
+          color: p.color ?? color,
           ghost: true,
         })),
       };
     },
-    [symbol, color],
+    [symbol, color, spriteSets],
   );
 
   const onMouseDown = useCallback(
@@ -1443,19 +1477,28 @@ export function Designer() {
             }
           });
         } else if (mode === "stamp-place" && symbol) {
-          const pts = symbolPoints(symbol, end.x, end.y);
-          writePixels((px) => {
-            for (const p of pts) {
-              if (
-                p.x < 0 ||
-                p.x >= config.width ||
-                p.y < 0 ||
-                p.y >= config.height
-              )
-                continue;
-              px[p.y * config.width + p.x] = color;
-            }
-          });
+          const resolved = spritePixelsByKey(spriteSets, symbol);
+          if (resolved) {
+            const pts = spritePointsAt(
+              resolved.pixels,
+              resolved.size,
+              end.x,
+              end.y,
+              resolved.colorful,
+            );
+            writePixels((px) => {
+              for (const p of pts) {
+                if (
+                  p.x < 0 ||
+                  p.x >= config.width ||
+                  p.y < 0 ||
+                  p.y >= config.height
+                )
+                  continue;
+                px[p.y * config.width + p.x] = p.color ?? color;
+              }
+            });
+          }
         }
       }
 
@@ -1487,6 +1530,7 @@ export function Designer() {
     previewText,
     pushHistory,
     shapePts,
+    spriteSets,
     symbol,
     text,
     tool,
@@ -2429,6 +2473,8 @@ export function Designer() {
               setSymbol(s);
               handleSetTool("stamp");
             }}
+            spriteSets={spriteSets}
+            maxSpriteSize={Math.min(config.width, config.height)}
             annotations={currentAnnotations}
             selection={selection}
             showAnnotations={showAnnotations}

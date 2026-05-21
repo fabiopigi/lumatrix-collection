@@ -1,7 +1,11 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
-import { SYMBOLS } from "@/lib/pixel-designer/symbols";
+import type {
+  SpriteKey,
+  SpriteSet,
+} from "@/lib/pixel-designer/sprites";
+import { formatSpriteKey, parseSpriteKey } from "@/lib/pixel-designer/sprites";
 import type {
   Annotation,
   Config,
@@ -57,8 +61,16 @@ interface SidePanelProps {
   onFont: (f: FontKey) => void;
   onText: (t: string) => void;
 
-  symbol: string | null;
-  onSymbol: (s: string) => void;
+  symbol: SpriteKey | null;
+  onSymbol: (s: SpriteKey) => void;
+  /** All available sprite sets (Classic mono + any PNG-backed sets the
+   *  loader resolved). Empty array while the async PNGs are still
+   *  decoding — the Sprites panel falls back to a "Loading…" hint. */
+  spriteSets: SpriteSet[];
+  /** Maximum sprite cell size that fits the active canvas. Sets larger
+   *  than this are hidden from the picker — the user can switch hardware
+   *  variants to access bigger sprite packs. */
+  maxSpriteSize: number;
 
   annotations: Annotation[];
   selection: Selection | null;
@@ -272,24 +284,14 @@ export function SidePanel(props: SidePanelProps) {
         />
       )}
 
-      <Section id="symbols" title="Symbols" hint="click then click grid">
-        <div className="flex flex-wrap gap-[5px]">
-          {Object.entries(SYMBOLS).map(([key, rows]) => (
-            <button
-              key={key}
-              type="button"
-              title={key}
-              onClick={() => props.onSymbol(key)}
-              className={`w-10 h-10 shrink-0 rounded border bg-panel-2 cursor-pointer p-[5px] flex items-center justify-center ${
-                props.symbol === key
-                  ? "border-accent bg-active"
-                  : "border-line-strong hover:bg-raised hover:border-line-stronger"
-              }`}
-            >
-              <SymbolSvg rows={rows} />
-            </button>
-          ))}
-        </div>
+      <Section id="symbols" title="Sprites" hint="click then click grid">
+        <SpritesPanel
+          sets={props.spriteSets}
+          maxSize={props.maxSpriteSize}
+          symbol={props.symbol}
+          color={props.color}
+          onSymbol={props.onSymbol}
+        />
       </Section>
 
       <AnnotationsSection
@@ -430,23 +432,185 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SymbolSvg({ rows }: { rows: string[] }) {
-  const w = rows[0].length;
-  const h = rows.length;
+function SpritesPanel({
+  sets,
+  maxSize,
+  symbol,
+  color,
+  onSymbol,
+}: {
+  sets: SpriteSet[];
+  maxSize: number;
+  symbol: SpriteKey | null;
+  color: string;
+  onSymbol: (s: SpriteKey) => void;
+}) {
+  // Hide sets larger than the active variant — a 16×16 sprite can't fit on
+  // 8×8 hardware. Switching variants in the header brings them back.
+  const visible = sets.filter((s) => s.size <= maxSize);
+
+  // Pick the active set: follow `symbol`'s setId when present, otherwise
+  // default to the first visible set. If the persisted set is hidden by
+  // the size filter, fall through to the default.
+  const symbolSetId = symbol ? parseSpriteKey(symbol).setId : null;
+  const fromSymbol =
+    symbolSetId ? visible.find((s) => s.id === symbolSetId) : undefined;
+  const [picked, setPicked] = useState<string | null>(null);
+  const activeId =
+    (picked && visible.find((s) => s.id === picked)?.id) ??
+    fromSymbol?.id ??
+    visible[0]?.id ??
+    null;
+  const active = visible.find((s) => s.id === activeId) ?? null;
+
+  if (sets.length === 0) {
+    return (
+      <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
+        Loading sprite sets…
+      </div>
+    );
+  }
+  if (!active) {
+    return (
+      <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
+        No sprite sets fit a {maxSize}×{maxSize} canvas yet. Switch to a larger
+        variant in the header to access bigger sets.
+      </div>
+    );
+  }
+
+  // Sort options so the dropdown is grouped by size; pick a representative
+  // tint colour for mono-set thumbnails so the buttons read like icons even
+  // before the user picks one.
+  const optionsBySize = new Map<number, SpriteSet[]>();
+  for (const s of visible) {
+    if (!optionsBySize.has(s.size)) optionsBySize.set(s.size, []);
+    optionsBySize.get(s.size)!.push(s);
+  }
+  const sortedSizes = [...optionsBySize.keys()].sort((a, b) => a - b);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <select
+        aria-label="Sprite set"
+        value={active.id}
+        onChange={(e) => setPicked(e.target.value)}
+        className="bg-sunken border border-edge text-foreground px-2 py-1.5 rounded text-xs outline-none focus:border-cta focus:bg-input-focus cursor-pointer"
+      >
+        {sortedSizes.map((size) => (
+          <optgroup key={size} label={`${size}×${size}`}>
+            {optionsBySize.get(size)!.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+
+      <div className="flex flex-wrap gap-[5px]">
+        {active.sprites.map((sprite) => {
+          const key = formatSpriteKey(active.id, sprite.name);
+          const selected = symbol === key;
+          return (
+            <button
+              key={sprite.name}
+              type="button"
+              title={sprite.name}
+              onClick={() => onSymbol(key)}
+              className={`w-10 h-10 shrink-0 rounded border bg-panel-2 cursor-pointer p-[5px] flex items-center justify-center ${
+                selected
+                  ? "border-accent bg-active"
+                  : "border-line-strong hover:bg-raised hover:border-line-stronger"
+              }`}
+            >
+              <SpriteSvg
+                pixels={sprite.pixels}
+                size={active.size}
+                tint={active.colorful ? null : color}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {(active.attribution || active.license) && (
+        <AttributionLine
+          name={active.name}
+          license={active.license}
+          attribution={active.attribution}
+          url={active.attributionUrl}
+        />
+      )}
+    </div>
+  );
+}
+
+function SpriteSvg({
+  pixels,
+  size,
+  tint,
+}: {
+  pixels: (string | null)[];
+  size: number;
+  /** Mono sets render every filled cell in this colour (matches "stamp uses
+   *  the active brush colour" behaviour). Pass null for colourful sets so
+   *  each cell shows its own hex. */
+  tint: string | null;
+}) {
   const rects: React.ReactNode[] = [];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (rows[y][x] === "X") {
-        rects.push(
-          <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill="#cce6ff" />,
-        );
-      }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const c = pixels[y * size + x];
+      if (!c) continue;
+      rects.push(
+        <rect
+          key={`${x},${y}`}
+          x={x}
+          y={y}
+          width={1}
+          height={1}
+          fill={tint ?? c}
+        />,
+      );
     }
   }
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="block w-full h-full">
+    <svg viewBox={`0 0 ${size} ${size}`} className="block w-full h-full">
       {rects}
     </svg>
+  );
+}
+
+function AttributionLine({
+  name,
+  license,
+  attribution,
+  url,
+}: {
+  name: string;
+  license?: string;
+  attribution?: string;
+  url?: string;
+}) {
+  const parts = [name];
+  if (license) parts.push(license);
+  if (attribution) parts.push(attribution);
+  return (
+    <div className="text-[10px] text-fg-faint px-1 leading-[1.4]">
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="hover:text-foreground underline-offset-2 hover:underline"
+        >
+          {parts.join(" · ")} ↗
+        </a>
+      ) : (
+        parts.join(" · ")
+      )}
+    </div>
   );
 }
 

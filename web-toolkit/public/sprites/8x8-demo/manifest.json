@@ -1,0 +1,52 @@
+{
+  "id": "8x8-demo",
+  "name": "Demo (8×8 colourful)",
+  "size": 8,
+  "colorful": true,
+  "sheet": "/sprites/8x8-demo/sheet.png",
+  "columns": 4,
+  "sprites": [
+    {
+      "name": "heart",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "name": "smiley",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "name": "star",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "name": "ghost",
+      "row": 0,
+      "col": 3
+    },
+    {
+      "name": "bug",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "name": "coin",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "name": "apple",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "name": "mushroom",
+      "row": 1,
+      "col": 3
+    }
+  ],
+  "license": "Stand-in (placeholder asset)",
+  "attribution": "LumenLab"
+}
