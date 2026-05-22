@@ -54,6 +54,12 @@ interface SidePanelProps {
   onRenamePalette: () => void;
   /** Delete the active palette. Parent only wires this when source is custom. */
   onDeletePalette: () => void;
+  /** Append the active brush colour to the current custom palette. Parent
+   *  silently no-ops on default / used / duplicates. */
+  onAddColorToPalette: () => void;
+  /** Remove a colour from the current custom palette. Wired only for the
+   *  custom source. */
+  onRemoveColorFromPalette: (color: string) => void;
   onColor: (c: string) => void;
 
   font: FontKey;
@@ -210,33 +216,94 @@ export function SidePanel(props: SidePanelProps) {
           onRename={props.onRenamePalette}
           onDelete={props.onDeletePalette}
         />
-        {props.palette.length === 0 ? (
-          <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
-            {props.paletteSource === "used"
-              ? "No colours on the canvas yet — paint something to populate this palette."
-              : "This palette is empty."}
-          </div>
-        ) : (
-          <div className="grid grid-cols-8 gap-1">
-            {props.palette.map((c, i) => {
-              const selected = c.toLowerCase() === props.color.toLowerCase();
-              return (
+        {(() => {
+          const isCustomPalette = props.paletteSource.startsWith("custom:");
+          const isDuplicate = props.palette.some(
+            (c) => c.toLowerCase() === props.color.toLowerCase(),
+          );
+          const showEmpty = props.palette.length === 0 && !isCustomPalette;
+          if (showEmpty) {
+            return (
+              <div className="text-[10.5px] text-fg-faint italic px-1 py-2">
+                {props.paletteSource === "used"
+                  ? "No colours on the canvas yet — paint something to populate this palette."
+                  : "This palette is empty."}
+              </div>
+            );
+          }
+          return (
+            <div className="grid grid-cols-8 gap-1">
+              {props.palette.map((c, i) => {
+                const selected = c.toLowerCase() === props.color.toLowerCase();
+                if (!isCustomPalette) {
+                  return (
+                    <button
+                      key={`${c}-${i}`}
+                      type="button"
+                      onClick={() => props.onColor(c)}
+                      title={c.toUpperCase()}
+                      style={{ background: c }}
+                      className={`aspect-square rounded-md border cursor-pointer transition-transform hover:scale-110 ${
+                        selected
+                          ? "border-accent shadow-[0_0_0_2px_#6cf,0_0_8px_rgba(108,204,255,0.4)]"
+                          : "border-white/[0.06]"
+                      }`}
+                    />
+                  );
+                }
+                // Custom palette: same swatch + a hover ✕ in the top-right
+                // for one-click removal. The X is its own button so clicking
+                // it doesn't also fire the swatch-select.
+                return (
+                  <div
+                    key={`${c}-${i}`}
+                    className="relative group aspect-square"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => props.onColor(c)}
+                      title={c.toUpperCase()}
+                      style={{ background: c }}
+                      className={`absolute inset-0 rounded-md border cursor-pointer transition-transform group-hover:scale-110 ${
+                        selected
+                          ? "border-accent shadow-[0_0_0_2px_#6cf,0_0_8px_rgba(108,204,255,0.4)]"
+                          : "border-white/[0.06]"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        props.onRemoveColorFromPalette(c);
+                      }}
+                      aria-label={`Remove ${c.toUpperCase()} from palette`}
+                      title={`Remove ${c.toUpperCase()}`}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sunken border border-line-strong text-[10px] leading-none text-fg-2 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-danger hover:border-danger-line cursor-pointer transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+              {isCustomPalette && (
                 <button
-                  key={`${c}-${i}`}
                   type="button"
-                  onClick={() => props.onColor(c)}
-                  title={c.toUpperCase()}
-                  style={{ background: c }}
-                  className={`aspect-square rounded-md border cursor-pointer transition-transform hover:scale-110 ${
-                    selected
-                      ? "border-accent shadow-[0_0_0_2px_#6cf,0_0_8px_rgba(108,204,255,0.4)]"
-                      : "border-white/[0.06]"
-                  }`}
-                />
-              );
-            })}
-          </div>
-        )}
+                  onClick={props.onAddColorToPalette}
+                  disabled={isDuplicate}
+                  title={
+                    isDuplicate
+                      ? `${props.color.toUpperCase()} is already in this palette`
+                      : `Add ${props.color.toUpperCase()} to palette`
+                  }
+                  aria-label="Add current colour to palette"
+                  className="aspect-square rounded-md border border-dashed border-line-strong text-fg-faint text-lg leading-none flex items-center justify-center cursor-pointer hover:border-cta hover:text-cta disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-line-strong disabled:hover:text-fg-faint"
+                >
+                  +
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </Section>
 
       <Section id="text" title="Text" hint="type then click on grid">

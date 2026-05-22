@@ -48,7 +48,9 @@ import {
   usedOnCanvasColors,
 } from "@/lib/pixel-designer/palette";
 import {
+  addColorToPalette,
   deletePalette as deletePaletteRecord,
+  removeColorFromPalette,
   listPalettes,
   loadPaletteLibrary,
   nextUntitledName as nextUntitledPaletteName,
@@ -2093,6 +2095,23 @@ export function Designer() {
     setDeletePaletteOpen(false);
   }, [paletteSource, setPaletteLibrary]);
 
+  const handleAddColorToPalette = useCallback(() => {
+    if (!paletteLibraryRef.current) return;
+    if (!paletteSource.startsWith("custom:")) return;
+    const id = paletteSource.slice("custom:".length);
+    setPaletteLibrary((lib) => addColorToPalette(lib, id, color));
+  }, [paletteSource, color, setPaletteLibrary]);
+
+  const handleRemoveColorFromPalette = useCallback(
+    (removed: string) => {
+      if (!paletteLibraryRef.current) return;
+      if (!paletteSource.startsWith("custom:")) return;
+      const id = paletteSource.slice("custom:".length);
+      setPaletteLibrary((lib) => removeColorFromPalette(lib, id, removed));
+    },
+    [paletteSource, setPaletteLibrary],
+  );
+
   // ============ derived UI ============
 
   const stCell = hover ? `${hover.x},${hover.y}` : "—";
@@ -2460,6 +2479,8 @@ export function Designer() {
             onSavePalette={() => setSavePaletteOpen(true)}
             onRenamePalette={() => setRenamePaletteOpen(true)}
             onDeletePalette={() => setDeletePaletteOpen(true)}
+            onAddColorToPalette={handleAddColorToPalette}
+            onRemoveColorFromPalette={handleRemoveColorFromPalette}
             onColor={setColor}
             font={font}
             text={text}
