@@ -130,6 +130,60 @@ export function deletePalette(
   return next;
 }
 
+/** Append a colour to a custom palette. Compares case-insensitively against
+ *  existing colours and silently no-ops on duplicates so clicking "+ Add"
+ *  twice with the same active colour doesn't bloat the swatch grid. */
+export function addColorToPalette(
+  library: PaletteLibrary,
+  id: string,
+  color: string,
+): PaletteLibrary {
+  const record = library.palettes[id];
+  if (!record) return library;
+  const normalized = color.toLowerCase();
+  if (record.colors.some((c) => c.toLowerCase() === normalized)) {
+    return library;
+  }
+  const next: PaletteLibrary = {
+    ...library,
+    palettes: {
+      ...library.palettes,
+      [id]: {
+        ...record,
+        colors: [...record.colors, color],
+        updatedAt: now(),
+      },
+    },
+  };
+  savePaletteLibrary(next);
+  return next;
+}
+
+/** Remove the first colour matching `color` (case-insensitive) from a custom
+ *  palette. No-ops when nothing matches so the caller doesn't have to know. */
+export function removeColorFromPalette(
+  library: PaletteLibrary,
+  id: string,
+  color: string,
+): PaletteLibrary {
+  const record = library.palettes[id];
+  if (!record) return library;
+  const normalized = color.toLowerCase();
+  const idx = record.colors.findIndex((c) => c.toLowerCase() === normalized);
+  if (idx < 0) return library;
+  const colors = record.colors.slice();
+  colors.splice(idx, 1);
+  const next: PaletteLibrary = {
+    ...library,
+    palettes: {
+      ...library.palettes,
+      [id]: { ...record, colors, updatedAt: now() },
+    },
+  };
+  savePaletteLibrary(next);
+  return next;
+}
+
 export function nextUntitledName(library: PaletteLibrary): string {
   return uniqueName(library, "Untitled palette");
 }
